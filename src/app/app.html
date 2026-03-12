@@ -1,0 +1,40 @@
+<main xmlns="http://www.w3.org/1999/html">
+  <div class="header">
+    <h1 class="form-h1">Chat</h1>
+    @if (inChat()) {
+      <input id="comment" type="text" [(ngModel)]="comment" (keyup.enter)="sendComment($event)"/>
+      <button (click)="leaveChat()">Leave room</button>
+    }
+    @else {
+      <div class="name-email">
+        <label for="name">Name</label>
+        <input id="name" type="text" [(ngModel)]="name"/>
+        <label for="name">Email</label>
+        <input id="name" type="text" placeholder="optional" [(ngModel)]="email"/>
+      </div>
+      <button (click)="enterChat()" [disabled]="!name().trim()">Enter room</button>
+    }
+  </div>
+  <div class="participants">
+    <span>Participants:</span>
+    @for (participant of participants(); track participant) {
+      <span class="participant">{{ participant }}</span>
+    }
+  </div>
+  <div class="message-list">
+    @for (message of messages(); track message) {
+      <div class="name">
+        <span [style]="message.style" [style.background-color]="getTextBackground(message.style)">{{ message.name }}</span>
+        @if (message.trip) {
+          <span class="trip">{{ message.trip }}</span>
+        }
+        @if (message.timestamp) {
+          <span class="time">{{ message.timestamp }}</span>
+        }
+      </div>
+      <div class="bubble" [innerHTML]="message.text"
+           [style]="message.style" [style.background-color]="getTextBackground(message.style)"></div>
+    }
+  </div>
+</main>
+<router-outlet />

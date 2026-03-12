@@ -1,0 +1,81 @@
+main {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh);
+  margin: 0 10px;
+}
+
+.header {
+  box-sizing: border-box;
+  flex-shrink: 0;
+
+  .name-email {
+    align-items: baseline;
+    display: inline-grid;
+    gap: 0.25em;
+    grid-template-columns: auto auto
+  }
+}
+
+.participants {
+  align-items: baseline;
+  border-bottom: 1px solid #ccc;
+  border-top: 1px solid #ccc;
+  box-sizing: border-box;
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  margin: 0.5em 0;
+  padding: 0.5em 0;
+
+  .participant {
+    background-color: #ccc;
+    border-radius: 4px;
+    padding: 4px;
+  }
+}
+
+.message-list {
+  flex: 1;
+  overflow-y: scroll;
+}
+
+.bubble {
+  background-color: white;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  padding: 10px;
+  width: fit-content;
+}
+
+.name {
+  align-items: baseline;
+  display: flex;
+  font-size: 0.9em;
+  font-weight: bold;
+  gap: 0;
+  margin-left: 10px;
+
+  > span {
+    border-radius: 4px 4px 0 0;
+    padding: 4px;
+  }
+}
+
+.trip {
+  font-weight: normal;
+  line-height: 1;
+  opacity: 0.40;
+
+  &::before {
+    content: "⬥";
+  }
+}
+
+.time {
+  font-weight: normal;
+  line-height: 1;
+  margin-left: 1em;
+  opacity: 0.60;
+}
