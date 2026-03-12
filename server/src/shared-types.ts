@@ -13,7 +13,8 @@ export interface Messages {
 }
 
 export interface Preferences {
-  color: string;
+  color: number;
   email: string;
+  localTime: boolean;
   name: string;
 }

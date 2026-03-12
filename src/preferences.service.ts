@@ -6,7 +6,7 @@ import { Preferences } from '../server/src/shared-types';
   providedIn: 'root',
 })
 export class PreferencesService {
-  private prefs: Preferences = { color: '#000000', email: '', name: ''};
+  private prefs: Preferences = { color: 0, email: '', localTime: true, name: ''};
 
   constructor() {
     const prefsStr = localStorage.getItem('gchat');

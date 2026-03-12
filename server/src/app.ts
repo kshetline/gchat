@@ -70,24 +70,37 @@ async function getMessages(name: string): Promise<Messages> {
   return { messages, participants, temp: messageRows[0] };
 }
 
-async function enterChat(sesh: string, name: string, email: string): Promise<void> {
+async function loadEnterForm(page: puppeteer.Page): Promise<void> {
+  await page.goto(`http://${domain}/comchat.cgi?mode=form&nam=&eml=&col=&retime=40&line=20`);
+  await page.waitForSelector('form');
+  await page.$eval('form', form => form.setAttribute('target', '_self'));
+}
+
+async function enterChat(sesh: string, name: string, email: string, color: number): Promise<void> {
   const page = sessions.get(sesh).page;
 
   await page.waitForSelector('input[name="name"]');
   await page.type('input[name="name"]', name);
   await page.type('input[name="email"]', email || '');
-  await page.click('input[type="submit"]');
+  await page.$eval(`input[type="radio"][value="${color}"]`, btn => btn.click());
+  await page.$eval('input[type="submit"]', btn => btn.click());
   await page.waitForSelector('input[name="comment"]');
+  await page.$eval('form', form => form.setAttribute('target', '_blank'));
 }
 
-async function leaveChat(name: string): Promise<void> {
-  await axios.get(`https://${domain}/comchat.cgi`, { params: { mode: 'out', name } });
+async function leaveChat(sesh: string): Promise<void> {
+  const page = sessions.get(sesh).page;
+
+  await page.waitForSelector('input[type="button"]');
+  await page.$eval('input[type="submit"]', btn => btn.click());
+  await loadEnterForm(page);
 }
 
-async function sendMessage(sesh: string, comment: string): Promise<void> {
+async function sendMessage(sesh: string, comment: string, color: number): Promise<void> {
   const page = sessions.get(sesh).page;
 
   await page.waitForSelector('input[name="comment"]');
+  await page.$eval('select[name="color"]', (sel, c) => sel.value = c, color);
   await page.type('input[name="comment"]', comment);
   await page.focus('input[name="comment"]');
   await page.keyboard.press('Enter');
@@ -107,9 +120,10 @@ app.use(async (req, _res, next) => {
     sesh = { browser: await puppeteer.launch() };
     sessions.set(req.sessionID, sesh);
     sesh.page = await sesh.browser.newPage();
-    await sesh.page.goto(`http://${domain}/comchat.cgi?mode=form&nam=&eml=&col=&retime=40&line=20`);
-    await sesh.page.waitForSelector('form');
-    await sesh.page.$eval('form', form => form.setAttribute('target', '_self'));
+    sesh.page.on('console', msg => {
+      console.log('Puppeteer %s: %s', msg.type, msg.text());
+    });
+    await loadEnterForm(sesh.page);
   }
 
   next();
@@ -126,16 +140,18 @@ app.get('/api/messages', async (req, res) => {
 });
 
 app.post('/api/enter', async (req, res) => {
-  await enterChat(req.sessionID, (req.query as any).name, (req.query as any).email);
+  const q = req.query as any;
+
+  await enterChat(req.sessionID, q.name, q.email, q.color);
   res.send('null');
 });
 
 app.post('/api/leave', async (req, res) => {
-  await leaveChat((req.query as any).name);
+  await leaveChat(req.sessionID);
   res.send('null');
 });
 
 app.post('/api/send', async (req, res) => {
-  await sendMessage(req.sessionID, (req.query as any).comment);
+  await sendMessage(req.sessionID, (req.query as any).comment, (req.query as any).color);
   res.send('null');
 });

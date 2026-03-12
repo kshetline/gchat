@@ -6,13 +6,32 @@
       <button (click)="leaveChat()">Leave room</button>
     }
     @else {
-      <div class="name-email">
-        <label for="name">Name</label>
-        <input id="name" type="text" [(ngModel)]="name"/>
-        <label for="name">Email</label>
-        <input id="name" type="text" placeholder="optional" [(ngModel)]="email"/>
+      <div class="entry-panel">
+        <div class="name-email">
+          <label for="name">Name</label>
+          <input id="name" type="text" [(ngModel)]="name"/>
+          <label for="name">Email</label>
+          <input id="name" type="text" placeholder="optional" [(ngModel)]="email"/>
+        </div>
+        <button (click)="enterChat()" [disabled]="!name().trim()">Enter room</button>
+        <div class="color-selector">
+          <div class="cs-title">- select text color -</div>
+          <div class="flex-break"></div>
+          @for (buttonColor of colors; track buttonColor; let i = $index) {
+            @if (!buttonColor) {
+              <div class="flex-break"></div>
+            }
+            @else {
+              <input type="radio" class="text-color" name="text-color" [style.color]="buttonColor" [value]="i"
+                [(ngModel)]="color" (change)="updateColor()">
+            }
+          }
+        </div>
+        <div class="label-pair">
+          <input id="local-time" type="checkbox" [(ngModel)]="localTime">
+          <label for="local-time">Local time</label>
+        </div>
       </div>
-      <button (click)="enterChat()" [disabled]="!name().trim()">Enter room</button>
     }
   </div>
   <div class="participants">
@@ -21,7 +40,7 @@
       <span class="participant">{{ participant }}</span>
     }
   </div>
-  <div class="message-list">
+  <div class="message-list" id="message-list">
     @for (message of messages(); track message) {
       <div class="name">
         <span [style]="message.style" [style.background-color]="getTextBackground(message.style)">{{ message.name }}</span>
@@ -29,7 +48,7 @@
           <span class="trip">{{ message.trip }}</span>
         }
         @if (message.timestamp) {
-          <span class="time">{{ message.timestamp }}</span>
+          <span class="time">{{ localTime() ? formatLocal(message.timestamp) : message.timestamp }}</span>
         }
       </div>
       <div class="bubble" [innerHTML]="message.text"
@@ -37,4 +56,4 @@
     }
   </div>
 </main>
-<router-outlet />
+<router-outlet/>

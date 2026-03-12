@@ -5,15 +5,47 @@ main {
   margin: 0 10px;
 }
 
+.text-color {
+  appearance: none;
+  border-radius: 50%;
+  background-color: currentColor;
+  border: 1px solid currentColor;
+  cursor: pointer;
+  height: 1.2em;
+  width: 1.2em;
+
+  &:checked {
+    outline: 3px solid currentColor;
+  }
+}
+
 .header {
   box-sizing: border-box;
   flex-shrink: 0;
+
+  .entry-panel {
+    align-items: flex-start;
+    display: flex;
+    gap: 0.5em;
+  }
 
   .name-email {
     align-items: baseline;
     display: inline-grid;
     gap: 0.25em;
     grid-template-columns: auto auto
+  }
+
+  .color-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1px;
+    justify-content: center;
+    width: 16em;
+
+    .cs-title {
+      font-size: 0.8em;
+    }
   }
 }
 

@@ -37,3 +37,14 @@ body {
 .fontSize5 {
   font-size: 1.5em;
 }
+
+.flex-break {
+  flex-basis: 100%;
+  width: 0;
+}
+
+.label-pair {
+  align-items: center;
+  display: flex;
+  gap: 0.25em;
+}
