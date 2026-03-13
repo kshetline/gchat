@@ -1,12 +1,12 @@
 <main xmlns="http://www.w3.org/1999/html">
   <div class="header">
     <h1 class="form-h1">Chat</h1>
-    @if (inChat()) {
-      <input id="comment" type="text" [(ngModel)]="comment" (keyup.enter)="sendComment($event)"/>
-      <button (click)="leaveChat()">Leave room</button>
-    }
-    @else {
-      <div class="entry-panel">
+    <div class="entry-panel">
+      @if (inChat()) {
+        <input id="comment" type="text" [(ngModel)]="comment" (keyup.enter)="sendComment($event)"/>
+        <button (click)="leaveChat()">Leave room</button>
+      }
+      @else {
         <div class="name-email">
           <label for="name">Name</label>
           <input id="name" type="text" [(ngModel)]="name"/>
@@ -27,12 +27,22 @@
             }
           }
         </div>
+      }
+      <div class="option-block">
         <div class="label-pair">
-          <input id="local-time" type="checkbox" [(ngModel)]="localTime">
+          <input id="notify-sound" type="checkbox" [(ngModel)]="notifySound" (change)="toggleNotifySound()">
+          <label for="notify-sound">Notification sound</label>
+        </div>
+        <div class="label-pair">
+          <input id="local-time" type="checkbox" [(ngModel)]="localTime" (change)="toggleLocalTime()">
           <label for="local-time">Local time</label>
         </div>
+        <div class="label-pair">
+          <input id="new-on-bottom" type="checkbox" [(ngModel)]="newOnBottom" (change)="toggleMessageOrder()">
+          <label for="new-on-bottom">New messages at bottom</label>
+        </div>
       </div>
-    }
+    </div>
   </div>
   <div class="participants">
     <span>Participants:</span>
@@ -41,9 +51,10 @@
     }
   </div>
   <div class="message-list" id="message-list">
-    @for (message of messages(); track message) {
+    @for (message of messages(); track message.hash) {
       <div class="name">
-        <span [style]="message.style" [style.background-color]="getTextBackground(message.style)">{{ message.name }}</span>
+        <span [style]="message.style" [style.background-color]="getTextBackground(message.style)">{{
+            message.name }}@if (message.email) { &nbsp;<a class="email-link" [href]="message.email">📫</a> }</span>
         @if (message.trip) {
           <span class="trip">{{ message.trip }}</span>
         }

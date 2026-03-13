@@ -1,12 +1,14 @@
 import { Injectable } from '@angular/core';
-import { clone, throttle } from '@tubular/util';
+import { clone, forEach, throttle } from '@tubular/util';
 import { Preferences } from '../server/src/shared-types';
+
+const defaultPrefs: Preferences = { color: 0, email: '', localTime: true, name: '', newOnBottom: true, notifySound: true};
 
 @Injectable({
   providedIn: 'root',
 })
 export class PreferencesService {
-  private prefs: Preferences = { color: 0, email: '', localTime: true, name: ''};
+  private prefs = clone(defaultPrefs);
 
   constructor() {
     const prefsStr = localStorage.getItem('gchat');
@@ -17,6 +19,14 @@ export class PreferencesService {
 
         if (!this.prefs || (typeof this.prefs !== 'object'))
           this.prefs = undefined;
+        else {
+          const prefs = this.prefs as any;
+
+          forEach(defaultPrefs as Record<string, any>, (key, value) => {
+            if (prefs[key] === undefined || typeof prefs[key] !== typeof value)
+              prefs[key] = value;
+          });
+        }
       }
       catch (err) {}
     }

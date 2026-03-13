@@ -1,4 +1,6 @@
 export interface Message {
+  email?: string;
+  hash: string;
   name: string;
   style: string;
   text: string;
@@ -17,4 +19,6 @@ export interface Preferences {
   email: string;
   localTime: boolean;
   name: string;
+  newOnBottom: boolean;
+  notifySound: boolean;
 }

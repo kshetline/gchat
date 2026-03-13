@@ -6,7 +6,7 @@ import { HtmlParser } from 'fortissimo-html';
 import { DomElement, DomNode } from 'fortissimo-html/dist/dom';
 import * as puppeteer from 'puppeteer';
 import { Message, Messages } from './shared-types';
-import { encodeForUri, toBoolean, toInt } from '@tubular/util';
+import { checksum53, encodeForUri, toBoolean, toInt } from '@tubular/util';
 
 interface SessionInfo {
   browser?: puppeteer.Browser;
@@ -48,16 +48,26 @@ function extractMessage(messageRow: DomNode): Message {
   const text = getTextAndMarkup(messageRow.querySelector('.messageComment').children);
   const nameElem = messageRow.querySelector('.messageName');
   const style = nameElem?.valuesLookup['style'];
-  const name = (nameElem?.children[1] as DomNode).children[0]?.content;
-  const timestamp = messageRow.querySelector('.messageDate').children[0]?.content?.slice(1, -1)
-    .replace('-', 'T').replace(/\//g, '-').replace(/\b(\d)\b/g, '0$1');
-  const trip = (nameElem?.children[2] as DomNode)?.content?.substring(1);
+  let nameIndex = 1;
+  let email: string;
+  const firstNode = (nameElem?.children?.at(0) as DomNode);
 
-  return { name, style, text, timestamp, trip };
+  if (firstNode?.tag === 'a') {
+    email = firstNode.valuesLookup['href'];
+    ++nameIndex;
+  }
+
+  const name = (nameElem?.children?.at(nameIndex) as DomNode)?.children?.at(0)?.content;
+  const timestamp = messageRow.querySelector('.messageDate')?.children?.at(0)?.content?.slice(1, -1)
+    .replace('-', 'T').replace(/\//g, '-').replace(/\b(\d)\b/g, '0$1');
+  const trip = (nameElem?.children?.at(nameIndex + 1) as DomNode)?.content?.substring(1);
+  const hash = checksum53(`${name};${trip || ''};${timestamp}`);
+
+  return { email, hash, name, style, text, timestamp, trip };
 }
 
 async function getMessages(name: string): Promise<Messages> {
-  const url = `https://${domain}/comchat.cgi?retime=20&lines=30&name=${encodeForUri(name, true)}`;
+  const url = `https://${domain}/comchat.cgi?retime=20&lines=200&name=${encodeForUri(name, true)}`;
   const raw = (await axios.get(url)).data;
   const dom = parser.parse(raw).domRoot;
   const body = dom.querySelector('body');
@@ -85,7 +95,7 @@ async function enterChat(sesh: string, name: string, email: string, color: numbe
   await page.$eval(`input[type="radio"][value="${color}"]`, btn => btn.click());
   await page.$eval('input[type="submit"]', btn => btn.click());
   await page.waitForSelector('input[name="comment"]');
-  await page.$eval('form', form => form.setAttribute('target', '_blank'));
+  await page.$eval('form', form => form.setAttribute('target', '_self'));
 }
 
 async function leaveChat(sesh: string): Promise<void> {

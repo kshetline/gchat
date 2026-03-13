@@ -2,7 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { Message, Messages, Preferences } from '../../server/src/shared-types';
-import { parseColor } from '@tubular/util';
+import { forEach, isEqual, parseColor } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 
@@ -13,6 +13,7 @@ import { PreferencesService } from '../preferences.service';
   styleUrl: './app.scss'
 })
 export class App implements OnInit {
+  private readonly chime = new Audio('assets/notify.wav');
   private readonly prefs: Preferences;
 
   private messageTimer: any;
@@ -26,14 +27,13 @@ export class App implements OnInit {
   localTime = signal(true);
   messages = signal([] as Message[]);
   name = signal('');
+  newOnBottom = signal(true);
+  notifySound = signal(true);
   participants = signal([] as string[]);
 
   constructor(private httpClient: HttpClient, private prefService: PreferencesService) {
     this.prefs = this.prefService.get();
-    this.email.set(this.prefs?.email || '');
-    this.localTime.set(this.prefs?.localTime ?? true);
-    this.name.set(this.prefs?.name || '');
-    this.color.set(this.prefs?.color || 0);
+    forEach(this.prefs as Record<string, any>, (key, value) => (this as any)[key]?.set(value));
   }
 
   ngOnInit(): void {
@@ -48,7 +48,17 @@ export class App implements OnInit {
 
     this.httpClient.get<Messages>('/api/messages', { params: { name: this.name() }}).subscribe({
       next: (messages: Messages): void => {
-        this.messages.set(messages.messages);
+        if (!this.newOnBottom())
+          messages.messages.reverse();
+
+        if (!isEqual(this.messages(), messages.messages)) {
+          if (this.messages().length > 0 && this.prefs.notifySound)
+            this.chime.play().finally();
+
+          this.messages.set(messages.messages);
+          this.adjustScrolling();
+        }
+
         this.participants.set(messages.participants);
 
         this.messageTimer = setTimeout(() => this.getMessages(), 10000);
@@ -110,5 +120,33 @@ export class App implements OnInit {
 
   formatLocal(timestamp: string): string {
     return new Date(timestamp + 'Z').toLocaleString();
+  }
+
+  toggleNotifySound(): void {
+    this.prefs.notifySound = this.notifySound();
+    this.prefService.set(this.prefs);
+  }
+
+  toggleLocalTime(): void {
+    this.prefs.localTime = this.localTime();
+    this.prefService.set(this.prefs);
+  }
+
+  toggleMessageOrder(): void {
+    this.prefs.newOnBottom = this.newOnBottom();
+    this.prefService.set(this.prefs);
+    this.messages.set(this.messages().reverse());
+    this.adjustScrolling();
+  }
+
+  private adjustScrolling(): void {
+    setTimeout(() => {
+      const messages = document.querySelector('#message-list');
+
+      if (this.newOnBottom())
+        messages.scrollTop = messages.scrollHeight;
+      else
+        messages.scrollTop = 0;
+    });
   }
 }
