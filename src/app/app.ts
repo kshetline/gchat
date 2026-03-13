@@ -1,5 +1,4 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { Message, Messages, Preferences } from '../../server/src/shared-types';
 import { forEach, isEqual, parseColor } from '@tubular/util';
@@ -8,7 +7,7 @@ import { PreferencesService } from '../preferences.service';
 
 @Component({
   selector: 'app-root',
-  imports: [FormsModule, RouterOutlet],
+  imports: [FormsModule],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
