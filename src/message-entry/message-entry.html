@@ -1,1 +1,27 @@
-<input type="text" [(ngModel)]="message" (keyup.enter)="sendMessage()" [disabled]="!enabled()" size="100"/>
+<div id="toolbar">
+  <span class="ql-formats">
+    <button class="ql-bold"></button>
+    <button class="ql-italic"></button>
+    <button class="ql-strike"></button>
+    <button class="ql-underline"></button>
+    <!-- <button class="ql-code-block"></button> -->
+  </span>
+  <span class="ql-formats">
+    <select class="ql-size">
+      <option value="0.625em">Tiny</option>
+      <option value="0.8125em">Small</option>
+      <option value="1em" selected>Normal</option>
+      <option value="1.125em">Large</option>
+      <option value="1.5em">Huge</option>
+    </select>
+  </span>
+  <div class="color-selector">
+    @for (buttonColor of colors; track buttonColor; let i = $index) {
+      @if (buttonColor) {
+        <input type="radio" class="text-color-btn" name="text-color-me" [style.color]="buttonColor" [value]="i"
+          [(ngModel)]="color" (change)="updateColor()">
+      }
+    }
+  </div>
+</div>
+<div id="editor"></div>

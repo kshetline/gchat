@@ -10,6 +10,7 @@ import { checksum53, encodeForUri, toBoolean, toInt } from '@tubular/util';
 
 interface SessionInfo {
   browser?: puppeteer.Browser;
+  inChat?: boolean;
   page?: puppeteer.Page;
 }
 
@@ -78,17 +79,22 @@ function extractMessage(messageRow: DomNode): Message {
 }
 
 async function getMessages(name: string): Promise<Messages> {
-  const url = `https://${domain}/comchat.cgi?retime=20&lines=200&name=${encodeForUri(name, true)}`;
-  const raw = (await axios.get(url)).data;
-  const dom = parser.parse(raw).domRoot;
-  const body = dom.querySelector('body');
-  const participantDiv = body?.querySelector('#participantList');
-  const participants = Array.from(new Set(participantDiv.children[0].content.trim().replace(/^.*:\s*/g, '').split(/[◆◇]/)
-    .map(p => p.trim()).filter(p => !!p)).values()).sort();
-  const messageRows = body?.querySelectorAll('.messageRow').reverse();
-  const messages = messageRows.map(row => extractMessage(row));
+  try {
+    const url = `https://${domain}/comchat.cgi?retime=20&lines=200&name=${encodeForUri(name, true)}`;
+    const raw = (await axios.get(url)).data;
+    const dom = parser.parse(raw).domRoot;
+    const body = dom.querySelector('body');
+    const participantDiv = body?.querySelector('#participantList');
+    const participants = Array.from(new Set(participantDiv.children[0].content.trim().replace(/^.*:\s*/g, '').split(/[◆◇]/)
+      .map(p => p.trim()).filter(p => !!p)).values()).sort();
+    const messageRows = body?.querySelectorAll('.messageRow').reverse();
+    const messages = messageRows.map(row => extractMessage(row));
 
-  return { messages, participants, temp: messageRows[0] };
+    return { messages, participants };
+  }
+  catch (err) {
+    return { errorMessage: ((err as any).message) || String(err) };
+  }
 }
 
 async function loadEnterForm(page: puppeteer.Page): Promise<void> {
@@ -98,22 +104,35 @@ async function loadEnterForm(page: puppeteer.Page): Promise<void> {
 }
 
 async function enterChat(sesh: string, name: string, email: string, color: number): Promise<void> {
-  const page = sessions.get(sesh).page;
+  const session = sessions.get(sesh);
+
+  if (session?.inChat)
+    return;
+
+  const page = session.page;
 
   await page.waitForSelector('input[name="name"]');
   await page.type('input[name="name"]', name);
   await page.type('input[name="email"]', email || '');
-  await page.$eval(`input[type="radio"][value="${color}"]`, btn => btn.click());
+
+  try {
+    await page.$eval(`input[type="radio"][value="${color}"]`, btn => btn.click());
+  }
+  catch {}
+
   await page.$eval('input[type="submit"]', btn => btn.click());
   await page.waitForSelector('input[name="comment"]');
   await page.$eval('form', form => form.setAttribute('target', '_blank'));
+  session.inChat = true;
 }
 
 async function leaveChat(sesh: string): Promise<void> {
-  const page = sessions.get(sesh).page;
+  const session = sessions.get(sesh);
+  const page = session.page;
 
   await page.waitForSelector('input[type="button"]');
   await page.$eval('input[type="submit"]', btn => btn.click());
+  session.inChat = false;
   await loadEnterForm(page);
 }
 
@@ -122,7 +141,7 @@ async function sendMessage(sesh: string, comment: string, color: number): Promis
 
   await page.waitForSelector('input[name="comment"]');
   await page.$eval('select[name="color"]', (sel, c) => sel.value = c, color);
-  await page.type('input[name="comment"]', comment);
+  await page.type('input[name="comment"]', comment || '\u00A0');
   await page.focus('input[name="comment"]');
   await page.keyboard.press('Enter');
 }

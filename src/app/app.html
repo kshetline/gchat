@@ -1,8 +1,9 @@
 <main xmlns="http://www.w3.org/1999/html">
   <div class="header">
     <h1 class="form-h1">Chat</h1>
-    <div class="entry-panel">
+    <div class="entry-panel" [class.in-chat]="inChat()">
       @if (inChat()) {
+        <label>{{ name() }}</label>
         <button (click)="leaveChat()">Leave room</button>
       }
       @else {
@@ -21,7 +22,7 @@
               <div class="flex-break"></div>
             }
             @else {
-              <input type="radio" class="text-color" name="text-color" [style.color]="buttonColor" [value]="i"
+              <input type="radio" class="text-color-btn" name="text-color" [style.color]="buttonColor" [value]="i"
                 [(ngModel)]="color" (change)="updateColor()">
             }
           }
@@ -50,7 +51,8 @@
     }
   </div>
   @if (inChat() && !newOnBottom()) {
-    <app-message-entry class="on-top" (newMessage)="sendComment($event)"></app-message-entry>
+    <app-message-entry class="on-top" [color]="color()" [colors]="colors"
+        (changeColor)="color.set($event)" (newMessage)="sendComment($event)"></app-message-entry>
   }
   <div class="message-list" id="message-list">
     @for (message of messages(); track message.hash) {
@@ -69,6 +71,6 @@
     }
   </div>
   @if (inChat() && newOnBottom()) {
-    <app-message-entry (newMessage)="sendComment($event)"></app-message-entry>
+    <app-message-entry [colors]="colors" (newMessage)="sendComment($event)"></app-message-entry>
   }
 </main>

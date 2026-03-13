@@ -49,22 +49,22 @@ export class App implements OnInit {
 
     this.httpClient.get<Messages>('/api/messages', { params: { name: this.name() }}).subscribe({
       next: (messages: Messages): void => {
-        if (!this.newOnBottom())
-          messages.messages.reverse();
+        if (!messages.errorMessage) {
+          if (!this.newOnBottom())
+            messages.messages.reverse();
 
-        if (!isEqual(this.messages(), messages.messages)) {
-          if (this.messages().length > 0 && this.prefs.notifySound)
-            this.chime.play().finally();
+          if (!isEqual(this.messages(), messages.messages)) {
+            if (this.messages().length > 0 && this.prefs.notifySound)
+              this.chime.play().finally();
 
-          this.messages.set(messages.messages);
-          this.adjustScrolling();
+            this.messages.set(messages.messages);
+            this.adjustScrolling();
+          }
+
+          this.participants.set(messages.participants);
         }
-
-        this.participants.set(messages.participants);
-
-        this.messageTimer = setTimeout(() => this.getMessages(), 10000);
       },
-      error: (_error): void => {
+      complete: (): void => {
         this.messageTimer = setTimeout(() => this.getMessages(), 10000);
       }
     });
@@ -94,6 +94,9 @@ export class App implements OnInit {
   }
 
   sendComment(comment: string): void {
+    if (!comment?.trim())
+      return;
+
     this.messageEntry.sendEnabled(false);
 
     const params = { ...this.prefs, comment };

@@ -5,20 +5,6 @@ main {
   margin: 0 10px;
 }
 
-.text-color {
-  appearance: none;
-  border-radius: 50%;
-  background-color: currentColor;
-  border: 1px solid currentColor;
-  cursor: pointer;
-  height: 1.2em;
-  width: 1.2em;
-
-  &:checked {
-    outline: 3px solid currentColor;
-  }
-}
-
 .header {
   box-sizing: border-box;
   flex-shrink: 0;
@@ -27,6 +13,10 @@ main {
     align-items: flex-start;
     display: flex;
     gap: 0.5em;
+
+    &.in-chat {
+      align-items: baseline;
+    }
   }
 
   .name-email {
@@ -54,9 +44,12 @@ main {
     gap: 0.5em;
 
     &.in-chat {
+      align-items: baseline;
       flex-direction: row;
       margin-left: 1em;
       gap: 1em;
+      position: relative;
+      top: 2px;
     }
   }
 }

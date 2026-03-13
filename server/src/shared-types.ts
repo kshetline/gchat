@@ -9,9 +9,9 @@ export interface Message {
 }
 
 export interface Messages {
-  messages: Message[];
-  participants: string[];
-  temp: any;
+  errorMessage?: string;
+  messages?: Message[];
+  participants?: string[];
 }
 
 export interface Preferences {
