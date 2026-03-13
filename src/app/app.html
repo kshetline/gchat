@@ -3,7 +3,6 @@
     <h1 class="form-h1">Chat</h1>
     <div class="entry-panel">
       @if (inChat()) {
-        <app-message-entry (newMessage)="sendComment($event)"></app-message-entry>
         <button (click)="leaveChat()">Leave room</button>
       }
       @else {
@@ -28,7 +27,7 @@
           }
         </div>
       }
-      <div class="option-block">
+      <div class="option-block" [class.in-chat]="inChat()">
         <div class="label-pair">
           <input id="notify-sound" type="checkbox" [(ngModel)]="notifySound" (change)="toggleNotifySound()">
           <label for="notify-sound">Notification sound</label>
@@ -50,6 +49,9 @@
       <span class="participant">{{ participant }}</span>
     }
   </div>
+  @if (inChat() && !newOnBottom()) {
+    <app-message-entry class="on-top" (newMessage)="sendComment($event)"></app-message-entry>
+  }
   <div class="message-list" id="message-list">
     @for (message of messages(); track message.hash) {
       <div class="name">
@@ -66,4 +68,7 @@
            [style]="message.style" [style.background-color]="getTextBackground(message.style)"></div>
     }
   </div>
+  @if (inChat() && newOnBottom()) {
+    <app-message-entry (newMessage)="sendComment($event)"></app-message-entry>
+  }
 </main>

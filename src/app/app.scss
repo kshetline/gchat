@@ -52,6 +52,12 @@ main {
     display: flex;
     flex-direction: column;
     gap: 0.5em;
+
+    &.in-chat {
+      flex-direction: row;
+      margin-left: 1em;
+      gap: 1em;
+    }
   }
 }
 
