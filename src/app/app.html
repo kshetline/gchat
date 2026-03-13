@@ -3,7 +3,7 @@
     <h1 class="form-h1">Chat</h1>
     <div class="entry-panel">
       @if (inChat()) {
-        <input id="comment" type="text" [(ngModel)]="comment" (keyup.enter)="sendComment($event)"/>
+        <app-message-entry (newMessage)="sendComment($event)"></app-message-entry>
         <button (click)="leaveChat()">Leave room</button>
       }
       @else {

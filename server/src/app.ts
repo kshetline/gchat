@@ -19,7 +19,7 @@ const domain = process.env.CHAT_DOMAIN;
 const parser = new HtmlParser();
 const sessions = new Map<string, SessionInfo>();
 
-function getTextAndMarkup(elems: DomElement[]): string {
+function getTextAndMarkup(elems: DomElement[], domain: string): string {
   if (!elems)
     return '';
 
@@ -27,13 +27,24 @@ function getTextAndMarkup(elems: DomElement[]): string {
 
   for (const elem of elems) {
     if (elem instanceof DomNode) {
-      const inner = getTextAndMarkup(elem.children);
+      const inner = getTextAndMarkup(elem.children, domain);
       let fromElem = `<${elem.tag}>${inner}</${elem.tag}>`;
 
       if (elem.tag === 'a')
         fromElem = fromElem.replace(/^<a>/, `<a href="${inner}" target="_blank">`);
       else if (elem.tag === 'span')
         fromElem = fromElem.replace(/^<span>/, `<span class="${elem.valuesLookup['class']}">`);
+      else if (elem.tag === 'img') {
+        const alt = elem.valuesLookup['alt'];
+
+        if ([...(alt || '')].length == 1)
+          fromElem = alt;
+        else {
+          const src = elem.valuesLookup['src']?.replace(/^\/(.*)$/, `https://${domain}/$1`);
+
+          fromElem = fromElem.replace(/>.*/, ` src=${src} alt=${alt || ''}>`);
+        }
+      }
 
       text += fromElem;
     }
@@ -45,7 +56,7 @@ function getTextAndMarkup(elems: DomElement[]): string {
 }
 
 function extractMessage(messageRow: DomNode): Message {
-  const text = getTextAndMarkup(messageRow.querySelector('.messageComment').children);
+  const text = getTextAndMarkup(messageRow.querySelector('.messageComment').children, domain);
   const nameElem = messageRow.querySelector('.messageName');
   const style = nameElem?.valuesLookup['style'];
   let nameIndex = 1;
@@ -95,7 +106,7 @@ async function enterChat(sesh: string, name: string, email: string, color: numbe
   await page.$eval(`input[type="radio"][value="${color}"]`, btn => btn.click());
   await page.$eval('input[type="submit"]', btn => btn.click());
   await page.waitForSelector('input[name="comment"]');
-  await page.$eval('form', form => form.setAttribute('target', '_self'));
+  await page.$eval('form', form => form.setAttribute('target', '_blank'));
 }
 
 async function leaveChat(sesh: string): Promise<void> {

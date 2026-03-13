@@ -1,13 +1,14 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, ViewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Message, Messages, Preferences } from '../../server/src/shared-types';
 import { forEach, isEqual, parseColor } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
+import { MessageEntry } from '../message-entry/message-entry';
 
 @Component({
   selector: 'app-root',
-  imports: [FormsModule],
+  imports: [FormsModule, MessageEntry],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -20,7 +21,6 @@ export class App implements OnInit {
   color = signal(0);
   colors = ['#000000', '#000080', '#4444cc', '#44cc44', '#cc9911', '#cc4444', '#cc6600', '',
             '#008040', '#33aaaa', '#cc44cc', '#800000', '#FF80C0', '#b87333', '#8ca9d9', '#4682b4'];
-  comment = signal('');
   email= signal('');
   inChat = signal(false);
   localTime = signal(true);
@@ -29,6 +29,8 @@ export class App implements OnInit {
   newOnBottom = signal(true);
   notifySound = signal(true);
   participants = signal([] as string[]);
+
+  @ViewChild(MessageEntry) private readonly messageEntry: MessageEntry;
 
   constructor(private httpClient: HttpClient, private prefService: PreferencesService) {
     this.prefs = this.prefService.get();
@@ -91,16 +93,18 @@ export class App implements OnInit {
     });
   }
 
-  sendComment(_evt: Event): void {
-    const params = { ...this.prefs, comment: this.comment() };
+  sendComment(comment: string): void {
+    this.messageEntry.sendEnabled(false);
+
+    const params = { ...this.prefs, comment };
 
     this.httpClient.post('/api/send', {}, { params }).subscribe({
       next: (): void => {
         this.inChat.set(true);
-        this.comment.set('');
+        this.messageEntry.reset();
         setTimeout(() => this.getMessages(), 500);
       },
-      error: (_error): void => this.inChat.set(false)
+      error: (_error): void => this.messageEntry.sendEnabled(true)
     });
   }
 
