@@ -81,14 +81,20 @@ export class App implements OnInit {
     this.prefService.set(this.prefs);
 
     this.httpClient.post('/api/enter', {}, { params: this.prefs as any }).subscribe({
-      next: (): void => this.inChat.set(true),
+      next: (): void => {
+        this.inChat.set(true);
+        setTimeout(() => this.adjustScrolling());
+      },
       error: (_error): void => this.inChat.set(false)
     });
   }
 
   leaveChat(): void {
     this.httpClient.post('/api/leave', {}, { params: this.prefs as any }).subscribe({
-      next: (): void => this.inChat.set(false),
+      next: (): void => {
+        this.inChat.set(false);
+        setTimeout(() => this.adjustScrolling());
+      },
       error: (_error): void => {}
     });
   }
@@ -135,6 +141,12 @@ export class App implements OnInit {
 
   toggleLocalTime(): void {
     this.prefs.localTime = this.localTime();
+    this.prefService.set(this.prefs);
+  }
+
+  setColor(color: number): void {
+    this.color.set(color);
+    this.prefs.color = color;
     this.prefService.set(this.prefs);
   }
 

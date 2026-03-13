@@ -23,18 +23,18 @@
             }
             @else {
               <input type="radio" class="text-color-btn" name="text-color" [style.color]="buttonColor" [value]="i"
-                [(ngModel)]="color" (change)="updateColor()">
+                [(ngModel)]="color" (ngModelChange)="updateColor()">
             }
           }
         </div>
       }
       <div class="option-block" [class.in-chat]="inChat()">
         <div class="label-pair">
-          <input id="notify-sound" type="checkbox" [(ngModel)]="notifySound" (change)="toggleNotifySound()">
+          <input id="notify-sound" type="checkbox" [(ngModel)]="notifySound" (ngModelChange)="toggleNotifySound()">
           <label for="notify-sound">Notification sound</label>
         </div>
         <div class="label-pair">
-          <input id="local-time" type="checkbox" [(ngModel)]="localTime" (change)="toggleLocalTime()">
+          <input id="local-time" type="checkbox" [(ngModel)]="localTime" (ngModelChange)="toggleLocalTime()">
           <label for="local-time">Local time</label>
         </div>
         <div class="label-pair">
@@ -46,13 +46,18 @@
   </div>
   <div class="participants">
     <span>Participants:</span>
-    @for (participant of participants(); track participant) {
-      <span class="participant">{{ participant }}</span>
+    @if (participants()) {
+      @for (participant of participants(); track participant) {
+        <span class="participant">{{ participant }}</span>
+      }
+    }
+    @else {
+      <span class="empty-chat">None</span>
     }
   </div>
   @if (inChat() && !newOnBottom()) {
     <app-message-entry class="on-top" [color]="color()" [colors]="colors"
-        (changeColor)="color.set($event)" (newMessage)="sendComment($event)"></app-message-entry>
+        (changeColor)="setColor($event)" (newMessage)="sendComment($event)"></app-message-entry>
   }
   <div class="message-list" id="message-list">
     @for (message of messages(); track message.hash) {
@@ -71,6 +76,7 @@
     }
   </div>
   @if (inChat() && newOnBottom()) {
-    <app-message-entry [colors]="colors" (newMessage)="sendComment($event)"></app-message-entry>
+    <app-message-entry class="at-bottom" [colors]="colors"
+        (changeColor)="setColor($event)" (newMessage)="sendComment($event)"></app-message-entry>
   }
 </main>

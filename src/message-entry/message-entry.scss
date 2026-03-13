@@ -13,9 +13,11 @@
 
 #editor {
   background-color: white;
-  max-height: 3.4em;
+  max-height: 2.8em;
 }
 
 .color-selector {
   display: inline-flex;
+  position: relative;
+  top: 0.25em;
 }

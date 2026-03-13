@@ -5,7 +5,7 @@ body {
   background-color: #EDDAD2;
   font: 14px "Trebuchet MS", Tahoma, Verdana, Arial, Meiryo, 'Hiragino Sans', Osaka, sans-serif;
   margin: 0;
-  overflow: hidden;
+  overflow: clip;
 }
 
 .form-h1 {
@@ -61,4 +61,12 @@ body {
   &:checked {
     outline: 3px solid currentColor;
   }
+}
+
+.ql-editor {
+  padding: 4px;
+}
+
+.at-bottom .ql-toolbar.ql-snow .ql-picker.ql-expanded .ql-picker-options {
+  top: -10.3em !important;
 }
