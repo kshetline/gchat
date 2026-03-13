@@ -28,17 +28,21 @@ function quillOpsToBBCode(ops: any[]): string {
         attrs.add(key);
 
         if (stack.at(-1) !== value) {
-          stack.push(value);
+          if (key === 'size') {
+            if (stack.at(-1)) {
+              result += `[/${sizeMap[stack.at(-1)]}]`;
+              stack.pop();
+            }
 
-          if (key === 'size')
             result += `[${sizeMap[value as string]}]`;
+          }
           else
             result += `[${tagMap[key]}]`;
+
+          stack.push(value);
         }
       }
     });
-
-    result += op.insert.replace(/[\n\r]/g, '').replace(/\[/g, '[\u200B');
 
     recognizedAttributes.forEach(attr => {
       const stack = stacks.get(attr);
@@ -52,6 +56,8 @@ function quillOpsToBBCode(ops: any[]): string {
         stack.pop();
       }
     });
+
+    result += op.insert.replace(/[\n\r]/g, '').replace(/\[/g, '[\u200B');
   }
 
   return result.trimEnd();
