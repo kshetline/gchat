@@ -5,7 +5,7 @@ import session from 'express-session';
 import { HtmlParser } from 'fortissimo-html';
 import { DomElement, DomNode } from 'fortissimo-html/dist/dom';
 import * as puppeteer from 'puppeteer';
-import { Message, Messages } from './shared-types';
+import { Config, Message, Messages } from './shared-types';
 import { checksum53, encodeForUri, toBoolean, toInt } from '@tubular/util';
 
 interface SessionInfo {
@@ -19,6 +19,11 @@ const port = toInt(process.env.HTTP_PORT) || 3000;
 const domain = process.env.CHAT_DOMAIN;
 const parser = new HtmlParser();
 const sessions = new Map<string, SessionInfo>();
+const config: Config = {
+  title: process.env.CHAT_TITLE,
+  navigation: process.env.NAV_LINKS.split(';').map(link => link.split('::'))
+  .map(link => ({ name: link[0], url: link[1], target: link[2] || '_blank' }))
+};
 
 function getTextAndMarkup(elems: DomElement[], domain: string): string {
   if (!elems)
@@ -173,6 +178,10 @@ app.use(cookieParser());
 
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
+});
+
+app.get('/api/config', (_req, res) => {
+  res.json(config);
 });
 
 app.get('/api/messages', async (req, res) => {

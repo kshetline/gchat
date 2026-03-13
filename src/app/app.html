@@ -1,6 +1,11 @@
 <main xmlns="http://www.w3.org/1999/html">
+  <div class="navigation">
+    @for (link of navigation(); track link.url) {
+      <a [href]="link.url" [target]="link.target || '_blank'">{{ link.name }}</a>
+    }
+  </div>
   <div class="header">
-    <h1 class="form-h1">Chat</h1>
+    <h1 class="form-h1">{{ title() }}</h1>
     <div class="entry-panel" [class.in-chat]="inChat()">
       @if (inChat()) {
         <label>{{ name() }}</label>

@@ -5,6 +5,17 @@ main {
   margin: 0 10px;
 }
 
+.navigation {
+  display: flex;
+  gap: 1em;
+  height: 0;
+  justify-content: center;
+  margin: 0.5em 0;
+  position: absolute;
+  top: 0;
+  width: 100%;
+}
+
 .header {
   box-sizing: border-box;
   flex-shrink: 0;

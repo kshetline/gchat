@@ -1,3 +1,8 @@
+export interface Config {
+  title: string;
+  navigation: { name: string; url: string; target?: string }[];
+}
+
 export interface Message {
   email?: string;
   hash: string;

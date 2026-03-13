@@ -1,6 +1,6 @@
 import { Component, OnInit, signal, ViewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Message, Messages, Preferences } from '../../server/src/shared-types';
+import { Config, Message, Messages, Preferences } from '../../server/src/shared-types';
 import { forEach, isEqual, parseColor } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
@@ -27,14 +27,39 @@ export class App implements OnInit {
   messages = signal([] as Message[]);
   name = signal('');
   newOnBottom = signal(true);
+  navigation = signal([] as { name: string, url: string; target?: string }[]);
   notifySound = signal(true);
   participants = signal([] as string[]);
+  title = signal('Chat');
 
   @ViewChild(MessageEntry) private readonly messageEntry: MessageEntry;
 
   constructor(private httpClient: HttpClient, private prefService: PreferencesService) {
     this.prefs = this.prefService.get();
     forEach(this.prefs as Record<string, any>, (key, value) => (this as any)[key]?.set(value));
+
+    const configStr = localStorage.getItem('gchat-config');
+
+    if (configStr) {
+      try {
+        const config = JSON.parse(configStr) as Config;
+
+        document.title = config.title;
+        this.title.set(config.title);
+        this.navigation.set(config.navigation);
+      }
+      catch {}
+    }
+
+    httpClient.get<Config>('/api/config').subscribe({
+      next: (config: Config): void => {
+        document.title = config.title;
+        this.title.set(config.title);
+        this.navigation.set(config.navigation);
+        localStorage.setItem('gchat-config', JSON.stringify(config));
+      },
+      error: (_error): void => {}
+    })
   }
 
   ngOnInit(): void {
