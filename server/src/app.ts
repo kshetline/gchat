@@ -117,8 +117,8 @@ async function enterChat(sesh: string, name: string, email: string, color: numbe
   const page = session.page;
 
   await page.waitForSelector('input[name="name"]');
-  await page.type('input[name="name"]', name);
-  await page.type('input[name="email"]', email || '');
+  await page.$eval('input[name="name"]', (input, name) => input.value = name, name);
+  await page.$eval('input[name="email"]', (input, email) => input.value = email || '', email);
 
   try {
     await page.$eval(`input[type="radio"][value="${color}"]`, btn => btn.click());
@@ -136,7 +136,7 @@ async function leaveChat(sesh: string): Promise<void> {
   const page = session.page;
 
   await page.waitForSelector('input[type="button"]');
-  await page.$eval('input[type="submit"]', btn => btn.click());
+  await page.$eval('input[type="button"]', btn => btn.click());
   session.inChat = false;
   await loadEnterForm(page);
 }
@@ -146,8 +146,8 @@ async function sendMessage(sesh: string, comment: string, color: number, tripCod
 
   await page.waitForSelector('input[name="comment"]');
   await page.$eval('select[name="color"]', (sel, c) => sel.value = c, color);
-  await page.type('input[name="comment"]', comment || '\u00A0');
-  await page.type('input[name="password"]', tripCode || '');
+  await page.$eval('input[name="comment"]', (input, comment) => input.value = comment, comment || '\u00A0');
+  await page.$eval('input[name="password"]', (input, tripCode) => input.value = tripCode, tripCode || '');
   await page.focus('input[name="comment"]');
   await page.keyboard.press('Enter');
 }

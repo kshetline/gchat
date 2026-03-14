@@ -116,6 +116,10 @@ export class MessageEntry implements OnInit {
     this.quill.focus();
   }
 
+  updateColor(): void {
+    this.changeColor.emit(this.color());
+  }
+
   sendMessage(): void {
     const message = quillOpsToBBCode(this.quill.getContents().ops);
 
