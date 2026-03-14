@@ -26,4 +26,5 @@ export interface Preferences {
   name: string;
   newOnBottom: boolean;
   notifySound: boolean;
+  tripCode: string;
 }

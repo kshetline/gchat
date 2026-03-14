@@ -1,10 +1,11 @@
 import { Component, OnInit, signal, ViewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Config, Message, Messages, Preferences } from '../../server/src/shared-types';
-import { forEach, isEqual, parseColor } from '@tubular/util';
+import { forEach, isEqual } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { MessageEntry } from '../message-entry/message-entry';
+import { colors, getTextBackground } from '../main';
 
 const matchEmoji = /(\uD83C[\uD000-\uDFFF]|\uD83D[\uD000-\uDFFF]|\uD83E[\uD000-\uDFFF])/g;
 
@@ -15,14 +16,15 @@ const matchEmoji = /(\uD83C[\uD000-\uDFFF]|\uD83D[\uD000-\uDFFF]|\uD83E[\uD000-\
   styleUrl: './app.scss'
 })
 export class App implements OnInit {
+  colors = colors;
+  getTextBackground = getTextBackground;
+
   private readonly chime = new Audio('assets/notify.wav');
   private readonly prefs: Preferences;
 
   private messageTimer: any;
 
   color = signal(0);
-  colors = ['#000000', '#000080', '#4444cc', '#44cc44', '#cc9911', '#cc4444', '#cc6600', '',
-            '#008040', '#33aaaa', '#cc44cc', '#800000', '#FF80C0', '#b87333', '#8ca9d9', '#4682b4'];
   email= signal('');
   inChat = signal(false);
   localTime = signal(true);
@@ -33,6 +35,7 @@ export class App implements OnInit {
   notifySound = signal(true);
   participants = signal([] as string[]);
   title = signal('Chat');
+  tripCode = signal('');
 
   @ViewChild(MessageEntry) private readonly messageEntry: MessageEntry;
 
@@ -107,12 +110,18 @@ export class App implements OnInit {
     this.prefs.email = this.email();
     this.prefService.set(this.prefs);
 
+    if (this.prefs.name.includes('#')) {
+      [this.prefs.name, this.prefs.tripCode] = this.prefs.name.split('#');
+      this.name.set(this.prefs.name);
+      this.tripCode.set(this.prefs.tripCode);
+    }
+
     this.httpClient.post('/api/enter', {}, { params: this.prefs as any }).subscribe({
       next: (): void => {
         this.inChat.set(true);
         setTimeout(() => {
           this.adjustScrolling();
-          this.messageEntry.focus();
+          this.messageEntry.focus(this.color());
         });
       },
       error: (_error): void => this.inChat.set(false)
@@ -147,29 +156,8 @@ export class App implements OnInit {
     });
   }
 
-  getTextBackground(style: string): string {
-    const color = (/color:\s*([^;]+)\b/.exec(style) || [])[1];
-
-    if (color) {
-      const rgb = parseColor(color);
-
-      if (rgb.r * 0.3 + rgb.g * 0.59 + rgb.b * 0.11 > 140)
-        return '#333333';
-    }
-
-    return 'white';
-  }
-
   formatLocal(timestamp: string): string {
     return new Date(timestamp + 'Z').toLocaleString();
-  }
-
-  toSimpleName(name: string): string {
-    return name.replace(/#.*$/, '');
-  }
-
-  toTripCode(name: string): string {
-    return name.replace(/^.*(?=#)/, '');
   }
 
   magnifyEmoji(text: string): string {

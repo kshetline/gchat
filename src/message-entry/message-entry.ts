@@ -1,7 +1,8 @@
-import { Component, EventEmitter, Input, OnInit, Output, signal } from '@angular/core';
+import { Component, effect, EventEmitter, OnInit, Output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import Quill from 'quill';
 import { forEach } from '@tubular/util';
+import { colors, getTextBackground } from '../main';
 
 const Size = Quill.import('attributors/style/size') as any;
 const sizeMap : Record<string, string>= { '0.625em': 's1', '0.8125em': 's2', '1em': 's3', '1.125em': 's4', '1.5em': 's5' };
@@ -70,14 +71,22 @@ function quillOpsToBBCode(ops: any[]): string {
   styleUrl: './message-entry.scss',
 })
 export class MessageEntry implements OnInit {
+  colors = colors;
+
   private quill: Quill;
 
+  color = signal(0);
   enabled = signal(true);
 
-  @Input() color = 0;
-  @Input() colors: string[] = [];
   @Output() changeColor = new EventEmitter<number>();
   @Output() newMessage = new EventEmitter<string>();
+
+  constructor() {
+    effect(() => {
+      this.quill.root.style.color = this.colors[this.color()];
+      this.quill.root.style.backgroundColor = getTextBackground(this.colors[this.color()]);
+    });
+  }
 
   ngOnInit(): void {
     const bindings = {
@@ -98,15 +107,13 @@ export class MessageEntry implements OnInit {
       },
       theme: 'snow'
     });
-    this.quill.root.setAttribute('spellcheck', 'true');
   }
 
-  focus(): void {
+  focus(color?: number): void {
+    if (color != null)
+      this.color.set(color);
+
     this.quill.focus();
-  }
-
-  updateColor(): void {
-    this.changeColor.emit(this.color);
   }
 
   sendMessage(): void {
@@ -122,6 +129,5 @@ export class MessageEntry implements OnInit {
   reset(): void {
     this.sendEnabled(true);
     this.quill.setText('');
-    this.focus();
   }
 }

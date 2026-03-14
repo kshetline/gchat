@@ -141,12 +141,13 @@ async function leaveChat(sesh: string): Promise<void> {
   await loadEnterForm(page);
 }
 
-async function sendMessage(sesh: string, comment: string, color: number): Promise<void> {
+async function sendMessage(sesh: string, comment: string, color: number, tripCode: string): Promise<void> {
   const page = sessions.get(sesh).page;
 
   await page.waitForSelector('input[name="comment"]');
   await page.$eval('select[name="color"]', (sel, c) => sel.value = c, color);
   await page.type('input[name="comment"]', comment || '\u00A0');
+  await page.type('input[name="password"]', tripCode || '');
   await page.focus('input[name="comment"]');
   await page.keyboard.press('Enter');
 }
@@ -201,6 +202,8 @@ app.post('/api/leave', async (req, res) => {
 });
 
 app.post('/api/send', async (req, res) => {
-  await sendMessage(req.sessionID, (req.query as any).comment, (req.query as any).color);
+  const q = req.query as any;
+
+  await sendMessage(req.sessionID, q.comment, q.color, q.tripCode);
   res.send('null');
 });

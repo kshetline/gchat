@@ -2,7 +2,8 @@ import { Injectable } from '@angular/core';
 import { clone, forEach, throttle } from '@tubular/util';
 import { Preferences } from '../server/src/shared-types';
 
-const defaultPrefs: Preferences = { color: 0, email: '', localTime: true, name: '', newOnBottom: true, notifySound: true};
+const defaultPrefs: Preferences = { color: 0, email: '', localTime: true, name: '',
+  newOnBottom: true, notifySound: true, tripCode: ''};
 
 @Injectable({
   providedIn: 'root',

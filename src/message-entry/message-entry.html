@@ -19,7 +19,7 @@
     @for (buttonColor of colors; track buttonColor; let i = $index) {
       @if (buttonColor) {
         <input type="radio" class="text-color-btn" name="text-color-me" [style.color]="buttonColor" [value]="i"
-          [(ngModel)]="color" (change)="updateColor()">
+          [(ngModel)]="color">
       }
     }
   </div>
