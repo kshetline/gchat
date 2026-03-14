@@ -8,7 +8,7 @@
     <h1 class="form-h1">{{ title() }}</h1>
     <div class="entry-panel" [class.in-chat]="inChat()">
       @if (inChat()) {
-        <label>{{ name() }}</label>
+        <div class="name-trip"><span>{{ toSimpleName(name()) }}</span><span>{{ toTripCode(name()) }}</span></div>
         <button (click)="leaveChat()">Leave room</button>
       }
       @else {
@@ -76,7 +76,7 @@
           <span class="time">{{ localTime() ? formatLocal(message.timestamp) : message.timestamp }}</span>
         }
       </div>
-      <div class="bubble" [innerHTML]="message.text"
+      <div class="bubble" [innerHTML]="magnifyEmoji(message.text)"
            [style]="message.style" [style.background-color]="getTextBackground(message.style)"></div>
     }
   </div>

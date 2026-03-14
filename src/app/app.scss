@@ -63,6 +63,18 @@ main {
       top: 2px;
     }
   }
+
+  .name-trip {
+    display: inline-flex;
+
+    :last-child {
+      filter: blur(4px);
+
+      &:hover {
+        filter: none;
+      }
+    }
+  }
 }
 
 .participants {

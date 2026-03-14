@@ -6,6 +6,8 @@ import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { MessageEntry } from '../message-entry/message-entry';
 
+const matchEmoji = /(\uD83C[\uD000-\uDFFF]|\uD83D[\uD000-\uDFFF]|\uD83E[\uD000-\uDFFF])/g;
+
 @Component({
   selector: 'app-root',
   imports: [FormsModule, MessageEntry],
@@ -108,7 +110,10 @@ export class App implements OnInit {
     this.httpClient.post('/api/enter', {}, { params: this.prefs as any }).subscribe({
       next: (): void => {
         this.inChat.set(true);
-        setTimeout(() => this.adjustScrolling());
+        setTimeout(() => {
+          this.adjustScrolling();
+          this.messageEntry.focus();
+        });
       },
       error: (_error): void => this.inChat.set(false)
     });
@@ -157,6 +162,18 @@ export class App implements OnInit {
 
   formatLocal(timestamp: string): string {
     return new Date(timestamp + 'Z').toLocaleString();
+  }
+
+  toSimpleName(name: string): string {
+    return name.replace(/#.*$/, '');
+  }
+
+  toTripCode(name: string): string {
+    return name.replace(/^.*(?=#)/, '');
+  }
+
+  magnifyEmoji(text: string): string {
+    return text.replace(matchEmoji, '<span class="big-emoji">$1</span>');
   }
 
   toggleNotifySound(): void {

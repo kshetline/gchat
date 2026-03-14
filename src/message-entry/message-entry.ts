@@ -84,6 +84,10 @@ export class MessageEntry implements OnInit {
       enter: {
         key: 'Enter',
         'handler': () => this.sendMessage()
+      },
+      tab: {
+        key: 'Tab',
+        'handler': () => true
       }
     };
 
@@ -94,6 +98,11 @@ export class MessageEntry implements OnInit {
       },
       theme: 'snow'
     });
+    this.quill.root.setAttribute('spellcheck', 'true');
+  }
+
+  focus(): void {
+    this.quill.focus();
   }
 
   updateColor(): void {
@@ -113,5 +122,6 @@ export class MessageEntry implements OnInit {
   reset(): void {
     this.sendEnabled(true);
     this.quill.setText('');
+    this.focus();
   }
 }
