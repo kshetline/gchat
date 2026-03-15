@@ -27,6 +27,7 @@ export class App implements OnInit {
   private pendingFocus = false;
 
   color = signal(0);
+  connectionTrouble = signal(false);
   email= signal('');
   inChat = signal(false);
   localTime = signal(true);
@@ -70,17 +71,22 @@ export class App implements OnInit {
 
     httpClient.get<Config>('/api/config').subscribe({
       next: (config: Config): void => {
+        this.connectionTrouble.set(false);
         document.title = config.title;
         this.title.set(config.title);
         this.navigation.set(config.navigation);
         localStorage.setItem('gchat-config', JSON.stringify(config));
       },
-      error: (_error): void => {}
+      error: (_error): void => this.connectionTrouble.set(true)
     })
   }
 
   ngOnInit(): void {
     this.getMessages();
+  }
+
+  private repollMessages(): void {
+    this.messageTimer = setTimeout(() => this.getMessages(), 10000);
   }
 
   protected getMessages(): void {
@@ -92,6 +98,8 @@ export class App implements OnInit {
     this.httpClient.get<Messages>('/api/messages', { params: { name: this.name() }}).subscribe({
       next: (messages: Messages): void => {
         if (!messages.errorMessage) {
+          this.connectionTrouble.set(false);
+
           if (!this.newOnBottom())
             messages.messages.reverse();
 
@@ -105,9 +113,14 @@ export class App implements OnInit {
 
           this.participants.set(messages.participants);
         }
+        else
+          this.connectionTrouble.set(true);
+
+        this.repollMessages();
       },
-      complete: (): void => {
-        this.messageTimer = setTimeout(() => this.getMessages(), 10000);
+      error: (_error): void => {
+        this.connectionTrouble.set(true);
+        this.repollMessages();
       }
     });
   }
@@ -130,21 +143,26 @@ export class App implements OnInit {
 
     this.httpClient.post('/api/enter', {}, { params: this.prefs as any }).subscribe({
       next: (): void => {
+        this.connectionTrouble.set(false)
         this.pendingFocus = true;
         this.inChat.set(true);
         setTimeout(() => this.adjustScrolling(), 250);
       },
-      error: (_error): void => this.inChat.set(false)
+      error: (_error): void => {
+        this.connectionTrouble.set(true);
+        this.inChat.set(false);
+      }
     });
   }
 
   leaveChat(): void {
     this.httpClient.post('/api/leave', {}, { params: this.prefs as any }).subscribe({
       next: (): void => {
+        this.connectionTrouble.set(false)
         this.inChat.set(false);
         setTimeout(() => this.adjustScrolling());
       },
-      error: (_error): void => {}
+      error: (_error): void => this.connectionTrouble.set(true)
     });
   }
 
@@ -158,11 +176,15 @@ export class App implements OnInit {
 
     this.httpClient.post('/api/send', {}, { params }).subscribe({
       next: (): void => {
+        this.connectionTrouble.set(false)
         this.inChat.set(true);
         this.messageEntry.reset();
         setTimeout(() => this.getMessages(), 500);
       },
-      error: (_error): void => this.messageEntry.sendEnabled(true)
+      error: (_error): void => {
+        this.connectionTrouble.set(true);
+        this.messageEntry.sendEnabled(true);
+      }
     });
   }
 

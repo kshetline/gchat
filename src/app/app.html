@@ -1,8 +1,9 @@
-<div class="navigation">
+<div class="navigation"><div>
   @for (link of navigation(); track link.url) {
     <a [href]="link.url" [target]="link.target || '_blank'">{{ link.name }}</a>
   }
-</div>
+</div></div>
+<div class="connection-trouble" [style.display]="connectionTrouble() ? 'block' : 'none'">⚡️Connection trouble</div>
 <main xmlns="http://www.w3.org/1999/html">
   <div class="header">
     <h1 class="form-h1">{{ title() }}</h1>

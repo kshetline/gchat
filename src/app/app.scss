@@ -5,14 +5,28 @@ main {
   margin: 0 10px;
 }
 
-.navigation {
-  display: flex;
-  gap: 1em;
-  justify-content: center;
-  margin: 0.5em 0;
-  position: absolute;
-  top: 0;
-  width: 100%;
+.connection-trouble {
+  background-color: #F06;
+  color: white;
+  padding: 0.25em 0.5em;
+  position: fixed;
+  right: 0.5em;
+  top: 0.5em;
+  z-index: 2;
+
+  animation: pulse-size 4s infinite ease-in-out;
+}
+
+@keyframes pulse-size {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .header {
