@@ -24,7 +24,7 @@
     }
   </div>
   <button id="emoji-button" (click)="toggleEmoji()">😀</button>
-  <emoji-mart #picker title="Pick your emoji…" emoji="point_up" [style.display]="showEmoji() ? 'block' : 'none'"
+  <emoji-mart emoji="" [style.display]="showEmoji() ? 'block' : 'none'"
       [style.top]="pickerPosition().top" [style.left]="pickerPosition().left"
       (emojiClick)="emojiClick($event)"></emoji-mart>
 </div>

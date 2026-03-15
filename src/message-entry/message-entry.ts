@@ -1,4 +1,4 @@
-import { Component, ElementRef, EventEmitter, Output, signal, ViewChild } from '@angular/core';
+import { Component, ElementRef, EventEmitter, Output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import Quill from 'quill';
 import { QuillModule  } from 'ngx-quill';
@@ -15,6 +15,10 @@ Quill.register(Size, true);
 
 const tagMap: Record<string, string> = { 'bold': 'b', 'italic': 'i', 'size': '', 'strike': 's', 'underline': 'u' };
 const recognizedAttributes = new Set(Object.keys(tagMap));
+
+if (!localStorage.getItem('emoji-mart.frequently'))
+  localStorage.setItem('emoji-mart.frequently',
+    '{"grinning":9,"laughing":8,"joy":7,"wink":6,"skull":5,"scream":4,"slightly_frowning_face":3,"+1":2,"-1":1}');
 
 function quillOpsToBBCode(ops: any[]): string {
   let result = '';
@@ -102,9 +106,7 @@ export class MessageEntry {
   @Output() changeColor = new EventEmitter<number>();
   @Output() newMessage = new EventEmitter<string>();
 
-  @ViewChild('picker') picker: ElementRef;
-
-  constructor() {
+  constructor(private elementRef: ElementRef<HTMLElement>) {
     document.addEventListener('keydown', (event: KeyboardEvent) => {
       if (event.key === 'Escape' && this.showEmoji()) {
         this.showEmoji.set(false);
@@ -155,9 +157,55 @@ export class MessageEntry {
   toggleEmoji(): void {
     this.showEmoji.set(!this.showEmoji());
 
-    if (this.showEmoji() && this.picker) {
-      const rectB = this.picker.nativeElement.getElementById('emoji-button')?.getBoundingClientRect();
-      const rectP = this.picker.nativeElement.getBoundingClientRect();
+    if (this.showEmoji()) {
+      setTimeout(() => {
+        const button = this.elementRef.nativeElement.querySelector('#emoji-button');
+        const picker = this.elementRef.nativeElement.querySelector('emoji-mart');
+        const editor = this.elementRef.nativeElement.querySelector('quill-editor');
+
+        if (!button || !picker || !editor) return;
+
+        const buttonRect = button.getBoundingClientRect();
+        const pickerRect = picker.getBoundingClientRect();
+        const editorRect = editor.getBoundingClientRect();
+
+        // Align left edge of picker to left edge of button
+        let left = buttonRect.left;
+
+        // Determine vertical position
+        let top: number;
+        const spaceAbove = buttonRect.top;
+        const fitsAbove = spaceAbove >= pickerRect.height;
+
+        if (fitsAbove)
+          // Position picker above button
+          top = buttonRect.top - pickerRect.height;
+        else
+          // Position picker below editor
+          top = editorRect.bottom;
+
+        // Ensure picker is not clipped off screen
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+
+        // Adjust horizontal position if clipped on right
+        if (left + pickerRect.width > viewportWidth)
+          left = viewportWidth - pickerRect.width;
+
+        // Adjust horizontal position if clipped on left
+        if (left < 0)
+          left = 0;
+
+        // Adjust vertical position if clipped on bottom
+        if (top + pickerRect.height > viewportHeight)
+          top = viewportHeight - pickerRect.height;
+
+        // Adjust vertical position if clipped on top
+        if (top < 0)
+          top = 0;
+
+        this.pickerPosition.set({ top: `${top}px`, left: `${left}px` });
+      });
     }
   }
 
@@ -169,5 +217,6 @@ export class MessageEntry {
       this.quill.deleteText(range.index, range.length);
 
     this.quill.insertText(range.index, char);
+    this.quill.setSelection(range.index + char.length);
   }
 }
