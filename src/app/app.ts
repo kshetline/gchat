@@ -22,9 +22,12 @@ export class App implements OnInit {
   private readonly chime = new Audio('assets/notify.wav');
   private readonly prefs: Preferences;
 
+  private baseTitle = 'Chat'
+  private chatActive = true;
   private _messageEntry: MessageEntry
   private messageTimer: any;
   private pendingFocus = false;
+  private unseenMessages = 0;
 
   color = signal(0);
   connectionTrouble = signal(false);
@@ -37,7 +40,7 @@ export class App implements OnInit {
   navigation = signal([] as { name: string, url: string; target?: string }[]);
   notifySound = signal(true);
   participants = signal([] as string[]);
-  title = signal('Chat');
+  title = signal(this.baseTitle);
   tripCode = signal('');
 
   get messageEntry(): MessageEntry { return this._messageEntry; }
@@ -62,7 +65,7 @@ export class App implements OnInit {
       try {
         const config = JSON.parse(configStr) as Config;
 
-        document.title = config.title;
+        document.title = this.baseTitle = config.title;
         this.title.set(config.title);
         this.navigation.set(config.navigation);
       }
@@ -78,11 +81,24 @@ export class App implements OnInit {
         localStorage.setItem('gchat-config', JSON.stringify(config));
       },
       error: (_error): void => this.connectionTrouble.set(true)
-    })
+    });
+
+    document.addEventListener('visibilitychange', () => this.checkChatActive());
+    window.addEventListener('blur', () => this.checkChatActive());
+    window.addEventListener('focus', () => this.checkChatActive());
   }
 
   ngOnInit(): void {
     this.getMessages();
+  }
+
+  private checkChatActive(): void {
+    this.chatActive = document.hasFocus() && !document.hidden;
+
+    if (this.chatActive) {
+      this.unseenMessages = 0;
+      document.title = this.baseTitle;
+    }
   }
 
   private repollMessages(): void {
@@ -104,8 +120,13 @@ export class App implements OnInit {
             messages.messages.reverse();
 
           if (!isEqual(this.messages(), messages.messages)) {
-            if (this.messages().length > 0 && this.prefs.notifySound)
-              this.chime.play().finally();
+            if (this.messages().length > 0 && !this.chatActive) {
+              this.unseenMessages++;
+              document.title = `(${this.unseenMessages}) ${this.baseTitle}`;
+
+              if (this.prefs.notifySound)
+                this.chime.play().finally();
+            }
 
             this.messages.set(messages.messages);
             this.adjustScrolling();
