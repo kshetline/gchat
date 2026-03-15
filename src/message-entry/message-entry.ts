@@ -103,6 +103,10 @@ export class MessageEntry {
     this.updateColor(false);
   }
 
+  setColor(color: number): void {
+    this.color.set(color);
+  }
+
   focus(color?: number): void {
     if (color != null)
       this.color.set(color);

@@ -22,7 +22,9 @@ export class App implements OnInit {
   private readonly chime = new Audio('assets/notify.wav');
   private readonly prefs: Preferences;
 
+  private _messageEntry: MessageEntry
   private messageTimer: any;
+  private pendingFocus = false;
 
   color = signal(0);
   email= signal('');
@@ -37,7 +39,17 @@ export class App implements OnInit {
   title = signal('Chat');
   tripCode = signal('');
 
-  @ViewChild(MessageEntry) private messageEntry: MessageEntry;
+  get messageEntry(): MessageEntry { return this._messageEntry; }
+  @ViewChild(MessageEntry) set messageEntry(value: MessageEntry) {
+    this._messageEntry = value;
+
+    if (this.pendingFocus) {
+      this.pendingFocus = false;
+      this.messageEntry?.focus(this.color());
+    }
+    else
+      this.messageEntry?.setColor(this.color());
+  }
 
   constructor(private httpClient: HttpClient, private prefService: PreferencesService) {
     this.prefs = this.prefService.get();
@@ -118,11 +130,9 @@ export class App implements OnInit {
 
     this.httpClient.post('/api/enter', {}, { params: this.prefs as any }).subscribe({
       next: (): void => {
+        this.pendingFocus = true;
         this.inChat.set(true);
-        setTimeout(() => {
-          this.adjustScrolling();
-          this.messageEntry.focus(this.color());
-        });
+        setTimeout(() => this.adjustScrolling());
       },
       error: (_error): void => this.inChat.set(false)
     });
@@ -185,7 +195,7 @@ export class App implements OnInit {
     this.prefService.set(this.prefs);
     this.messages.set(this.messages().reverse());
     this.adjustScrolling();
-    setTimeout(() => this.messageEntry?.focus(), 250);
+    this.pendingFocus = true;
   }
 
   private adjustScrolling(): void {
