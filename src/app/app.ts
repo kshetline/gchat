@@ -37,7 +37,7 @@ export class App implements OnInit {
   title = signal('Chat');
   tripCode = signal('');
 
-  @ViewChild(MessageEntry) private readonly messageEntry: MessageEntry;
+  @ViewChild(MessageEntry) private messageEntry: MessageEntry;
 
   constructor(private httpClient: HttpClient, private prefService: PreferencesService) {
     this.prefs = this.prefService.get();
@@ -185,6 +185,7 @@ export class App implements OnInit {
     this.prefService.set(this.prefs);
     this.messages.set(this.messages().reverse());
     this.adjustScrolling();
+    setTimeout(() => this.messageEntry?.focus(), 250);
   }
 
   private adjustScrolling(): void {

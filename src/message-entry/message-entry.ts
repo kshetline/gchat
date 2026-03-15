@@ -1,6 +1,7 @@
-import { Component, effect, EventEmitter, OnInit, Output, signal } from '@angular/core';
+import { Component, EventEmitter, Output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import Quill from 'quill';
+import { QuillModule  } from 'ngx-quill';
 import { forEach } from '@tubular/util';
 import { colors, getTextBackground } from '../main';
 
@@ -66,11 +67,11 @@ function quillOpsToBBCode(ops: any[]): string {
 
 @Component({
   selector: 'app-message-entry',
-  imports: [FormsModule],
+  imports: [FormsModule, QuillModule],
   templateUrl: './message-entry.html',
   styleUrl: './message-entry.scss',
 })
-export class MessageEntry implements OnInit {
+export class MessageEntry {
   colors = colors;
 
   private quill: Quill;
@@ -78,46 +79,43 @@ export class MessageEntry implements OnInit {
   color = signal(0);
   enabled = signal(true);
 
+  modules = {
+    keyboard: {
+      bindings: {
+        enter: {
+          key: 'Enter',
+          'handler': () => this.sendMessage()
+        },
+        tab: {
+          key: 'Tab',
+          'handler': () => true
+        }
+      }
+    },
+    toolbar: '#my-toolbar',
+  };
+
   @Output() changeColor = new EventEmitter<number>();
   @Output() newMessage = new EventEmitter<string>();
 
-  constructor() {
-    effect(() => {
-      this.quill.root.style.color = this.colors[this.color()];
-      this.quill.root.style.backgroundColor = getTextBackground(this.colors[this.color()]);
-    });
-  }
-
-  ngOnInit(): void {
-    const bindings = {
-      enter: {
-        key: 'Enter',
-        'handler': () => this.sendMessage()
-      },
-      tab: {
-        key: 'Tab',
-        'handler': () => true
-      }
-    };
-
-    this.quill = new Quill('#editor', {
-      modules: {
-        keyboard: { bindings },
-        toolbar: '#toolbar',
-      },
-      theme: 'snow'
-    });
+  editorCreated(quill: Quill): void {
+    this.quill = quill;
+    this.updateColor(false);
   }
 
   focus(color?: number): void {
     if (color != null)
       this.color.set(color);
 
-    this.quill.focus();
+    setTimeout(() => this.quill?.focus(), 250);
   }
 
-  updateColor(): void {
-    this.changeColor.emit(this.color());
+  updateColor(emit = true): void {
+    if (emit)
+      this.changeColor.emit(this.color());
+
+    this.quill.root.style.color = this.colors[this.color()];
+    this.quill.root.style.backgroundColor = getTextBackground(this.colors[this.color()]);
   }
 
   sendMessage(): void {

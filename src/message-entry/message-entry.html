@@ -1,4 +1,4 @@
-<div id="toolbar">
+<div id="my-toolbar">
   <span class="ql-formats">
     <button class="ql-bold"></button>
     <button class="ql-italic"></button>
@@ -19,9 +19,10 @@
     @for (buttonColor of colors; track buttonColor; let i = $index) {
       @if (buttonColor) {
         <input type="radio" class="text-color-btn" name="text-color-me" [style.color]="buttonColor" [value]="i"
-          [(ngModel)]="color" (change)="updateColor()">
+               [(ngModel)]="color" (change)="updateColor()">
       }
     }
   </div>
 </div>
-<div id="editor"></div>
+<quill-editor [modules]="modules" (onEditorCreated)="editorCreated($event)" placeholder="">
+</quill-editor>
