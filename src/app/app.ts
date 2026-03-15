@@ -132,7 +132,7 @@ export class App implements OnInit {
       next: (): void => {
         this.pendingFocus = true;
         this.inChat.set(true);
-        setTimeout(() => this.adjustScrolling());
+        setTimeout(() => this.adjustScrolling(), 250);
       },
       error: (_error): void => this.inChat.set(false)
     });
