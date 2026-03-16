@@ -16,8 +16,8 @@ const matchEmoji = /(\uD83C[\uD000-\uDFFF]|\uD83D[\uD000-\uDFFF]|\uD83E[\uD000-\
   styleUrl: './app.scss'
 })
 export class App implements OnInit {
-  colorByIndex = colorByIndex;
-  colors = colors;
+  protected colorByIndex = colorByIndex;
+  protected colors = colors;
 
   private readonly chime = new Audio('assets/notify.wav');
   private readonly prefs: Preferences;
@@ -326,6 +326,7 @@ export class App implements OnInit {
 
     this.prefs.theme = theme;
     this.prefService.set(this.prefs);
+    setTimeout(() => this.messageEntry?.updateColor(false));
   }
 
   protected getColor(message: Message) {

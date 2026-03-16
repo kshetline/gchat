@@ -28,9 +28,9 @@ export function getTextBackground(styleOrColor: string, darkMode = false): strin
     const rgb = parseColor(color);
     const luminance = rgb.r * 0.299 + rgb.g * 0.587 + rgb.b * 0.114;
 
-    if (darkMode ? luminance > 20 : luminance > 140)
+    if (darkMode ? luminance > 85 : luminance > 140)
       lightBackground = false;
   }
 
-  return lightBackground ? (darkMode ? '#999' : 'white') : '#222';
+  return lightBackground ? (darkMode ? '#AAA' : 'white') : '#333';
 }

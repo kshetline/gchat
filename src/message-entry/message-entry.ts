@@ -150,7 +150,7 @@ export class MessageEntry {
     setTimeout(() => this.quill?.focus(), 250);
   }
 
-  protected updateColor(emit = true): void {
+  updateColor(emit = true): void {
     if (emit)
       this.changeColor.emit(this.color());
 
