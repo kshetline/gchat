@@ -20,9 +20,10 @@ const domain = process.env.CHAT_DOMAIN;
 const parser = new HtmlParser();
 const sessions = new Map<string, SessionInfo>();
 const config: Config = {
-  title: process.env.CHAT_TITLE,
+  backgroundColor: process.env.CHAT_BACKGROUND || '#DDDDDD',
   navigation: process.env.NAV_LINKS.split(';').map(link => link.split('::'))
-  .map(link => ({ name: link[0], url: link[1], target: link[2] || '_blank' }))
+    .map(link => ({ name: link[0], url: link[1], target: link[2] || '_blank' })),
+  title: process.env.CHAT_TITLE,
 };
 
 function getTextAndMarkup(elems: DomElement[], domain: string): string {

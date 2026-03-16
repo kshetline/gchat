@@ -3,6 +3,15 @@
     <a [href]="link.url" [target]="link.target || '_blank'">{{ link.name }}</a>
   }
 </div></div>
+<div class="theme-select">
+  <i class="fa-solid fa-circle-half-stroke" (click)="showThemes.set(!showThemes())"></i>
+  <div class="theme-list" [style.display]="showThemes() ? 'flex' : 'none'">
+    <div (click)="setTheme('')" style="background-color: var(--primary-bkg)"
+        >Default</div>
+    <div (click)="setTheme('light-blue')" style="background-color: var(--theme-light-blue-bkg)"
+        >Light Blue</div>
+  </div>
+</div>
 <div class="connection-trouble" [style.display]="connectionTrouble() ? 'block' : 'none'">⚡️Connection trouble</div>
 <main xmlns="http://www.w3.org/1999/html">
   <div class="header">

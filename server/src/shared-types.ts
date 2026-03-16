@@ -1,6 +1,7 @@
 export interface Config {
-  title: string;
+  backgroundColor: string;
   navigation: { name: string; url: string; target?: string }[];
+  title: string;
 }
 
 export interface Message {
@@ -26,5 +27,6 @@ export interface Preferences {
   name: string;
   newOnBottom: boolean;
   notifySound: boolean;
+  theme?: string;
   tripCode: string;
 }

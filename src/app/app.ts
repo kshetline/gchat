@@ -41,6 +41,8 @@ export class App implements OnInit {
   protected navigation = signal([] as { name: string, url: string; target?: string }[]);
   protected notifySound = signal(true);
   protected participants = signal([] as string[]);
+  protected showThemes = signal(false);
+  protected theme = signal('');
   protected title = signal(this.baseTitle);
   protected toolHash = signal('');
   protected toolTimer: any;
@@ -61,8 +63,10 @@ export class App implements OnInit {
   constructor(private httpClient: HttpClient, private prefService: PreferencesService) {
     this.prefs = this.prefService.get();
     forEach(this.prefs as Record<string, any>, (key, value) => (this as any)[key]?.set(value));
+    this.setTheme(this.prefs.theme);
 
     const configStr = localStorage.getItem('gchat-config');
+    const root = document.documentElement;
 
     if (configStr) {
       try {
@@ -71,6 +75,7 @@ export class App implements OnInit {
         document.title = this.baseTitle = config.title;
         this.title.set(config.title);
         this.navigation.set(config.navigation);
+        root.style.setProperty('--primary-bkg', config.backgroundColor || '#DDDDDD');
       }
       catch {}
     }
@@ -81,10 +86,18 @@ export class App implements OnInit {
         document.title = config.title;
         this.title.set(config.title);
         this.navigation.set(config.navigation);
+        root.style.setProperty('--primary-bkg', config.backgroundColor || '#DDDDDD');
         localStorage.setItem('gchat-config', JSON.stringify(config));
       },
       error: (_error): void => this.connectionTrouble.set(true)
     });
+
+    document.addEventListener('keydown', (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && this.showThemes()) {
+        this.showThemes.set(false);
+        event.preventDefault();
+      }
+    })
 
     document.addEventListener('mouseup', () => setTimeout(() => this.lastSelectedText = window.getSelection().toString()));
 
@@ -297,5 +310,16 @@ export class App implements OnInit {
       else
         messages.scrollTop = 0;
     });
+  }
+
+  protected setTheme(theme: string) {
+    Array.from(document.body.classList).forEach(c => c.startsWith('theme-') && document.body.classList.remove(c));
+
+    if (theme)
+      document.body.classList.add(`theme-${theme}`);
+
+    this.showThemes.set(false);
+    this.prefs.theme = theme;
+    this.prefService.set(this.prefs);
   }
 }

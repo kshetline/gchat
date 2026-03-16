@@ -224,11 +224,7 @@ export class MessageEntry {
   }
 
   insertQuote(name: string, quote: string): void {
-    const range = this.quill.selection.savedRange;
-    let index = range.index;
-
-    if (range.length > 0)
-      this.quill.deleteText(range.index, range.length);
+    let index = 0;
 
     this.quill.insertText(index, name, { underline: true });
     index += name.length;

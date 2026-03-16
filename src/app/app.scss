@@ -5,12 +5,36 @@ main {
   margin: 0 10px;
 }
 
+.theme-select {
+  align-items: end;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  right: 0.5em;
+  top: 0.5em;
+  z-index: 1;
+
+  .theme-list {
+    border: 3px solid #999;
+    display: none;
+    flex-direction: column;
+    position: relative;
+    right: 0;
+
+    > div {
+      font-weight: bold;
+      padding: 0.5em;
+    }
+  }
+}
+
 .connection-trouble {
   background-color: #F06;
   color: white;
   padding: 0.25em 0.5em;
   position: fixed;
-  right: 0.5em;
+  right: 4em;
   top: 0.5em;
   z-index: 2;
 
@@ -150,6 +174,7 @@ main {
 
     .bubble {
       flex-grow: 1;
+      text-align: end;
     }
   }
 
