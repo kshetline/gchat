@@ -29,19 +29,19 @@ export class App implements OnInit {
   private pendingFocus = false;
   private unseenMessages = 0;
 
-  color = signal(0);
-  connectionTrouble = signal(false);
-  email= signal('');
-  inChat = signal(false);
-  localTime = signal(true);
-  messages = signal([] as Message[]);
-  name = signal('');
-  newOnBottom = signal(true);
-  navigation = signal([] as { name: string, url: string; target?: string }[]);
-  notifySound = signal(true);
-  participants = signal([] as string[]);
-  title = signal(this.baseTitle);
-  tripCode = signal('');
+  protected color = signal(0);
+  protected connectionTrouble = signal(false);
+  protected email= signal('');
+  protected inChat = signal(false);
+  protected localTime = signal(true);
+  protected messages = signal([] as Message[]);
+  protected name = signal('');
+  protected newOnBottom = signal(true);
+  protected navigation = signal([] as { name: string, url: string; target?: string }[]);
+  protected notifySound = signal(true);
+  protected participants = signal([] as string[]);
+  protected title = signal(this.baseTitle);
+  protected tripCode = signal('');
 
   get messageEntry(): MessageEntry { return this._messageEntry; }
   @ViewChild(MessageEntry) set messageEntry(value: MessageEntry) {
@@ -146,12 +146,12 @@ export class App implements OnInit {
     });
   }
 
-  updateColor(): void {
+  protected updateColor(): void {
     this.prefs.color = this.color();
     this.prefService.set(this.prefs);
   }
 
-  enterChat(): void {
+  protected enterChat(): void {
     this.prefs.name = this.name();
     this.prefs.email = this.email();
     this.prefService.set(this.prefs);
@@ -176,7 +176,7 @@ export class App implements OnInit {
     });
   }
 
-  leaveChat(): void {
+  protected leaveChat(): void {
     this.httpClient.post('/api/leave', {}, { params: this.prefs as any }).subscribe({
       next: (): void => {
         this.connectionTrouble.set(false)
@@ -187,7 +187,7 @@ export class App implements OnInit {
     });
   }
 
-  sendComment(comment: string): void {
+  protected sendComment(comment: string): void {
     if (!comment?.trim())
       return;
 
@@ -209,36 +209,62 @@ export class App implements OnInit {
     });
   }
 
-  formatLocal(timestamp: string): string {
+  protected formatLocal(timestamp: string): string {
     return new Date(timestamp + 'Z').toLocaleString();
   }
 
-  magnifyEmoji(text: string): string {
+  protected magnifyEmoji(text: string): string {
     return text.replace(matchEmoji, '<span class="big-emoji">$1</span>');
   }
 
-  toggleNotifySound(): void {
+  protected toggleNotifySound(): void {
     this.prefs.notifySound = this.notifySound();
     this.prefService.set(this.prefs);
   }
 
-  toggleLocalTime(): void {
+  protected toggleLocalTime(): void {
     this.prefs.localTime = this.localTime();
     this.prefService.set(this.prefs);
   }
 
-  setColor(color: number): void {
+  protected setColor(color: number): void {
     this.color.set(color);
     this.prefs.color = color;
     this.prefService.set(this.prefs);
   }
 
-  toggleMessageOrder(): void {
+  protected toggleMessageOrder(): void {
     this.prefs.newOnBottom = this.newOnBottom();
     this.prefService.set(this.prefs);
     this.messages.set(this.messages().reverse());
     this.adjustScrolling();
     this.pendingFocus = true;
+  }
+
+  protected isMe(message: Message): boolean {
+    return message.name === this.name();
+  }
+
+  protected isAdmin(): boolean {
+    return false;
+  }
+
+  protected focusMessage(_message: Message, _state: boolean): void {
+  }
+
+  protected quoteMessage(_message: Message): void {
+  }
+
+  protected editMessage(_message: Message): void {
+    alert('Not yet implemented');
+  }
+
+  protected deleteMessage(_message: Message): void {
+    alert('Not yet implemented');
+  }
+
+  protected isFocused(_message: Message) {
+
   }
 
   private adjustScrolling(): void {

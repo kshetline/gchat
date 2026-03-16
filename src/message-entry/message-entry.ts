@@ -78,16 +78,16 @@ function quillOpsToBBCode(ops: any[]): string {
   styleUrl: './message-entry.scss',
 })
 export class MessageEntry {
-  colors = colors;
+  protected colors = colors;
 
   private quill: Quill;
 
-  color = signal(0);
-  enabled = signal(true);
-  showEmoji = signal(false);
-  pickerPosition = signal({ top: '0', left: '0' });
+  protected color = signal(0);
+  protected enabled = signal(true);
+  protected showEmoji = signal(false);
+  protected pickerPosition = signal({ top: '0', left: '0' });
 
-  modules = {
+  protected modules = {
     keyboard: {
       bindings: {
         enter: {
@@ -115,7 +115,7 @@ export class MessageEntry {
     })
   }
 
-  editorCreated(quill: Quill): void {
+  protected editorCreated(quill: Quill): void {
     this.quill = quill;
     this.updateColor(false);
   }
@@ -131,7 +131,7 @@ export class MessageEntry {
     setTimeout(() => this.quill?.focus(), 250);
   }
 
-  updateColor(emit = true): void {
+  protected updateColor(emit = true): void {
     if (emit)
       this.changeColor.emit(this.color());
 
@@ -154,7 +154,7 @@ export class MessageEntry {
     this.quill.setText('');
   }
 
-  toggleEmoji(): void {
+  protected toggleEmoji(): void {
     this.showEmoji.set(!this.showEmoji());
 
     if (this.showEmoji()) {
@@ -209,7 +209,7 @@ export class MessageEntry {
     }
   }
 
-  emojiClick(emoji: Emoji): void {
+  protected emojiClick(emoji: Emoji): void {
     const char = ((emoji.emoji instanceof String) ? emoji.emoji : (emoji.emoji as EmojiData)?.native)?.toString() || '';
     const range = this.quill.selection.savedRange;
 

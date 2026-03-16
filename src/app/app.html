@@ -73,7 +73,7 @@
   }
   <div class="message-list" id="message-list">
     @for (message of messages(); track message.hash) {
-      <div class="name">
+      <div class="name" [class.me]="isMe(message)">
         <span [style]="message.style" [style.background-color]="getTextBackground(message.style)">{{
             message.name }}@if (message.email) { &nbsp;<a class="email-link" [href]="message.email">📫</a> }</span>
         @if (message.trip) {
@@ -83,8 +83,26 @@
           <span class="time">{{ localTime() ? formatLocal(message.timestamp) : message.timestamp }}</span>
         }
       </div>
-      <div class="bubble" [innerHTML]="magnifyEmoji(message.text)"
-           [style]="message.style" [style.background-color]="getTextBackground(message.style)"></div>
+      <div class="bubble-wrap" [class.me]="isMe(message)"
+           (mouseenter)="focusMessage(message, true)" (mouseleave)="focusMessage(message, false)"
+           (click)="focusMessage(message, true)" [class.show-tools]="isFocused(message)">
+        <div class="bubble" [innerHTML]="magnifyEmoji(message.text)"
+             [style]="message.style" [style.background-color]="getTextBackground(message.style)"></div>
+        @if (inChat()) {
+          <div class="tools">
+            @if (isMe(message)) {
+              <i class="fa-solid fa-pencil" (click)="editMessage(message)"></i>
+            }
+            @else {
+              <i class="fa-solid fa-quote-left" (click)="quoteMessage(message)"></i>
+            }
+
+            @if (isMe(message) || isAdmin()) {
+              <i class="fa-solid fa-trash-can" (click)="deleteMessage(message)"></i>
+            }
+          </div>
+        }
+      </div>
     }
   </div>
   @if (inChat() && newOnBottom()) {
