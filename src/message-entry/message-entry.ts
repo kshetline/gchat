@@ -20,6 +20,9 @@ if (!localStorage.getItem('emoji-mart.frequently'))
   localStorage.setItem('emoji-mart.frequently',
     '{"grinning":9,"laughing":8,"joy":7,"wink":6,"skull":5,"scream":4,"slightly_frowning_face":3,"+1":2,"-1":1}');
 
+const QUOTE_NAME_DELIM = ': ';
+const QUOTE_MARKER = '\u00A0◀︎ ';
+
 function quillOpsToBBCode(ops: any[]): string {
   let result = '';
   const stacks = new Map<string, any[]>();
@@ -218,5 +221,23 @@ export class MessageEntry {
 
     this.quill.insertText(range.index, char);
     this.quill.setSelection(range.index + char.length);
+  }
+
+  insertQuote(name: string, quote: string): void {
+    const range = this.quill.selection.savedRange;
+    let index = range.index;
+
+    if (range.length > 0)
+      this.quill.deleteText(range.index, range.length);
+
+    this.quill.insertText(index, name, { underline: true });
+    index += name.length;
+    this.quill.insertText(index, QUOTE_NAME_DELIM, { underline: false });
+    index += QUOTE_NAME_DELIM.length;
+    this.quill.insertText(index, quote, { italic: true });
+    index += quote.length;
+    this.quill.insertText(index, QUOTE_MARKER, { italic: false });
+    index += QUOTE_MARKER.length;
+    this.quill.setSelection(index);
   }
 }

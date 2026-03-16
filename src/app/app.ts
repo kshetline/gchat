@@ -1,7 +1,7 @@
 import { Component, OnInit, signal, ViewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Config, Message, Messages, Preferences } from '../../server/src/shared-types';
-import { forEach, isEqual } from '@tubular/util';
+import { forEach, htmlUnescape, isEqual } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { MessageEntry } from '../message-entry/message-entry';
@@ -24,6 +24,7 @@ export class App implements OnInit {
 
   private baseTitle = 'Chat'
   private chatActive = true;
+  private lastSelectedText = '';
   private _messageEntry: MessageEntry
   private messageTimer: any;
   private pendingFocus = false;
@@ -41,6 +42,8 @@ export class App implements OnInit {
   protected notifySound = signal(true);
   protected participants = signal([] as string[]);
   protected title = signal(this.baseTitle);
+  protected toolHash = signal('');
+  protected toolTimer: any;
   protected tripCode = signal('');
 
   get messageEntry(): MessageEntry { return this._messageEntry; }
@@ -82,6 +85,8 @@ export class App implements OnInit {
       },
       error: (_error): void => this.connectionTrouble.set(true)
     });
+
+    document.addEventListener('mouseup', () => setTimeout(() => this.lastSelectedText = window.getSelection().toString()));
 
     document.addEventListener('visibilitychange', () => this.checkChatActive());
     window.addEventListener('blur', () => this.checkChatActive());
@@ -249,10 +254,26 @@ export class App implements OnInit {
     return false;
   }
 
-  protected focusMessage(_message: Message, _state: boolean): void {
+  protected focusMessage(message: Message, state: boolean): void {
+    if (state) {
+      if (this.toolTimer) {
+        clearTimeout(this.toolTimer);
+        this.toolTimer = undefined;
+      }
+
+      this.toolHash.set(message.hash);
+    }
+    else if (this.toolHash() === message.hash)
+      this.toolTimer = setTimeout(() => this.toolHash.set(''), 2000);
   }
 
-  protected quoteMessage(_message: Message): void {
+  protected quoteMessage(message: Message): void {
+    let quote = htmlUnescape(message.text.replace(/<.+?>/g, '')).replace(/\s+/g, ' ');
+
+    if (this.lastSelectedText && quote.includes(this.lastSelectedText))
+      quote = this.lastSelectedText;
+
+    this.messageEntry.insertQuote(message.name, quote.trim());
   }
 
   protected editMessage(_message: Message): void {
@@ -263,8 +284,8 @@ export class App implements OnInit {
     alert('Not yet implemented');
   }
 
-  protected isFocused(_message: Message) {
-
+  protected isFocused(message: Message) {
+    return this.inChat() && this.toolHash() === message.hash;
   }
 
   private adjustScrolling(): void {
