@@ -18,15 +18,17 @@
   <div class="color-selector">
     @for (buttonColor of colors; track buttonColor; let i = $index) {
       @if (buttonColor) {
-        <input type="radio" class="text-color-btn" name="text-color-me" [style.color]="buttonColor" [value]="i"
+        <input type="radio" class="text-color-btn" name="text-color-me"
+               [style.color]="colorByIndex(i, darkMode())" [value]="i"
                [(ngModel)]="color" (change)="updateColor()">
       }
     }
   </div>
   <button id="emoji-button" (click)="toggleEmoji()">😀</button>
-  <emoji-mart emoji="" [style.display]="showEmoji() ? 'block' : 'none'"
+  <emoji-mart emoji="" [style.display]="showEmoji() ? 'block' : 'none'" [darkMode]="darkMode()"
       [style.top]="pickerPosition().top" [style.left]="pickerPosition().left" [totalFrequentLines]="2"
       (emojiClick)="emojiClick($event)"></emoji-mart>
 </div>
-<quill-editor [modules]="modules" (onEditorCreated)="editorCreated($event)" placeholder="">
+<quill-editor [formats]="formats" [modules]="modules" [sanitize]="true"
+              (onEditorCreated)="editorCreated($event)" placeholder="">
 </quill-editor>

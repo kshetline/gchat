@@ -1,9 +1,9 @@
-import { Component, ElementRef, EventEmitter, Output, signal } from '@angular/core';
+import { Component, ElementRef, EventEmitter, input, Output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import Quill from 'quill';
 import { QuillModule  } from 'ngx-quill';
 import { forEach } from '@tubular/util';
-import { colors, getTextBackground } from '../main';
+import { colorByIndex, colors, getTextBackground } from '../main';
 import { PickerComponent } from '@ctrl/ngx-emoji-mart';
 import { Emoji, EmojiData } from '@ctrl/ngx-emoji-mart/ngx-emoji';
 
@@ -74,6 +74,9 @@ function quillOpsToBBCode(ops: any[]): string {
   return result.trimEnd();
 }
 
+const formats = ['bold', 'italic', 'underline', 'strike', 'size'];
+const formatSet = new Set(formats);
+
 @Component({
   selector: 'app-message-entry',
   imports: [FormsModule, PickerComponent, QuillModule],
@@ -81,6 +84,7 @@ function quillOpsToBBCode(ops: any[]): string {
   styleUrl: './message-entry.scss',
 })
 export class MessageEntry {
+  protected colorByIndex = colorByIndex;
   protected colors = colors;
 
   private quill: Quill;
@@ -90,7 +94,18 @@ export class MessageEntry {
   protected showEmoji = signal(false);
   protected pickerPosition = signal({ top: '0', left: '0' });
 
+  protected formats = formats;
   protected modules = {
+    clipboard: {
+      matchers: [
+        [Node.ELEMENT_NODE, (_node: any, delta: any) => {
+          delta.ops.forEach((op: any) => {
+            forEach(op.attributes, key => !formatSet.has(key) && delete op.attributes[key]);
+          });
+          return delta;
+        }]
+      ]
+    },
     keyboard: {
       bindings: {
         enter: {
@@ -106,6 +121,7 @@ export class MessageEntry {
     toolbar: '#my-toolbar',
   };
 
+  darkMode = input(false);
   @Output() changeColor = new EventEmitter<number>();
   @Output() newMessage = new EventEmitter<string>();
 
@@ -138,8 +154,8 @@ export class MessageEntry {
     if (emit)
       this.changeColor.emit(this.color());
 
-    this.quill.root.style.color = this.colors[this.color()];
-    this.quill.root.style.backgroundColor = getTextBackground(this.colors[this.color()]);
+    this.quill.root.style.color = colorByIndex(this.color(), this.darkMode());
+    this.quill.root.style.backgroundColor = getTextBackground(this.quill.root.style.color );
   }
 
   sendMessage(): void {

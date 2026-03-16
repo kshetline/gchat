@@ -20,7 +20,7 @@ const domain = process.env.CHAT_DOMAIN;
 const parser = new HtmlParser();
 const sessions = new Map<string, SessionInfo>();
 const config: Config = {
-  backgroundColor: process.env.CHAT_BACKGROUND || '#DDDDDD',
+  backgroundColor: process.env.CHAT_BACKGROUND || '#DDD',
   navigation: process.env.NAV_LINKS.split(';').map(link => link.split('::'))
     .map(link => ({ name: link[0], url: link[1], target: link[2] || '_blank' })),
   title: process.env.CHAT_TITLE,

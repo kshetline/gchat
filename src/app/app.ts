@@ -5,7 +5,7 @@ import { forEach, htmlUnescape, isEqual } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { MessageEntry } from '../message-entry/message-entry';
-import { colors, getTextBackground } from '../main';
+import { colorByIndex, colorFromStyle, colors, getTextBackground } from '../main';
 
 const matchEmoji = /(\uD83C[\uD000-\uDFFF]|\uD83D[\uD000-\uDFFF]|\uD83E[\uD000-\uDFFF])/g;
 
@@ -16,8 +16,8 @@ const matchEmoji = /(\uD83C[\uD000-\uDFFF]|\uD83D[\uD000-\uDFFF]|\uD83E[\uD000-\
   styleUrl: './app.scss'
 })
 export class App implements OnInit {
+  colorByIndex = colorByIndex;
   colors = colors;
-  getTextBackground = getTextBackground;
 
   private readonly chime = new Audio('assets/notify.wav');
   private readonly prefs: Preferences;
@@ -32,6 +32,7 @@ export class App implements OnInit {
 
   protected color = signal(0);
   protected connectionTrouble = signal(false);
+  protected darkMode = signal(false);
   protected email= signal('');
   protected inChat = signal(false);
   protected localTime = signal(true);
@@ -42,7 +43,6 @@ export class App implements OnInit {
   protected notifySound = signal(true);
   protected participants = signal([] as string[]);
   protected showThemes = signal(false);
-  protected theme = signal('');
   protected title = signal(this.baseTitle);
   protected toolHash = signal('');
   protected toolTimer: any;
@@ -62,7 +62,7 @@ export class App implements OnInit {
 
   constructor(private httpClient: HttpClient, private prefService: PreferencesService) {
     this.prefs = this.prefService.get();
-    forEach(this.prefs as Record<string, any>, (key, value) => (this as any)[key]?.set(value));
+    forEach(this.prefs as Record<string, any>, (key, value) => (this as any)[key] && (this as any)[key]?.set(value));
     this.setTheme(this.prefs.theme);
 
     const configStr = localStorage.getItem('gchat-config');
@@ -75,7 +75,7 @@ export class App implements OnInit {
         document.title = this.baseTitle = config.title;
         this.title.set(config.title);
         this.navigation.set(config.navigation);
-        root.style.setProperty('--primary-bkg', config.backgroundColor || '#DDDDDD');
+        root.style.setProperty('--primary-bkg', config.backgroundColor || '#DDD');
       }
       catch {}
     }
@@ -86,7 +86,7 @@ export class App implements OnInit {
         document.title = config.title;
         this.title.set(config.title);
         this.navigation.set(config.navigation);
-        root.style.setProperty('--primary-bkg', config.backgroundColor || '#DDDDDD');
+        root.style.setProperty('--primary-bkg', config.backgroundColor || '#DDD');
         localStorage.setItem('gchat-config', JSON.stringify(config));
       },
       error: (_error): void => this.connectionTrouble.set(true)
@@ -319,7 +319,25 @@ export class App implements OnInit {
       document.body.classList.add(`theme-${theme}`);
 
     this.showThemes.set(false);
+    this.darkMode.set(/\bdark\b/.test(theme));
+
+    if (this.darkMode())
+      document.body.classList.add(`theme-dark`);
+
     this.prefs.theme = theme;
     this.prefService.set(this.prefs);
+  }
+
+  protected getColor(message: Message) {
+    let color = colorFromStyle(message.style);
+
+    if (this.darkMode() && (color === '#000' || color === '#000000' || color === 'black'))
+      color = '#DDD';
+
+    return color;
+  }
+
+  protected getBackground(message: Message) {
+    return getTextBackground(this.getColor(message), this.darkMode());
   }
 }

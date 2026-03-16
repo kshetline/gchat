@@ -17,6 +17,7 @@ main {
 
   .theme-list {
     border: 3px solid #999;
+    color: black;
     display: none;
     flex-direction: column;
     position: relative;
@@ -34,7 +35,7 @@ main {
   color: white;
   padding: 0.25em 0.5em;
   position: fixed;
-  right: 4em;
+  right: 2.25em;
   top: 0.5em;
   z-index: 2;
 
@@ -103,84 +104,12 @@ main {
   }
 }
 
-.participants {
-  align-items: baseline;
-  border-bottom: 1px solid #ccc;
-  border-top: 1px solid #ccc;
-  box-sizing: border-box;
-  display: flex;
-  flex-shrink: 0;
-  flex-wrap: wrap;
-  gap: 0.5em;
-  margin: 0.5em 0;
-  padding: 0.5em 0;
-
-  .participant {
-    background-color: #ccc;
-    border-radius: 4px;
-    padding: 4px;
-  }
-
-  .empty-chat {
-    font-style: italic;
-  }
-}
-
 .message-list {
   display: flex;
   flex: 1;
   flex-direction: column;
   overflow-x: hidden;
   overflow-y: scroll;
-}
-
-.bubble-wrap {
-  align-items: center;
-  background-color: #CCC;
-  border-radius: 10px;
-  display: flex;
-  margin-bottom: 10px;
-  margin-right: 10px;
-  width: fit-content;
-
-  .bubble {
-    border-radius: 10px;
-    padding: 10px;
-  }
-
-  .tools {
-    display: flex;
-    flex-basis: 0;
-    flex-grow: 0;
-    gap: 0.25em;
-    overflow: hidden;
-
-    i {
-      cursor: pointer;
-
-      &:first-child {
-        padding-left: 0.25em;
-      }
-
-      &:last-child {
-        padding-right: 0.25em;
-      }
-    }
-  }
-
-  &.me {
-    align-self: flex-end;
-    flex-direction: row-reverse;
-
-    .bubble {
-      flex-grow: 1;
-      text-align: end;
-    }
-  }
-
-  &.show-tools .tools {
-    overflow: visible;
-  }
 }
 
 .email-link {

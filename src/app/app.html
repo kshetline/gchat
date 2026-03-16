@@ -10,6 +10,8 @@
         >Default</div>
     <div (click)="setTheme('light-blue')" style="background-color: var(--theme-light-blue-bkg)"
         >Light Blue</div>
+    <div (click)="setTheme('dark-blue')" style="background-color: var(--theme-dark-blue-bkg); color: var(--theme-dark-text)"
+        >Dark Blue</div>
   </div>
 </div>
 <div class="connection-trouble" [style.display]="connectionTrouble() ? 'block' : 'none'">⚡️Connection trouble</div>
@@ -37,7 +39,8 @@
               <div class="flex-break"></div>
             }
             @else {
-              <input type="radio" class="text-color-btn" name="text-color" [style.color]="buttonColor" [value]="i"
+              <input type="radio" class="text-color-btn" name="text-color"
+                [style.color]="colorByIndex(i, darkMode())" [value]="i"
                 [(ngModel)]="color" (ngModelChange)="updateColor()">
             }
           }
@@ -77,13 +80,13 @@
     }
   </div>
   @if (inChat() && !newOnBottom()) {
-    <app-message-entry class="on-top"
+    <app-message-entry class="on-top" [darkMode]="darkMode()"
         (changeColor)="setColor($event)" (newMessage)="sendComment($event)"></app-message-entry>
   }
   <div class="message-list" id="message-list">
     @for (message of messages(); track message.hash) {
       <div class="name" [class.me]="isMe(message)">
-        <span [style]="message.style" [style.background-color]="getTextBackground(message.style)">{{
+        <span [style.color]="getColor(message)" [style.background-color]="getBackground(message)">{{
             message.name }}@if (message.email) { &nbsp;<a class="email-link" [href]="message.email">📫</a> }</span>
         @if (message.trip) {
           <span class="trip">{{ message.trip }}</span>
@@ -96,7 +99,7 @@
            (mouseenter)="focusMessage(message, true)" (mouseleave)="focusMessage(message, false)"
            (click)="focusMessage(message, true)" [class.show-tools]="isFocused(message)">
         <div class="bubble" [innerHTML]="magnifyEmoji(message.text)"
-             [style]="message.style" [style.background-color]="getTextBackground(message.style)"></div>
+             [style.color]="getColor(message)" [style.background-color]="getBackground(message)"></div>
         @if (inChat()) {
           <div class="tools">
             @if (isMe(message)) {
@@ -115,7 +118,7 @@
     }
   </div>
   @if (inChat() && newOnBottom()) {
-    <app-message-entry
+    <app-message-entry [darkMode]="darkMode()"
         (changeColor)="setColor($event)" (newMessage)="sendComment($event)"></app-message-entry>
   }
 </main>

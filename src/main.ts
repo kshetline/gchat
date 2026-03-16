@@ -9,15 +9,28 @@ bootstrapApplication(App, appConfig)
 export const colors = ['#000000', '#000080', '#4444cc', '#44cc44', '#cc9911', '#cc4444', '#cc6600', '',
                        '#008040', '#33aaaa', '#cc44cc', '#800000', '#FF80C0', '#b87333', '#8ca9d9', '#4682b4'];
 
-export function getTextBackground(styleOrColor: string): string {
-  const color = (/color:\s*([^;]+)\b/.exec(styleOrColor) || [])[1] || styleOrColor;
+export function colorByIndex(index: number, darkMode = false): string {
+  if (index === 0 && darkMode)
+    return '#FFFFFF';
+  else
+    return colors[index % colors.length];
+}
+
+export function colorFromStyle(styleOrColor: string): string {
+  return (/color:\s*([^;]+)\b/.exec(styleOrColor) || [])[1] || styleOrColor;
+}
+
+export function getTextBackground(styleOrColor: string, darkMode = false): string {
+  const color = colorFromStyle(styleOrColor);
+  let lightBackground = true;
 
   if (color) {
     const rgb = parseColor(color);
+    const luminance = rgb.r * 0.299 + rgb.g * 0.587 + rgb.b * 0.114;
 
-    if (rgb.r * 0.3 + rgb.g * 0.59 + rgb.b * 0.11 > 140)
-      return '#333333';
+    if (darkMode ? luminance > 20 : luminance > 140)
+      lightBackground = false;
   }
 
-  return 'white';
+  return lightBackground ? (darkMode ? '#999' : 'white') : '#222';
 }
