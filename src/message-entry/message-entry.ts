@@ -131,6 +131,13 @@ export class MessageEntry {
         this.showEmoji.set(false);
         event.preventDefault();
       }
+    });
+
+    document.addEventListener('mousedown', (evt: MouseEvent) => {
+      if (!document.querySelector('emoji-mart')?.contains(evt.target as Node) && this.showEmoji()) {
+        this.showEmoji.set(false);
+        evt.preventDefault();
+      }
     })
   }
 

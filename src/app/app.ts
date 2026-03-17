@@ -99,6 +99,13 @@ export class App implements OnInit {
       }
     })
 
+    document.addEventListener('mousedown', (evt: MouseEvent) => {
+      if (!document.getElementById('theme-select')?.contains(evt.target as Node) && this.showThemes()) {
+        this.showThemes.set(false);
+        evt.preventDefault();
+      }
+    })
+
     document.addEventListener('mouseup', () => setTimeout(() => this.lastSelectedText = window.getSelection().toString()));
 
     document.addEventListener('visibilitychange', () => this.checkChatActive());

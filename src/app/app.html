@@ -3,7 +3,7 @@
     <a [href]="link.url" [target]="link.target || '_blank'">{{ link.name }}</a>
   }
 </div></div>
-<div class="theme-select">
+<div id="theme-select">
   <i class="fa-solid fa-circle-half-stroke" (click)="showThemes.set(!showThemes())"></i>
   <div class="theme-list" [style.display]="showThemes() ? 'flex' : 'none'">
     <div (click)="setTheme('')" style="background-color: var(--primary-bkg)"
