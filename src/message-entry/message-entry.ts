@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import Quill from 'quill';
 import { QuillModule  } from 'ngx-quill';
 import { forEach } from '@tubular/util';
-import { colorByIndex, colors, getTextBackground } from '../main';
+import { colorByIndex, colors, getTextBackground, kaomoji, shouldIgnoreClick, startClickSuppress } from '../main';
 import { PickerComponent } from '@ctrl/ngx-emoji-mart';
 import { Emoji, EmojiData } from '@ctrl/ngx-emoji-mart/ngx-emoji';
 
@@ -13,7 +13,7 @@ const sizeMap : Record<string, string>= { '0.625em': 's1', '0.8125em': 's2', '1e
 Size.whitelist = Object.keys(sizeMap);
 Quill.register(Size, true);
 
-const tagMap: Record<string, string> = { 'bold': 'b', 'italic': 'i', 'size': '', 'strike': 's', 'underline': 'u' };
+const tagMap: Record<string, string> = { 'bold': 'b', 'code': 'code', 'italic': 'i', 'size': '', 'strike': 's', 'underline': 'u' };
 const recognizedAttributes = new Set(Object.keys(tagMap));
 
 if (!localStorage.getItem('emoji-mart.frequently'))
@@ -74,7 +74,7 @@ function quillOpsToBBCode(ops: any[]): string {
   return result.trimEnd();
 }
 
-const formats = ['bold', 'italic', 'underline', 'strike', 'size'];
+const formats = ['bold', 'code', 'italic', 'underline', 'strike', 'size'];
 const formatSet = new Set(formats);
 
 @Component({
@@ -86,12 +86,15 @@ const formatSet = new Set(formats);
 export class MessageEntry {
   protected colorByIndex = colorByIndex;
   protected colors = colors;
+  protected kaomoji = kaomoji;
 
   private quill: Quill;
 
   protected color = signal(0);
   protected enabled = signal(true);
   protected showEmoji = signal(false);
+  protected showKaomoji = signal(false);
+  protected kaomojiPosition = signal({ top: '0', left: '0' });
   protected pickerPosition = signal({ top: '0', left: '0' });
 
   protected formats = formats;
@@ -134,9 +137,16 @@ export class MessageEntry {
     });
 
     document.addEventListener('mousedown', (evt: MouseEvent) => {
+      console.log('mousedown:', evt);
       if (!document.querySelector('emoji-mart')?.contains(evt.target as Node) && this.showEmoji()) {
         this.showEmoji.set(false);
         evt.preventDefault();
+        startClickSuppress();
+      }
+      else if (!document.querySelector('#kaomoji')?.contains(evt.target as Node) && this.showKaomoji()) {
+        this.showKaomoji.set(false);
+        evt.preventDefault();
+        startClickSuppress();
       }
     })
   }
@@ -180,13 +190,13 @@ export class MessageEntry {
     this.quill.setText('');
   }
 
-  protected toggleEmoji(): void {
-    this.showEmoji.set(!this.showEmoji());
+  private togglePanel(state: any, position: any, btn: string, panel: string): void {
+    state.set(!state());
 
-    if (this.showEmoji()) {
+    if (state()) {
       setTimeout(() => {
-        const button = this.elementRef.nativeElement.querySelector('#emoji-button');
-        const picker = this.elementRef.nativeElement.querySelector('emoji-mart');
+        const button = this.elementRef.nativeElement.querySelector(btn);
+        const picker = this.elementRef.nativeElement.querySelector(panel);
         const editor = this.elementRef.nativeElement.querySelector('quill-editor');
 
         if (!button || !picker || !editor) return;
@@ -230,9 +240,23 @@ export class MessageEntry {
         if (top < 0)
           top = 0;
 
-        this.pickerPosition.set({ top: `${top}px`, left: `${left}px` });
+        position.set({ top: `${top}px`, left: `${left}px` });
       });
     }
+  }
+
+  protected toggleEmoji(): void {
+    if (shouldIgnoreClick())
+      return;
+
+    this.togglePanel(this.showEmoji, this.pickerPosition, '#emoji-button', 'emoji-mart');
+  }
+
+  protected toggleKaomoji(): void {
+    if (shouldIgnoreClick())
+      return;
+
+    this.togglePanel(this.showKaomoji, this.kaomojiPosition, '#kaomoji-button', '#kaomoji');
   }
 
   protected emojiClick(emoji: Emoji): void {
@@ -258,5 +282,16 @@ export class MessageEntry {
     this.quill.insertText(index, QUOTE_MARKER, { italic: false });
     index += QUOTE_MARKER.length;
     this.quill.setSelection(index);
+  }
+
+  protected insertKaomoji(text: string): void {
+    const range = this.quill.selection.savedRange;
+
+    if (range.length > 0)
+      this.quill.deleteText(range.index, range.length);
+
+    this.quill.insertText(range.index, text);
+    this.quill.setSelection(range.index + text.length);
+    this.showKaomoji.set(false);
   }
 }

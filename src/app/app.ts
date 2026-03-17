@@ -5,7 +5,7 @@ import { forEach, htmlUnescape, isEqual } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { MessageEntry } from '../message-entry/message-entry';
-import { colorByIndex, colorFromStyle, colors, getTextBackground } from '../main';
+import { colorByIndex, colorFromStyle, colors, getTextBackground, shouldIgnoreClick, startClickSuppress } from '../main';
 
 const matchEmoji = /(\uD83C[\uD000-\uDFFF]|\uD83D[\uD000-\uDFFF]|\uD83E[\uD000-\uDFFF])/g;
 
@@ -103,6 +103,7 @@ export class App implements OnInit {
       if (!document.getElementById('theme-select')?.contains(evt.target as Node) && this.showThemes()) {
         this.showThemes.set(false);
         evt.preventDefault();
+        startClickSuppress();
       }
     })
 
@@ -320,6 +321,9 @@ export class App implements OnInit {
   }
 
   protected setTheme(theme: string) {
+    if (shouldIgnoreClick())
+      return;
+
     Array.from(document.body.classList).forEach(c => c.startsWith('theme-') && document.body.classList.remove(c));
 
     if (theme)

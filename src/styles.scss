@@ -49,6 +49,10 @@ body {
       &.ql-blank::before {
         color: #aaa !important;
       }
+
+      code {
+        background-color: #666;
+      }
     }
 
     .ql-stroke, .ql-picker-label, .ql-picker-item {
@@ -58,6 +62,10 @@ body {
 
     .ql-fill {
       fill: var(--theme-dark-text);
+    }
+
+    .ql-toolbar .ql-active {
+      color: #08F;
     }
   }
 }
@@ -288,5 +296,36 @@ body.theme-dark-midnight .navigation > div {
   &:focus-visible {
     outline: 2px solid #6ab0f3;
     outline-offset: 2px;
+  }
+}
+
+.kaomoji {
+  font-family: "MS PGothic", "Mona", "Monapo", "IPAMonaPGothic", "IPAPGothic", "saitamaar_light", "submona", sans-serif !important;
+}
+
+#kaomoji {
+  background-color: #DDD;
+  border: 1px solid #CCC;
+  display: none;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.25em;
+  justify-items: stretch;
+  padding: 0.5em;
+  position: fixed;
+
+  > div {
+    background-color: white;
+    cursor: pointer;
+    padding: 0.25em;
+    text-align: center;
+  }
+}
+
+.theme-dark #kaomoji {
+  background-color: #666;
+  border-color: #666;
+
+  > div {
+    background-color: #333;
   }
 }

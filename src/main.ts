@@ -9,6 +9,13 @@ bootstrapApplication(App, appConfig)
 export const colors = ['#000000', '#000080', '#4444cc', '#44cc44', '#cc9911', '#cc4444', '#cc6600', '',
                        '#008040', '#33aaaa', '#cc44cc', '#800000', '#FF80C0', '#b87333', '#8ca9d9', '#4682b4'];
 
+export const kaomoji = [
+  '(＾_＾)', '(＾_＾；)', '(*＾＾*)', '(；_；)', '(ーー；', 'ｍ（_ _）ｍ', '(・_・)', '(＾＾）/~~',
+  '(＠_＠)', '＼（＾Ｏ＾）／', '(？_？)', '(｀・ω・´) ', 'ヽ(´ー｀)ノ', '(;´Д`)', 'ヽ(´∇`)ノ', '(´∇`)σ',
+  '(;^Д^)', '(;ﾟ∇ﾟ)', '(;ﾟДﾟ)', 'ヽ(`Д´)ノ', '(ρ_;)', '(´￢`)', 'ヽ(ﾟρﾟ)ノ', 'ヽ(´π｀)ノ',
+  '(ﾟДﾟ)', '(´人｀)', 'ъ( ﾟｰ^)', '(⌒∇⌒ゞ)', '(^^;ﾜﾗ', '┐(´∀｀)┌', '(｀∩´)σ'
+];
+
 export function colorByIndex(index: number, darkMode = false): string {
   if (index === 0 && darkMode)
     return '#FFFFFF';
@@ -33,4 +40,17 @@ export function getTextBackground(styleOrColor: string, darkMode = false): strin
   }
 
   return lightBackground ? (darkMode ? '#AAA' : 'white') : '#333';
+}
+
+let clickSuppress: any;
+
+export function startClickSuppress(): void {
+  if (clickSuppress)
+    clearTimeout(clickSuppress);
+
+  clickSuppress = setTimeout((): any => clickSuppress = undefined, 250);
+}
+
+export function shouldIgnoreClick(): boolean {
+  return !!clickSuppress;
 }

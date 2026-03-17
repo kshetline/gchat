@@ -29,12 +29,21 @@ quill-editor {
 }
 
 #emoji-button {
-  border: none;
+  appearance: none;
   float: none !important;
   font-size: 1.75em;
   margin: 0 0.5em;
   position: relative;
   top: 0.15em;
+  width: auto;
+}
+
+#kaomoji-button {
+  color: inherit;
+  float: none !important;
+  text-align: center;
+  white-space: nowrap;
+  width: auto;
 }
 
 emoji-mart {
