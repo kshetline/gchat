@@ -9,9 +9,17 @@
     <div (click)="setTheme('')" style="background-color: var(--primary-bkg)"
         >Default</div>
     <div (click)="setTheme('light-blue')" style="background-color: var(--theme-light-blue-bkg)"
-        >Light Blue</div>
+        >Sky</div>
+    <div (click)="setTheme('light-mint')" style="background-color: var(--theme-light-mint-bkg)"
+        >Mint</div>
+    <div (click)="setTheme('light-desert')" style="background-color: var(--theme-light-desert-bkg)"
+        >Desert</div>
+    <div (click)="setTheme('dark-cypress')" style="background-color: var(--theme-dark-cypress-bkg); color: var(--theme-dark-text)"
+        >Cypress</div>
     <div (click)="setTheme('dark-blue')" style="background-color: var(--theme-dark-blue-bkg); color: var(--theme-dark-text)"
-        >Dark Blue</div>
+        >Abyss</div>
+    <div (click)="setTheme('dark-midnight')" style="background-color: var(--theme-dark-midnight-bkg); color: var(--theme-dark-text)"
+        >Midnight</div>
   </div>
 </div>
 <div class="connection-trouble" [style.display]="connectionTrouble() ? 'block' : 'none'">⚡️Connection trouble</div>

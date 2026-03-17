@@ -1,7 +1,11 @@
 :root {
   --primary-bkg: #DDD;
   --theme-light-blue-bkg: #DEF;
+  --theme-light-mint-bkg: #CCFFDD;
+  --theme-light-desert-bkg: #FFE6C0;
   --theme-dark-blue-bkg: #004;
+  --theme-dark-cypress-bkg: #004040;
+  --theme-dark-midnight-bkg: #111;
   --theme-dark-text: #DDD;
 }
 
@@ -15,8 +19,24 @@ body {
     background-color: var(--theme-light-blue-bkg);
   }
 
+  &.theme-light-mint {
+    background-color: var(--theme-light-mint-bkg);
+  }
+
+  &.theme-light-desert {
+    background-color: var(--theme-light-desert-bkg);
+  }
+
   &.theme-dark-blue {
     background-color: var(--theme-dark-blue-bkg);
+  }
+
+  &.theme-dark-cypress {
+    background-color: var(--theme-dark-cypress-bkg);
+  }
+
+  &.theme-dark-midnight {
+    background-color: var(--theme-dark-midnight-bkg);
   }
 
   &.theme-dark {
@@ -62,8 +82,26 @@ body.theme-light-blue .navigation > div {
   background-color: var(--theme-light-blue-bkg);
 }
 
+body.theme-light-mint .navigation > div {
+  background-color: var(--theme-light-mint-bkg);
+}
+
+body.theme-light-desert .navigation > div {
+  background-color: var(--theme-light-desert-bkg);
+}
+
 body.theme-dark-blue .navigation > div {
   background-color: var(--theme-dark-blue-bkg);
+  color: var(--theme-dark-text);
+}
+
+body.theme-dark-cypress .navigation > div {
+  background-color: var(--theme-dark-cypress-bkg);
+  color: var(--theme-dark-text);
+}
+
+body.theme-dark-midnight .navigation > div {
+  background-color: var(--theme-dark-midnight-bkg);
   color: var(--theme-dark-text);
 }
 
