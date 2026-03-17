@@ -5,7 +5,7 @@ import { forEach, htmlUnescape, isEqual } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { MessageEntry } from '../message-entry/message-entry';
-import { colorByIndex, colorFromStyle, colors, getTextBackground, shouldIgnoreClick, startClickSuppress } from '../main';
+import { colorByIndex, colorFromStyle, colors, getTextBackground, kaomoji, shouldIgnoreClick, startClickSuppress } from '../main';
 
 const matchEmoji = /(\uD83C[\uD000-\uDFFF]|\uD83D[\uD000-\uDFFF]|\uD83E[\uD000-\uDFFF])/g;
 
@@ -239,8 +239,11 @@ export class App implements OnInit {
     return new Date(timestamp + 'Z').toLocaleString();
   }
 
-  protected magnifyEmoji(text: string): string {
-    return text.replace(matchEmoji, '<span class="big-emoji">$1</span>');
+  protected adjustMarkup(text: string): string {
+    return text.replace(matchEmoji, '<span class="big-emoji">$1</span>')
+      .replace(/(\u2000(.+?)\u2000)/g, (_$0, $1, $2) =>
+        kaomoji.includes($2) ? `<span class="kaomoji">${$1}</span>` : $1
+      );
   }
 
   protected toggleNotifySound(): void {

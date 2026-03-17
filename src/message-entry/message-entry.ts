@@ -74,10 +74,10 @@ function quillOpsToBBCode(ops: any[]): string {
       }
     });
 
-    result += op.insert.replace(/[\n\r]/g, '').replace(/\[/g, '[\u200B');
+    result += op.insert.replace(/\[/g, '[\u200B');
   }
 
-  return result.trimEnd();
+  return result.replace(/[ \n\r]+$/, '');
 }
 
 const formats = ['bold', 'code', 'font', 'italic', 'underline', 'strike', 'size'];
@@ -298,8 +298,9 @@ export class MessageEntry {
     if (range.length > 0)
       this.quill.deleteText(range.index, range.length);
 
-    this.quill.insertText(range.index, ' ' + text + ' ', { font: 'ms-pgothic' });
-    this.quill.setSelection(range.index + text.length + 2);
+    text = '\u2000' + text + '\u2000'
+    this.quill.insertText(range.index, text, { font: 'ms-pgothic' });
+    this.quill.setSelection(range.index + text.length);
     this.showKaomoji.set(false);
   }
 }

@@ -151,12 +151,21 @@ async function sendMessage(sesh: string, name: string, email: string,
   }
 
   const page = session.page;
+  let face = '';
+  const $ = /^(.*)(\u2000(.+)\u2000)\s*$/.exec(comment);
+
+  if ($) {
+    comment = $[1];
+    face = $[3];
+  }
 
   await page.waitForSelector('input[name="comment"]');
   await page.$eval('select[name="color"]', (sel, c) => sel.value = c, color);
+  await page.$eval('#face', (sel, face) => sel.value = face, face);
   await page.$eval('input[name="comment"]', (input, comment) => input.value = comment, comment || '\u00A0');
   await page.$eval('input[name="password"]', (input, tripCode) => input.value = tripCode, tripCode || '');
   await page.focus('input[name="comment"]');
+
   await page.keyboard.press('Enter');
 }
 
