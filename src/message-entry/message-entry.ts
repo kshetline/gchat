@@ -1,4 +1,4 @@
-import { Component, ElementRef, EventEmitter, input, Output, signal } from '@angular/core';
+import { Component, ElementRef, EventEmitter, input, Output, signal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import Quill from 'quill';
 import { QuillModule  } from 'ngx-quill';
@@ -13,8 +13,14 @@ const sizeMap : Record<string, string>= { '0.625em': 's1', '0.8125em': 's2', '1e
 Size.whitelist = Object.keys(sizeMap);
 Quill.register(Size, true);
 
-const tagMap: Record<string, string> = { 'bold': 'b', 'code': 'code', 'italic': 'i', 'size': '', 'strike': 's', 'underline': 'u' };
+const tagMap: Record<string, string> = {
+  'bold': 'b', 'code': 'code', 'italic': 'i', 'size': '', 'strike': 's', 'underline': 'u'
+};
 const recognizedAttributes = new Set(Object.keys(tagMap));
+
+const FontAttributor = Quill.import('attributors/class/font') as any;
+FontAttributor.whitelist = ['ms-pgothic'];
+Quill.register(FontAttributor, true);
 
 if (!localStorage.getItem('emoji-mart.frequently'))
   localStorage.setItem('emoji-mart.frequently',
@@ -74,7 +80,7 @@ function quillOpsToBBCode(ops: any[]): string {
   return result.trimEnd();
 }
 
-const formats = ['bold', 'code', 'italic', 'underline', 'strike', 'size'];
+const formats = ['bold', 'code', 'font', 'italic', 'underline', 'strike', 'size'];
 const formatSet = new Set(formats);
 
 @Component({
@@ -103,7 +109,10 @@ export class MessageEntry {
       matchers: [
         [Node.ELEMENT_NODE, (_node: any, delta: any) => {
           delta.ops.forEach((op: any) => {
-            forEach(op.attributes, key => !formatSet.has(key) && delete op.attributes[key]);
+            forEach(op.attributes, (key, value) => {
+              if ((key === 'font' && value !== 'ms-pgothic') || !formatSet.has(key))
+                delete op.attributes[key];
+            })
           });
           return delta;
         }]
@@ -137,7 +146,6 @@ export class MessageEntry {
     });
 
     document.addEventListener('mousedown', (evt: MouseEvent) => {
-      console.log('mousedown:', evt);
       if (!document.querySelector('emoji-mart')?.contains(evt.target as Node) && this.showEmoji()) {
         this.showEmoji.set(false);
         evt.preventDefault();
@@ -190,7 +198,7 @@ export class MessageEntry {
     this.quill.setText('');
   }
 
-  private togglePanel(state: any, position: any, btn: string, panel: string): void {
+  private togglePanel(state: WritableSignal<any>, position: WritableSignal<any>, btn: string, panel: string): void {
     state.set(!state());
 
     if (state()) {
@@ -290,8 +298,8 @@ export class MessageEntry {
     if (range.length > 0)
       this.quill.deleteText(range.index, range.length);
 
-    this.quill.insertText(range.index, text);
-    this.quill.setSelection(range.index + text.length);
+    this.quill.insertText(range.index, ' ' + text + ' ', { font: 'ms-pgothic' });
+    this.quill.setSelection(range.index + text.length + 2);
     this.showKaomoji.set(false);
   }
 }
