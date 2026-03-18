@@ -1,4 +1,4 @@
-<div class="message-list" id="message-list">
+<div id="message-list">
   @for (message of messages(); track message.hash) {
     <div class="name" [class.me]="isMe(message)">
         <span [style.color]="getColor(message)" [style.background-color]="getBackground(message)">{{

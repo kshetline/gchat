@@ -43,7 +43,7 @@ const darkDefaults = {
   _toolbar_background: '#666',
   _toolbar_item_background: '#333',
   _quill_active_tool: '#0CF',
-  _quill_color: '#AAA',
+  _quill_color: '#BBB',
   _quill_background: '#333',
   _quill_code_background: '#666',
   _quill_picker_background: '#666'
