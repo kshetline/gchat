@@ -25,6 +25,7 @@ const lightDefaults = {
   _toolbar_item_background: '#FFF',
   _quill_active_tool: '#0CC',
   _quill_background: '#333',
+  _quill_color: '#444',
   _quill_code_background: '#EEE',
   _quill_picker_background: '#333'
 }
@@ -42,6 +43,7 @@ const darkDefaults = {
   _toolbar_background: '#666',
   _toolbar_item_background: '#333',
   _quill_active_tool: '#0CF',
+  _quill_color: '#AAA',
   _quill_background: '#333',
   _quill_code_background: '#666',
   _quill_picker_background: '#666'

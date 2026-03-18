@@ -151,7 +151,7 @@ export class MessageEntry {
         evt.preventDefault();
         startClickSuppress();
       }
-      else if (!document.querySelector('#kaomoji')?.contains(evt.target as Node) && this.showKaomoji()) {
+      else if (!document.querySelector('#kaomoji-panel')?.contains(evt.target as Node) && this.showKaomoji()) {
         this.showKaomoji.set(false);
         evt.preventDefault();
         startClickSuppress();
@@ -264,7 +264,7 @@ export class MessageEntry {
     if (shouldIgnoreClick())
       return;
 
-    this.togglePanel(this.showKaomoji, this.kaomojiPosition, '#kaomoji-button', '#kaomoji');
+    this.togglePanel(this.showKaomoji, this.kaomojiPosition, '#kaomoji-button', '#kaomoji-panel');
   }
 
   protected emojiClick(emoji: Emoji): void {

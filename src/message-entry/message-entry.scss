@@ -40,7 +40,7 @@ quill-editor {
 
 #kaomoji-button {
   appearance: none;
-  color: inherit;
+  color: var(--main-quill-color);
   float: none !important;
   text-align: center;
   white-space: nowrap;

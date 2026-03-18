@@ -3,6 +3,7 @@
   --main-quill-active-tool: #0CC;
   --main-quill-background: #DDD;
   --main-quill-code-background: #DDD;
+  --main-quill-color: #444;
   --main-quill-picker-background: #FFF;
 }
 
@@ -12,11 +13,11 @@
 }
 
 .ql-editor {
-  background-color: var(--main-quill-background); // #333
+  background-color: var(--main-quill-background);
   color: var(--main-color);
 
   code {
-    background-color: var(--main-quill-code-background); // #666;
+    background-color: var(--main-quill-code-background);
   }
 }
 
@@ -24,13 +25,13 @@
   background-color: var(--main-quill-picker-background);
 }
 
-.ql-stroke, .ql-picker-label, .ql-picker-item {
-  color: var(--main-color);
-  stroke: var(--main-color);
+.ql-snow .ql-stroke, .ql-picker-label, .ql-picker-item {
+  color: var(--main-quill-color);
+  stroke: var(--main-quill-color);
 }
 
-.ql-fill {
-  fill: var(--main-color);
+.ql-snow .ql-fill {
+  fill: var(--main-quill-color);
 }
 
 .ql-snow a,
@@ -115,4 +116,8 @@
 
 .ql-font-ms-pgothic {
   font-family: "MS PGothic", "ＭＳ Ｐゴシック", sans-serif;
+}
+
+.at-bottom .ql-toolbar.ql-snow .ql-picker.ql-expanded .ql-picker-options {
+  top: -10.3em !important;
 }

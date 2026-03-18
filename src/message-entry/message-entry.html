@@ -24,7 +24,7 @@
       }
     }
   </div>
-  <div id="kaomoji" [style.top]="kaomojiPosition().top" [style.left]="kaomojiPosition().left"
+  <div id="kaomoji-panel" [style.top]="kaomojiPosition().top" [style.left]="kaomojiPosition().left"
        [style.display]="showKaomoji() ? 'grid' : 'none'">
     @for (kaomoji of kaomoji; track kaomoji) {
       <div class="kaomoji-item kaomoji" (click)="insertKaomoji(kaomoji)">{{ kaomoji }}</div>

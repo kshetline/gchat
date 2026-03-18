@@ -5,6 +5,108 @@ main {
   margin: 0 10px;
 }
 
+.navigation {
+  display: flex;
+  justify-content: center;
+  margin: 0.5em 0;
+  position: absolute;
+  top: 0;
+  width: 100%;
+
+  > div {
+    background-color: var(--main-background);
+    display: flex;
+    gap: 1em;
+    padding: 0 0.25em;
+  }
+}
+
+.form-h1 {
+  margin: 8px 0;
+  font-family: "Trebuchet MS", Tahoma, Verdana, Arial, Meiryo, 'Hiragino Sans', Osaka, sans-serif;
+  font-size: 1.5em;
+}
+
+.participants {
+  align-items: baseline;
+  border-bottom: 1px solid var(--main-border);
+  border-top: 1px solid var(--main-border);
+  box-sizing: border-box;
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  margin: 0.5em 0;
+  padding: 0.5em 0;
+
+  .participant {
+    background-color: var(--main-participant-background);
+    border-radius: 4px;
+    padding: 4px;
+  }
+
+  .empty-chat {
+    font-style: italic;
+  }
+}
+
+#my-toolbar {
+  background-color: var(--main-toolbar-background);
+  border-bottom: none !important;
+}
+
+.bubble-wrap {
+  align-items: center;
+  border-radius: 10px;
+  display: flex;
+  margin-bottom: 10px;
+  margin-right: 10px;
+  width: fit-content;
+
+  .bubble {
+    border-radius: 10px;
+    padding: 10px;
+  }
+
+  .tools {
+    display: flex;
+    flex-basis: 0;
+    flex-grow: 0;
+    gap: 0.25em;
+    overflow: hidden;
+
+    i {
+      cursor: pointer;
+
+      &:first-child {
+        padding-left: 0.25em;
+      }
+
+      &:last-child {
+        padding-right: 0.25em;
+      }
+    }
+  }
+
+  &.me {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+
+    .bubble {
+      flex-grow: 1;
+      text-align: end;
+    }
+  }
+
+  &.show-tools {
+    background-color: var(--main-bubble-tool-background);
+
+    .tools {
+      overflow: visible;
+    }
+  }
+}
+
 #theme-select {
   align-items: end;
   cursor: pointer;
