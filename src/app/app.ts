@@ -1,21 +1,17 @@
 import { Component, OnInit, signal, ViewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Config, Message, Messages, Preferences } from '../../server/src/shared-types';
-import { forEach, htmlUnescape, isEqual } from '@tubular/util';
+import { forEach, isEqual } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { MessageEntry } from '../message-entry/message-entry';
-import {
-  colorByIndex, colorFromStyle, colors, getLuminance, getTextBackground, kaomoji, shouldIgnoreClick,
-  startClickSuppress
-} from '../main';
+import { colorByIndex, colors, shouldIgnoreClick, startClickSuppress } from '../main';
 import { applyTheme, getThemeMenuStyle, getThemes } from '../themes';
-
-const matchEmoji = /(\uD83C[\uD000-\uDFFF]|\uD83D[\uD000-\uDFFF]|\uD83E[\uD000-\uDFFF])/g;
+import { MessageList } from '../message-list/message-list';
 
 @Component({
   selector: 'app-root',
-  imports: [FormsModule, MessageEntry],
+  imports: [FormsModule, MessageEntry, MessageList],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -28,9 +24,9 @@ export class App implements OnInit {
   private readonly chime = new Audio('assets/notify.wav');
   private readonly prefs: Preferences;
 
-  private baseTitle = 'Chat'
+  // noinspection TypeScriptFieldCanBeMadeReadonly
+  private baseTitle = 'Chat';
   private chatActive = true;
-  private lastSelectedText = '';
   private _messageEntry: MessageEntry
   private messageTimer: any;
   private pendingFocus = false;
@@ -50,8 +46,6 @@ export class App implements OnInit {
   protected participants = signal([] as string[]);
   protected showThemes = signal(false);
   protected title = signal(this.baseTitle);
-  protected toolHash = signal('');
-  protected toolTimer: any;
   protected tripCode = signal('');
 
   get messageEntry(): MessageEntry { return this._messageEntry; }
@@ -113,8 +107,6 @@ export class App implements OnInit {
         startClickSuppress();
       }
     })
-
-    document.addEventListener('mouseup', () => setTimeout(() => this.lastSelectedText = window.getSelection().toString()));
 
     document.addEventListener('visibilitychange', () => this.checkChatActive());
     window.addEventListener('blur', () => this.checkChatActive());
@@ -242,17 +234,6 @@ export class App implements OnInit {
     });
   }
 
-  protected formatLocal(timestamp: string): string {
-    return new Date(timestamp + 'Z').toLocaleString();
-  }
-
-  protected adjustMarkup(text: string): string {
-    return text.replace(matchEmoji, '<span class="big-emoji">$1</span>')
-      .replace(/(\u2000(.+?)\u2000)/g, (_$0, $1, $2) =>
-        kaomoji.includes($2) ? `<span class="kaomoji">${$1}</span>` : $1
-      );
-  }
-
   protected toggleNotifySound(): void {
     this.prefs.notifySound = this.notifySound();
     this.prefService.set(this.prefs);
@@ -277,51 +258,13 @@ export class App implements OnInit {
     this.pendingFocus = true;
   }
 
-  protected isMe(message: Message): boolean {
-    return message.name === this.name();
-  }
-
   protected isAdmin(): boolean {
     return false;
   }
 
-  protected focusMessage(message: Message, state: boolean): void {
-    if (state) {
-      if (this.toolTimer) {
-        clearTimeout(this.toolTimer);
-        this.toolTimer = undefined;
-      }
-
-      this.toolHash.set(message.hash);
-    }
-    else if (this.toolHash() === message.hash)
-      this.toolTimer = setTimeout(() => this.toolHash.set(''), 2000);
-  }
-
-  protected quoteMessage(message: Message): void {
-    let quote = htmlUnescape(message.text.replace(/<.+?>/g, '')).replace(/\s+/g, ' ');
-
-    if (this.lastSelectedText && quote.includes(this.lastSelectedText))
-      quote = this.lastSelectedText;
-
-    this.messageEntry.insertQuote(message.name, quote.trim());
-  }
-
-  protected editMessage(_message: Message): void {
-    alert('Edit not yet implemented');
-  }
-
-  protected deleteMessage(_message: Message): void {
-    alert('Delete not yet implemented');
-  }
-
-  protected isFocused(message: Message): boolean {
-    return this.inChat() && this.toolHash() === message.hash;
-  }
-
   private adjustScrolling(): void {
     setTimeout(() => {
-      const messages = document.querySelector('#message-list');
+      const messages = document.querySelector('app-message-list');
 
       if (this.newOnBottom())
         messages.scrollTop = messages.scrollHeight;
@@ -340,22 +283,5 @@ export class App implements OnInit {
     this.prefs.theme = theme;
     this.prefService.set(this.prefs);
     setTimeout(() => this.messageEntry?.updateColor(false));
-  }
-
-  protected getColor(message: Message): string {
-    let color = colorFromStyle(message.style);
-
-    if (this.darkMode() && (color === '#000' || color === '#000000' || color === 'black'))
-      color = '#DDD';
-
-    return color;
-  }
-
-  protected isLight(message: Message): boolean {
-    return getLuminance(this.getBackground(message)) > 127;
-  }
-
-  protected getBackground(message: Message): string {
-    return getTextBackground(this.getColor(message), this.darkMode());
   }
 }

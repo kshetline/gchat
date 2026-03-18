@@ -121,3 +121,8 @@
 .at-bottom .ql-toolbar.ql-snow .ql-picker.ql-expanded .ql-picker-options {
   top: -10.3em !important;
 }
+
+#my-toolbar {
+  background-color: var(--main-toolbar-background);
+  border-bottom: none !important;
+}
