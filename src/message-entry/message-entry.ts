@@ -301,6 +301,7 @@ export class MessageEntry {
     text = '\u2000' + text + '\u2000'
     this.quill.insertText(range.index, text, { font: 'ms-pgothic' });
     this.quill.setSelection(range.index + text.length);
+    this.quill.format('font', undefined);
     this.showKaomoji.set(false);
   }
 }

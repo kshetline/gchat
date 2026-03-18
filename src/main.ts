@@ -26,20 +26,24 @@ export function colorByIndex(index: number, darkMode = false): string {
 export function colorFromStyle(styleOrColor: string): string {
   return (/color:\s*([^;]+)\b/.exec(styleOrColor) || [])[1] || styleOrColor;
 }
+export function getLuminance(color: string): number {
+  const rgb = parseColor(color);
+
+  return rgb.r * 0.299 + rgb.g * 0.587 + rgb.b * 0.114;
+}
 
 export function getTextBackground(styleOrColor: string, darkMode = false): string {
   const color = colorFromStyle(styleOrColor);
   let lightBackground = true;
 
   if (color) {
-    const rgb = parseColor(color);
-    const luminance = rgb.r * 0.299 + rgb.g * 0.587 + rgb.b * 0.114;
+    const luminance = getLuminance(color);
 
     if (darkMode ? luminance > 85 : luminance > 140)
       lightBackground = false;
   }
 
-  return lightBackground ? (darkMode ? '#AAA' : 'white') : '#333';
+  return lightBackground ? (darkMode ? '#AAA' : '#FFF') : '#333';
 }
 
 let clickSuppress: any;

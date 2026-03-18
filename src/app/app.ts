@@ -5,7 +5,11 @@ import { forEach, htmlUnescape, isEqual } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { MessageEntry } from '../message-entry/message-entry';
-import { colorByIndex, colorFromStyle, colors, getTextBackground, kaomoji, shouldIgnoreClick, startClickSuppress } from '../main';
+import {
+  colorByIndex, colorFromStyle, colors, getLuminance, getTextBackground, kaomoji, shouldIgnoreClick,
+  startClickSuppress
+} from '../main';
+import { applyTheme, getThemeMenuStyle, getThemes } from '../themes';
 
 const matchEmoji = /(\uD83C[\uD000-\uDFFF]|\uD83D[\uD000-\uDFFF]|\uD83E[\uD000-\uDFFF])/g;
 
@@ -18,6 +22,8 @@ const matchEmoji = /(\uD83C[\uD000-\uDFFF]|\uD83D[\uD000-\uDFFF]|\uD83E[\uD000-\
 export class App implements OnInit {
   protected colorByIndex = colorByIndex;
   protected colors = colors;
+  protected getThemeMenuStyle = getThemeMenuStyle;
+  protected themes = getThemes();
 
   private readonly chime = new Audio('assets/notify.wav');
   private readonly prefs: Preferences;
@@ -63,7 +69,6 @@ export class App implements OnInit {
   constructor(private httpClient: HttpClient, private prefService: PreferencesService) {
     this.prefs = this.prefService.get();
     forEach(this.prefs as Record<string, any>, (key, value) => (this as any)[key] && (this as any)[key]?.set(value));
-    this.setTheme(this.prefs.theme);
 
     const configStr = localStorage.getItem('gchat-config');
     const root = document.documentElement;
@@ -75,10 +80,12 @@ export class App implements OnInit {
         document.title = this.baseTitle = config.title;
         this.title.set(config.title);
         this.navigation.set(config.navigation);
-        root.style.setProperty('--primary-bkg', config.backgroundColor || '#DDD');
+        root.style.setProperty('--primary-background', config.backgroundColor || '#DDD');
       }
       catch {}
     }
+
+    this.setTheme(this.prefs.theme);
 
     httpClient.get<Config>('/api/config').subscribe({
       next: (config: Config): void => {
@@ -86,7 +93,7 @@ export class App implements OnInit {
         document.title = config.title;
         this.title.set(config.title);
         this.navigation.set(config.navigation);
-        root.style.setProperty('--primary-bkg', config.backgroundColor || '#DDD');
+        root.style.setProperty('--primary-background', config.backgroundColor || '#DDD');
         localStorage.setItem('gchat-config', JSON.stringify(config));
       },
       error: (_error): void => this.connectionTrouble.set(true)
@@ -301,14 +308,14 @@ export class App implements OnInit {
   }
 
   protected editMessage(_message: Message): void {
-    alert('Not yet implemented');
+    alert('Edit not yet implemented');
   }
 
   protected deleteMessage(_message: Message): void {
-    alert('Not yet implemented');
+    alert('Delete not yet implemented');
   }
 
-  protected isFocused(message: Message) {
+  protected isFocused(message: Message): boolean {
     return this.inChat() && this.toolHash() === message.hash;
   }
 
@@ -323,27 +330,19 @@ export class App implements OnInit {
     });
   }
 
-  protected setTheme(theme: string) {
+  protected setTheme(theme: string): void {
     if (shouldIgnoreClick())
       return;
 
-    Array.from(document.body.classList).forEach(c => c.startsWith('theme-') && document.body.classList.remove(c));
-
-    if (theme)
-      document.body.classList.add(`theme-${theme}`);
-
+    applyTheme(theme);
     this.showThemes.set(false);
-    this.darkMode.set(/\bdark\b/.test(theme));
-
-    if (this.darkMode())
-      document.body.classList.add(`theme-dark`);
-
+    this.darkMode.set(this.themes.find(t => t.name === theme)?.darkMode || false);
     this.prefs.theme = theme;
     this.prefService.set(this.prefs);
     setTimeout(() => this.messageEntry?.updateColor(false));
   }
 
-  protected getColor(message: Message) {
+  protected getColor(message: Message): string {
     let color = colorFromStyle(message.style);
 
     if (this.darkMode() && (color === '#000' || color === '#000000' || color === 'black'))
@@ -352,7 +351,11 @@ export class App implements OnInit {
     return color;
   }
 
-  protected getBackground(message: Message) {
+  protected isLight(message: Message): boolean {
+    return getLuminance(this.getBackground(message)) > 127;
+  }
+
+  protected getBackground(message: Message): string {
     return getTextBackground(this.getColor(message), this.darkMode());
   }
 }

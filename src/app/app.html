@@ -6,20 +6,9 @@
 <div id="theme-select">
   <i class="fa-solid fa-circle-half-stroke" (click)="showThemes.set(!showThemes())"></i>
   <div class="theme-list" [style.display]="showThemes() ? 'flex' : 'none'">
-    <div (click)="setTheme('')" style="background-color: var(--primary-bkg)"
-        >Default</div>
-    <div (click)="setTheme('light-blue')" style="background-color: var(--theme-light-blue-bkg)"
-        >Sky</div>
-    <div (click)="setTheme('light-mint')" style="background-color: var(--theme-light-mint-bkg)"
-        >Mint</div>
-    <div (click)="setTheme('light-desert')" style="background-color: var(--theme-light-desert-bkg)"
-        >Desert</div>
-    <div (click)="setTheme('dark-cypress')" style="background-color: var(--theme-dark-cypress-bkg); color: var(--theme-dark-text)"
-        >Cypress</div>
-    <div (click)="setTheme('dark-blue')" style="background-color: var(--theme-dark-blue-bkg); color: var(--theme-dark-text)"
-        >Abyss</div>
-    <div (click)="setTheme('dark-midnight')" style="background-color: var(--theme-dark-midnight-bkg); color: var(--theme-dark-text)"
-        >Midnight</div>
+    @for (theme of themes; track theme) {
+      <div (click)="setTheme(theme.name)" [style]="getThemeMenuStyle(theme.name)">{{ theme.displayName }}</div>
+    }
   </div>
 </div>
 <div class="connection-trouble" [style.display]="connectionTrouble() ? 'block' : 'none'">⚡️Connection trouble</div>
@@ -107,6 +96,7 @@
            (mouseenter)="focusMessage(message, true)" (mouseleave)="focusMessage(message, false)"
            (click)="focusMessage(message, true)" [class.show-tools]="isFocused(message)">
         <div class="bubble" [innerHTML]="adjustMarkup(message.text)"
+             [class.local-light]="isLight(message)" [class.local-dark]="!isLight(message)"
              [style.color]="getColor(message)" [style.background-color]="getBackground(message)"></div>
         @if (inChat()) {
           <div class="tools">
@@ -126,7 +116,7 @@
     }
   </div>
   @if (inChat() && newOnBottom()) {
-    <app-message-entry [darkMode]="darkMode()"
+    <app-message-entry class="at-bottom" [darkMode]="darkMode()"
         (changeColor)="setColor($event)" (newMessage)="sendComment($event)"></app-message-entry>
   }
 </main>

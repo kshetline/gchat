@@ -47,7 +47,7 @@ quill-editor {
   width: auto;
 
   &:hover {
-    color: #06C;
+    color: var(--main-quill-active-tool);
   }
 }
 
