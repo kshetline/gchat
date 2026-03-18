@@ -28,21 +28,11 @@
           <input id="name" type="text" placeholder="optional" [(ngModel)]="email"/>
         </div>
         <button (click)="enterChat()" [disabled]="!name().trim()">Enter room</button>
-        <div class="color-selector">
-          <div class="cs-title">- select text color -</div>
-          <div class="flex-break"></div>
-          @for (buttonColor of colors; track buttonColor; let i = $index) {
-            @if (!buttonColor) {
-              <div class="flex-break"></div>
-            }
-            @else {
-              <input type="radio" class="text-color-btn" name="text-color"
-                [style.color]="colorByIndex(i, darkMode())" [value]="i"
-                [(ngModel)]="color" (ngModelChange)="updateColor()">
-            }
-          }
+        <div class="titled-color-selector">
+          <span>- select text color -</span>
+          <chat-color-selector [(color)]="color" [darkMode]="darkMode()"></chat-color-selector>
         </div>
-      }
+     }
       <div class="option-block" [class.in-chat]="inChat()">
         <div class="label-pair">
           <input id="notify-sound" type="checkbox" [(ngModel)]="notifySound" (ngModelChange)="toggleNotifySound()">

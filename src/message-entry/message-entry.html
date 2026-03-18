@@ -15,15 +15,7 @@
       <option value="1.5em">Huge</option>
     </select>
   </span>
-  <div class="color-selector">
-    @for (buttonColor of colors; track buttonColor; let i = $index) {
-      @if (buttonColor) {
-        <input type="radio" class="text-color-btn" name="text-color-me"
-               [style.color]="colorByIndex(i, darkMode())" [value]="i"
-               [(ngModel)]="color" (change)="updateColor()">
-      }
-    }
-  </div>
+  <chat-color-selector [(color)]="color" [darkMode]="darkMode()"></chat-color-selector>
   <div id="kaomoji-panel" [style.top]="kaomojiPosition().top" [style.left]="kaomojiPosition().left"
        [style.display]="showKaomoji() ? 'grid' : 'none'">
     @for (kaomoji of kaomoji; track kaomoji) {

@@ -5,19 +5,18 @@ import { forEach, isEqual } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { MessageEntry } from '../message-entry/message-entry';
-import { colorByIndex, colors, shouldIgnoreClick, startClickSuppress } from '../main';
+import { shouldIgnoreClick, startClickSuppress } from '../main';
 import { applyTheme, getThemeMenuStyle, getThemes } from '../themes';
 import { MessageList } from '../message-list/message-list';
+import { ColorSelector } from '../color-selector/color-selector';
 
 @Component({
   selector: 'chat-root',
-  imports: [FormsModule, MessageEntry, MessageList],
+  imports: [ColorSelector, FormsModule, MessageEntry, MessageList],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
 export class App implements OnInit {
-  protected colorByIndex = colorByIndex;
-  protected colors = colors;
   protected getThemeMenuStyle = getThemeMenuStyle;
   protected themes = getThemes();
 
@@ -27,12 +26,12 @@ export class App implements OnInit {
   // noinspection TypeScriptFieldCanBeMadeReadonly
   private baseTitle = 'Chat';
   private chatActive = true;
+  private _color = 0;
   private _messageEntry: MessageEntry
   private messageTimer: any;
   private pendingFocus = false;
   private unseenMessages = 0;
 
-  protected color = signal(0);
   protected connectionTrouble = signal(false);
   protected darkMode = signal(false);
   protected email= signal('');
@@ -48,16 +47,24 @@ export class App implements OnInit {
   protected title = signal(this.baseTitle);
   protected tripCode = signal('');
 
+  get color(): number { return this._color; }
+  set color(value: number) {
+    if (this._color !== value) {
+      this._color = value;
+      this.updateColor();
+    }
+  }
+
   get messageEntry(): MessageEntry { return this._messageEntry; }
   @ViewChild(MessageEntry) set messageEntry(value: MessageEntry) {
     this._messageEntry = value;
 
     if (this.pendingFocus) {
       this.pendingFocus = false;
-      this.messageEntry?.focus(this.color());
+      this.messageEntry?.focus(this.color);
     }
     else
-      this.messageEntry?.setColor(this.color());
+      this.messageEntry?.setColor(this.color);
   }
 
   constructor(private httpClient: HttpClient, private prefService: PreferencesService) {
@@ -172,7 +179,7 @@ export class App implements OnInit {
   }
 
   protected updateColor(): void {
-    this.prefs.color = this.color();
+    this.prefs.color = this.color;
     this.prefService.set(this.prefs);
   }
 
@@ -245,7 +252,7 @@ export class App implements OnInit {
   }
 
   protected setColor(color: number): void {
-    this.color.set(color);
+    this.color = color;
     this.prefs.color = color;
     this.prefService.set(this.prefs);
   }
