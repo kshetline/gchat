@@ -10,7 +10,7 @@ import { applyTheme, getThemeMenuStyle, getThemes } from '../themes';
 import { MessageList } from '../message-list/message-list';
 
 @Component({
-  selector: 'app-root',
+  selector: 'chat-root',
   imports: [FormsModule, MessageEntry, MessageList],
   templateUrl: './app.html',
   styleUrl: './app.scss'
@@ -264,7 +264,7 @@ export class App implements OnInit {
 
   private adjustScrolling(): void {
     setTimeout(() => {
-      const messages = document.querySelector('app-message-list');
+      const messages = document.querySelector('chat-message-list');
 
       if (this.newOnBottom())
         messages.scrollTop = messages.scrollHeight;

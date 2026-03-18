@@ -84,7 +84,7 @@ const formats = ['bold', 'code', 'font', 'italic', 'underline', 'strike', 'size'
 const formatSet = new Set(formats);
 
 @Component({
-  selector: 'app-message-entry',
+  selector: 'chat-message-entry',
   imports: [FormsModule, PickerComponent, QuillModule],
   templateUrl: './message-entry.html',
   styleUrl: './message-entry.scss',

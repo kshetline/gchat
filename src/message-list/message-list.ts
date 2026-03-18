@@ -7,7 +7,7 @@ import { MessageEntry } from '../message-entry/message-entry';
 const matchEmoji = /(\uD83C[\uD000-\uDFFF]|\uD83D[\uD000-\uDFFF]|\uD83E[\uD000-\uDFFF])/g;
 
 @Component({
-  selector: 'app-message-list',
+  selector: 'chat-message-list',
   imports: [],
   templateUrl: './message-list.html',
   styleUrl: './message-list.scss',

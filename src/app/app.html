@@ -77,13 +77,13 @@
     }
   </div>
   @if (inChat() && !newOnBottom()) {
-    <app-message-entry class="on-top" [darkMode]="darkMode()"
-        (changeColor)="setColor($event)" (newMessage)="sendComment($event)"></app-message-entry>
+    <chat-message-entry class="on-top" [darkMode]="darkMode()"
+        (changeColor)="setColor($event)" (newMessage)="sendComment($event)"></chat-message-entry>
   }
-  <app-message-list [isAdmin]="isAdmin()" [darkMode]="darkMode()" [inChat]="inChat()" [localTime]="localTime()"
-                    [messages]="messages()" [messageEntry]="messageEntry" [name]="name()"></app-message-list>
+  <chat-message-list [isAdmin]="isAdmin()" [darkMode]="darkMode()" [inChat]="inChat()" [localTime]="localTime()"
+                     [messages]="messages()" [messageEntry]="messageEntry" [name]="name()"></chat-message-list>
   @if (inChat() && newOnBottom()) {
-    <app-message-entry class="at-bottom" [darkMode]="darkMode()"
-        (changeColor)="setColor($event)" (newMessage)="sendComment($event)"></app-message-entry>
+    <chat-message-entry class="at-bottom" [darkMode]="darkMode()"
+        (changeColor)="setColor($event)" (newMessage)="sendComment($event)"></chat-message-entry>
   }
 </main>
