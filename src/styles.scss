@@ -104,20 +104,6 @@ a {
   gap: 0.25em;
 }
 
-.text-color-btn {
-  appearance: none;
-  border-radius: 50%;
-  background-color: currentColor;
-  border: 1px solid currentColor;
-  cursor: pointer;
-  height: 1.2em;
-  width: 1.2em;
-
-  &:checked {
-    outline: 3px solid currentColor;
-  }
-}
-
 .big-emoji {
   font-size: 1.5em;
   line-height: 0.5em;

@@ -1,0 +1,26 @@
+:host {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  justify-content: center;
+  min-width: 220px;
+  width: 16em;
+
+  .cs-title {
+    font-size: 0.8em;
+  }
+}
+
+.text-color-btn {
+  appearance: none;
+  border-radius: 50%;
+  background-color: currentColor;
+  border: 1px solid currentColor;
+  cursor: pointer;
+  height: 1.2em;
+  width: 1.2em;
+
+  &:checked {
+    outline: 3px solid currentColor;
+  }
+}

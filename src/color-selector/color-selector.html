@@ -1,0 +1,9 @@
+@for (buttonColor of colors; track buttonColor; let i = $index) {
+  @if (!buttonColor) {
+    <div class="flex-break"></div>
+  }
+  @else {
+    <input type="radio" class="text-color-btn" [name]="`text-color-${idn}`"
+           [style.color]="colorByIndex(i, darkMode())" [value]="i" [(ngModel)]="color">
+  }
+}

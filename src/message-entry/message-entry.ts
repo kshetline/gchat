@@ -3,9 +3,10 @@ import { FormsModule } from '@angular/forms';
 import Quill from 'quill';
 import { QuillModule  } from 'ngx-quill';
 import { forEach } from '@tubular/util';
-import { colorByIndex, colors, getTextBackground, kaomoji, shouldIgnoreClick, startClickSuppress } from '../main';
+import { colorByIndex, getTextBackground, kaomoji, shouldIgnoreClick, startClickSuppress } from '../main';
 import { PickerComponent } from '@ctrl/ngx-emoji-mart';
 import { Emoji, EmojiData } from '@ctrl/ngx-emoji-mart/ngx-emoji';
+import { ColorSelector } from '../color-selector/color-selector';
 
 const Size = Quill.import('attributors/style/size') as any;
 const sizeMap : Record<string, string>= { '0.625em': 's1', '0.8125em': 's2', '1em': 's3', '1.125em': 's4', '1.5em': 's5' };
@@ -85,18 +86,16 @@ const formatSet = new Set(formats);
 
 @Component({
   selector: 'chat-message-entry',
-  imports: [FormsModule, PickerComponent, QuillModule],
+  imports: [FormsModule, PickerComponent, QuillModule, ColorSelector],
   templateUrl: './message-entry.html',
   styleUrl: './message-entry.scss',
 })
 export class MessageEntry {
-  protected colorByIndex = colorByIndex;
-  protected colors = colors;
   protected kaomoji = kaomoji;
 
+  private _color = 0;
   private quill: Quill;
 
-  protected color = signal(0);
   protected enabled = signal(true);
   protected showEmoji = signal(false);
   protected showKaomoji = signal(false);
@@ -137,6 +136,14 @@ export class MessageEntry {
   @Output() changeColor = new EventEmitter<number>();
   @Output() newMessage = new EventEmitter<string>();
 
+  get color(): number { return this._color; }
+  set color(value: number) {
+    if (this._color !== value) {
+      this._color = value;
+      this.updateColor(false);
+    }
+  }
+
   constructor(private elementRef: ElementRef<HTMLElement>) {
     document.addEventListener('keydown', (event: KeyboardEvent) => {
       if (event.key === 'Escape' && this.showEmoji()) {
@@ -165,22 +172,24 @@ export class MessageEntry {
   }
 
   setColor(color: number): void {
-    this.color.set(color);
+    this.color = color;
   }
 
   focus(color?: number): void {
     if (color != null)
-      this.color.set(color);
+      this.color = color;
 
     setTimeout(() => this.quill?.focus(), 250);
   }
 
   updateColor(emit = true): void {
     if (emit)
-      this.changeColor.emit(this.color());
+      this.changeColor.emit(this.color);
 
-    this.quill.root.style.color = colorByIndex(this.color(), this.darkMode());
-    this.quill.root.style.backgroundColor = getTextBackground(this.quill.root.style.color );
+    if (this.quill.root) {
+      this.quill.root.style.color = colorByIndex(this.color, this.darkMode());
+      this.quill.root.style.backgroundColor = getTextBackground(this.quill.root.style.color);
+    }
   }
 
   sendMessage(): void {

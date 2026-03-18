@@ -1,14 +1,9 @@
 :host {
-  display: block;
+  display: flex;
   flex: 1;
   flex-direction: column;
   overflow-x: hidden;
   overflow-y: scroll;
-}
-
-#message-list {
-  display: flex;
-  flex-direction: column;
 }
 
 .email-link {

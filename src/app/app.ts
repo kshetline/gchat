@@ -27,7 +27,7 @@ export class App implements OnInit {
   private baseTitle = 'Chat';
   private chatActive = true;
   private _color = 0;
-  private _messageEntry: MessageEntry
+  private _messageEntry: MessageEntry;
   private messageTimer: any;
   private pendingFocus = false;
   private unseenMessages = 0;
@@ -37,6 +37,7 @@ export class App implements OnInit {
   protected email= signal('');
   protected inChat = signal(false);
   protected localTime = signal(true);
+  protected messageEntrySignal = signal<MessageEntry>(undefined);
   protected messages = signal([] as Message[]);
   protected name = signal('');
   protected newOnBottom = signal(true);
@@ -57,14 +58,17 @@ export class App implements OnInit {
 
   get messageEntry(): MessageEntry { return this._messageEntry; }
   @ViewChild(MessageEntry) set messageEntry(value: MessageEntry) {
-    this._messageEntry = value;
+    if (this._messageEntry !== value) {
+      this._messageEntry = value;
+      setTimeout(() => this.messageEntrySignal.set(value), 0);
 
-    if (this.pendingFocus) {
-      this.pendingFocus = false;
-      this.messageEntry?.focus(this.color);
+      if (this.pendingFocus) {
+        this.pendingFocus = false;
+        this.messageEntry?.focus(this.color);
+      }
+      else
+        this.messageEntry?.setColor(this.color);
     }
-    else
-      this.messageEntry?.setColor(this.color);
   }
 
   constructor(private httpClient: HttpClient, private prefService: PreferencesService) {

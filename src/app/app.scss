@@ -120,14 +120,13 @@ main {
     grid-template-columns: auto auto
   }
 
-  .color-selector {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1px;
-    justify-content: center;
-    width: 16em;
+  .titled-color-selector {
+    align-items: center;
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.25em;
 
-    .cs-title {
+    > span {
       font-size: 0.8em;
     }
   }

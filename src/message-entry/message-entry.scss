@@ -12,6 +12,14 @@
   }
 }
 
+#my-toolbar {
+  align-items: center;
+  background-color: var(--main-toolbar-background);
+  border-bottom: none !important;
+  display: flex;
+  padding: 0.25em 0.5em;
+}
+
 quill-editor {
   width: 100%;
 }
@@ -31,10 +39,10 @@ quill-editor {
 #emoji-button {
   appearance: none;
   float: none !important;
-  font-size: 1.75em;
-  margin: 0 0.5em;
+  margin-right: 1em;
   position: relative;
-  top: 0.15em;
+  top: -0.3em;
+  transform: scale(1.75);
   width: auto;
 }
 
