@@ -76,4 +76,7 @@
     <chat-message-entry class="at-bottom" [darkMode]="darkMode()"
         (changeColor)="setColor($event)" (newMessage)="sendComment($event)"></chat-message-entry>
   }
+  @if (!inChat() && newOnBottom()) {
+    <div class="spacer"></div>
+  }
 </main>
