@@ -1,7 +1,7 @@
 import { Component, OnInit, signal, ViewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Config, Message, Messages, Preferences } from '../../server/src/shared-types';
-import { forEach, isEqual } from '@tubular/util';
+import { forEach } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { MessageEntry } from '../message-entry/message-entry';
@@ -9,6 +9,8 @@ import { shouldIgnoreClick, startClickSuppress } from '../main';
 import { applyTheme, getThemeMenuStyle, getThemes } from '../themes';
 import { MessageList } from '../message-list/message-list';
 import { ColorSelector } from '../color-selector/color-selector';
+
+const REPOLL_RATE = 10000;
 
 @Component({
   selector: 'chat-root',
@@ -27,6 +29,7 @@ export class App implements OnInit {
   private baseTitle = 'Chat';
   private chatActive = true;
   private _color = 0;
+  private lastMessageId: string;
   private _messageEntry: MessageEntry;
   private messageTimer: any;
   private pendingFocus = false;
@@ -138,7 +141,7 @@ export class App implements OnInit {
   }
 
   private repollMessages(): void {
-    this.messageTimer = setTimeout(() => this.getMessages(), 10000);
+    this.messageTimer = setTimeout(() => this.getMessages(), REPOLL_RATE);
   }
 
   protected getMessages(): void {
@@ -151,13 +154,23 @@ export class App implements OnInit {
       next: (messages: Messages): void => {
         if (!messages.errorMessage) {
           this.connectionTrouble.set(false);
+          this.checkChatActive();
+
+          let newMessageCount = 1;
+          const previousLastMessageIndex = this.lastMessageId ?
+            messages.messages.findIndex(m => m.hash === this.lastMessageId) : -1;
+
+          if (previousLastMessageIndex >= 0)
+            newMessageCount = messages.messages.length - previousLastMessageIndex - 1;
+
+          this.lastMessageId = messages.messages.at(-1).hash;
 
           if (!this.newOnBottom())
             messages.messages.reverse();
 
-          if (!isEqual(this.messages(), messages.messages)) {
+          if (previousLastMessageIndex !== messages.messages.length - 1) {
             if (this.messages().length > 0 && !this.chatActive) {
-              this.unseenMessages++;
+              this.unseenMessages += newMessageCount;
               document.title = `(${this.unseenMessages}) ${this.baseTitle}`;
 
               if (this.prefs.notifySound)

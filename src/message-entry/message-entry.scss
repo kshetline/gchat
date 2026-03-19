@@ -17,7 +17,7 @@
   background-color: var(--main-toolbar-background);
   border-bottom: none !important;
   display: flex;
-  padding: 0.25em 0.5em;
+  padding: 0.3em 0.5em;
 }
 
 quill-editor {
@@ -30,10 +30,9 @@ quill-editor {
   max-height: 2.8em;
 }
 
-.color-selector {
-  display: inline-flex;
+chat-color-selector {
   position: relative;
-  top: 0.25em;
+  top: -1px;
 }
 
 #emoji-button {
@@ -41,7 +40,7 @@ quill-editor {
   float: none !important;
   margin-right: 1em;
   position: relative;
-  top: -0.3em;
+  top: -1px;
   transform: scale(1.75);
   width: auto;
 }

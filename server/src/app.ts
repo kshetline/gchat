@@ -139,7 +139,10 @@ async function leaveChat(sesh: string): Promise<void> {
   await page.waitForSelector('input[type="button"]');
   await page.$eval('input[type="button"]', btn => btn.click());
   session.inChat = false;
-  await loadEnterForm(page);
+  const oldPage = page;
+  session.page = await session.browser.newPage();
+  await oldPage.close();
+  await loadEnterForm(session.page);
 }
 
 async function sendMessage(sesh: string, name: string, email: string,
@@ -165,7 +168,6 @@ async function sendMessage(sesh: string, name: string, email: string,
   await page.$eval('input[name="comment"]', (input, comment) => input.value = comment, comment || '\u00A0');
   await page.$eval('input[name="password"]', (input, tripCode) => input.value = tripCode, tripCode || '');
   await page.focus('input[name="comment"]');
-
   await page.keyboard.press('Enter');
 }
 

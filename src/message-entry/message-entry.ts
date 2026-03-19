@@ -140,7 +140,7 @@ export class MessageEntry {
   set color(value: number) {
     if (this._color !== value) {
       this._color = value;
-      this.updateColor(false);
+      this.updateColor();
     }
   }
 
@@ -186,7 +186,7 @@ export class MessageEntry {
     if (emit)
       this.changeColor.emit(this.color);
 
-    if (this.quill.root) {
+    if (this.quill?.root) {
       this.quill.root.style.color = colorByIndex(this.color, this.darkMode());
       this.quill.root.style.backgroundColor = getTextBackground(this.quill.root.style.color);
     }
