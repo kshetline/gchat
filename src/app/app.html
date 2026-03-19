@@ -15,10 +15,13 @@
 <main xmlns="http://www.w3.org/1999/html">
   <div class="header">
     <h1 class="form-h1">{{ title() }}</h1>
+    @if (!inChat()) {
+      <button class="upper-enter" (click)="enterChat()" [disabled]="!name().trim()">Enter&nbsp;room</button>
+    }
     <div class="entry-panel" [class.in-chat]="inChat()">
       @if (inChat()) {
         <span>{{ name() }}</span>
-        <button (click)="leaveChat()">Leave room</button>
+        <button (click)="leaveChat()">Leave&nbsp;room</button>
       }
       @else {
         <div class="name-email">
@@ -27,12 +30,18 @@
           <label for="name">Email</label>
           <input id="name" type="text" placeholder="optional" [(ngModel)]="email"/>
         </div>
-        <button (click)="enterChat()" [disabled]="!name().trim()">Enter room</button>
+        <button class="lower-enter" (click)="enterChat()" [disabled]="!name().trim()">Enter&nbsp;room</button>
         <div class="titled-color-selector">
           <span>- select text color -</span>
           <chat-color-selector [(color)]="color" [darkMode]="darkMode()"></chat-color-selector>
         </div>
-     }
+      }
+      @if (inChat()) {
+        <div class="label-pair">
+          <label for="tripcode">Tripcode&nbsp;#</label>
+          <input id="tripcode" type="password" [(ngModel)]="tripCode" autocomplete="off">
+        </div>
+      }
       <div class="option-block" [class.in-chat]="inChat()">
         <div class="label-pair">
           <input id="notify-sound" type="checkbox" [(ngModel)]="notifySound" (ngModelChange)="toggleNotifySound()">
@@ -46,12 +55,6 @@
           <input id="new-on-bottom" type="checkbox" [(ngModel)]="newOnBottom" (change)="toggleMessageOrder()">
           <label for="new-on-bottom">New messages at bottom</label>
         </div>
-        @if (inChat()) {
-          <div class="label-pair">
-            <label for="tripcode">Tripcode #</label>
-            <input id="tripcode" type="password" [(ngModel)]="tripCode" autocomplete="off">
-          </div>
-        }
       </div>
     </div>
   </div>

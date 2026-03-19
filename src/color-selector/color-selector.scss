@@ -24,3 +24,10 @@
     outline: 3px solid currentColor;
   }
 }
+
+@media (max-width: 900px) {
+  .text-color-btn {
+    height: 1em;
+    width: 1em;
+  }
+}

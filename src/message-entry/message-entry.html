@@ -22,11 +22,13 @@
       <div class="kaomoji-item kaomoji" (click)="insertKaomoji(kaomoji)">{{ kaomoji }}</div>
     }
   </div>
-  <button id="emoji-button" (click)="toggleEmoji()">😀</button>
-  <button id="kaomoji-button" class=" kaomoji" (click)="toggleKaomoji()">ヽ(´∇`)ノ</button>
-  <emoji-mart emoji="" [style.display]="showEmoji() ? 'block' : 'none'" [darkMode]="darkMode()"
-      [style.top]="pickerPosition().top" [style.left]="pickerPosition().left" [totalFrequentLines]="2"
-      (emojiClick)="emojiClick($event)"></emoji-mart>
+  <div class="moji">
+    <button id="emoji-button" (click)="toggleEmoji()">😀</button>
+    <button id="kaomoji-button" class=" kaomoji" (click)="toggleKaomoji()">ヽ(´∇`)ノ</button>
+    <emoji-mart emoji="" [style.display]="showEmoji() ? 'block' : 'none'" [darkMode]="darkMode()"
+        [style.top]="pickerPosition().top" [style.left]="pickerPosition().left" [totalFrequentLines]="2"
+        (emojiClick)="emojiClick($event)"></emoji-mart>
+  </div>
 </div>
 <quill-editor [formats]="formats" [modules]="modules" [sanitize]="true"
               (onEditorCreated)="editorCreated($event)" placeholder="">

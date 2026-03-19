@@ -5,6 +5,10 @@ main {
   margin: 0 10px;
 }
 
+.upper-enter {
+  display: none;
+}
+
 .navigation {
   display: flex;
   justify-content: center;
@@ -106,6 +110,7 @@ main {
   .entry-panel {
     align-items: flex-start;
     display: flex;
+    flex-wrap: wrap;
     gap: 0.5em;
 
     &.in-chat {
@@ -139,7 +144,6 @@ main {
     &.in-chat {
       align-items: center;
       flex-direction: row;
-      flex-wrap: wrap;
       margin-left: 1em;
       gap: 1em;
       position: relative;
@@ -150,4 +154,42 @@ main {
 
 .spacer {
   height: 16px;
+}
+
+@media (max-width: 900px) {
+  .form-h1 {
+    display: inline-block;
+    margin-right: 1em;
+    margin-top: 1.5em;
+  }
+
+  .upper-enter {
+    display: inline;
+  }
+
+  .lower-enter {
+    display: none;
+  }
+
+  .connection-trouble {
+    top: 2.25em;
+  }
+
+  .header {
+    .option-block {
+      flex-direction: row;
+      gap: 0.25em;
+    }
+  }
+
+  .titled-color-selector {
+    position: relative;
+    top: -0.2em;
+  }
+}
+
+@media (max-width: 420px) {
+  .navigation {
+    font-size: 0.8em;
+  }
 }
