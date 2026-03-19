@@ -169,6 +169,54 @@ export class MessageEntry {
   protected editorCreated(quill: Quill): void {
     this.quill = quill;
     this.updateColor(false);
+
+    this.quill.root.addEventListener('paste', (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+
+      if (!items)
+        return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (/\bimage\b/.test(items[i].type)) {
+          e.preventDefault();
+          const blob = items[i].getAsFile();
+
+          if (blob) {
+            this.insertImage(blob);
+            break;
+          }
+        }
+      }
+    });
+
+    this.quill.root.addEventListener('drop', (e: DragEvent) => {
+      e.preventDefault();
+      const files = e.dataTransfer?.files;
+
+      if (!files)
+        return;
+
+      const images: File[] = [];
+
+      for (let i = 0; i < files.length; i++) {
+        if (/\bimage\b/.test(files[i].type))
+          images.push(files[i]);
+      }
+
+      if (images.length === 1)
+        this.insertImage(images[0]);
+      else if (images.length > 1)
+        alert('Only one image can be dropped at a time.');
+    });
+  }
+
+  private insertImage(file: File): void {
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      console.log(e.target?.result?.toString());
+    };
+    reader.readAsDataURL(file);
   }
 
   setColor(color: number): void {
