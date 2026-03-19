@@ -67,13 +67,13 @@
     }
   </div>
   @if (inChat() && !newOnBottom()) {
-    <chat-message-entry class="on-top" [darkMode]="darkMode()"
+    <chat-message-entry class="on-top" [darkMode]="darkMode()" (uploadFile)="upload($event)"
         (changeColor)="setColor($event)" (newMessage)="sendComment($event)"></chat-message-entry>
   }
   <chat-message-list [isAdmin]="isAdmin()" [darkMode]="darkMode()" [inChat]="inChat()" [localTime]="localTime()"
                      [messages]="messages()" [messageEntry]="messageEntrySignal()" [name]="name()"></chat-message-list>
   @if (inChat() && newOnBottom()) {
-    <chat-message-entry class="at-bottom" [darkMode]="darkMode()"
+    <chat-message-entry class="at-bottom" [darkMode]="darkMode()" (uploadFile)="upload($event)"
         (changeColor)="setColor($event)" (newMessage)="sendComment($event)"></chat-message-entry>
   }
   @if (!inChat() && newOnBottom()) {

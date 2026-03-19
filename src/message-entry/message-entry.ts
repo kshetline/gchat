@@ -1,4 +1,4 @@
-import { Component, ElementRef, EventEmitter, input, Output, signal, WritableSignal } from '@angular/core';
+import { Component, ElementRef, EventEmitter, input, output, signal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import Quill from 'quill';
 import { QuillModule  } from 'ngx-quill';
@@ -7,6 +7,11 @@ import { colorByIndex, getTextBackground, kaomoji, shouldIgnoreClick, startClick
 import { PickerComponent } from '@ctrl/ngx-emoji-mart';
 import { Emoji, EmojiData } from '@ctrl/ngx-emoji-mart/ngx-emoji';
 import { ColorSelector } from '../color-selector/color-selector';
+
+export interface FileUploadEvent {
+  file: File;
+  quill: Quill;
+}
 
 const Size = Quill.import('attributors/style/size') as any;
 const sizeMap : Record<string, string>= { '0.625em': 's1', '0.8125em': 's2', '1em': 's3', '1.125em': 's4', '1.5em': 's5' };
@@ -133,8 +138,9 @@ export class MessageEntry {
   };
 
   darkMode = input(false);
-  @Output() changeColor = new EventEmitter<number>();
-  @Output() newMessage = new EventEmitter<string>();
+  changeColor = output<number>();
+  newMessage = output<string>();
+  uploadFile = output<FileUploadEvent>();
 
   get color(): number { return this._color; }
   set color(value: number) {
@@ -211,12 +217,7 @@ export class MessageEntry {
   }
 
   private insertImage(file: File): void {
-    const reader = new FileReader();
-
-    reader.onload = (e) => {
-      console.log(e.target?.result?.toString());
-    };
-    reader.readAsDataURL(file);
+    this.uploadFile.emit({ file, quill: this.quill });
   }
 
   setColor(color: number): void {

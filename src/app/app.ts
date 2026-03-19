@@ -4,11 +4,12 @@ import { Config, Message, Messages, Preferences } from '../../server/src/shared-
 import { forEach } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
-import { MessageEntry } from '../message-entry/message-entry';
+import { FileUploadEvent, MessageEntry } from '../message-entry/message-entry';
 import { shouldIgnoreClick, startClickSuppress } from '../main';
 import { applyTheme, getThemeMenuStyle, getThemes } from '../themes';
 import { MessageList } from '../message-list/message-list';
 import { ColorSelector } from '../color-selector/color-selector';
+import { Uploader } from '../uploader';
 
 const REPOLL_RATE = 10000;
 
@@ -34,6 +35,7 @@ export class App implements OnInit {
   private messageTimer: any;
   private pendingFocus = false;
   private unseenMessages = 0;
+  private uploader: Uploader;
 
   protected connectionTrouble = signal(false);
   protected darkMode = signal(false);
@@ -75,6 +77,7 @@ export class App implements OnInit {
   }
 
   constructor(private httpClient: HttpClient, private prefService: PreferencesService) {
+    this.uploader = new Uploader(this.httpClient);
     this.prefs = this.prefService.get();
     forEach(this.prefs as Record<string, any>, (key, value) => (this as any)[key] && (this as any)[key]?.set(value));
 
@@ -256,6 +259,10 @@ export class App implements OnInit {
         this.messageEntry.sendEnabled(true);
       }
     });
+  }
+
+  protected upload(evt: FileUploadEvent): void {
+    this.uploader.upload(evt.file, evt.quill, this.tripCode());
   }
 
   protected toggleNotifySound(): void {

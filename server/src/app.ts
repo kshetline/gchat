@@ -7,12 +7,10 @@ import { DomElement, DomNode } from 'fortissimo-html/dist/dom';
 import * as puppeteer from 'puppeteer';
 import { Config, Message, Messages } from './shared-types';
 import { checksum53, encodeForUri, toBoolean, toInt } from '@tubular/util';
+import { uploadSingle } from './uploader';
+import { SessionInfo } from './session-info';
 
-interface SessionInfo {
-  browser?: puppeteer.Browser;
-  inChat?: boolean;
-  page?: puppeteer.Page;
-}
+let browser: puppeteer.Browser;
 
 const app = express();
 const port = toInt(process.env.HTTP_PORT) || 3000;
@@ -140,7 +138,7 @@ async function leaveChat(sesh: string): Promise<void> {
   await page.$eval('input[type="button"]', btn => btn.click());
   session.inChat = false;
   const oldPage = page;
-  session.page = await session.browser.newPage();
+  session.page = await session.context.newPage();
   await oldPage.close();
   await loadEnterForm(session.page);
 }
@@ -182,9 +180,10 @@ app.use(async (req, _res, next) => {
   let sesh = sessions.get(req.sessionID);
 
   if (!sesh) {
-    sesh = { browser: await puppeteer.launch() };
+    browser = browser || (await puppeteer.launch());
+    sesh = { context: await browser.createBrowserContext() };
     sessions.set(req.sessionID, sesh);
-    sesh.page = await sesh.browser.newPage();
+    sesh.page = await sesh.context.newPage();
     sesh.page.on('console', msg => {
       console.log('Puppeteer %s: %s', msg.type, msg.text());
     });
@@ -225,4 +224,20 @@ app.post('/api/send', async (req, res) => {
 
   await sendMessage(req.sessionID, q.name, q.email, q.comment, q.color, q.tripCode);
   res.send('null');
+});
+
+app.post('/api/upload', async (req, res) => {
+  let session = sessions.get(req.sessionID);
+
+  try {
+    const file = await uploadSingle(session, req, res);
+    const fileUrl = `/uploads/${file.filename}`;
+    res.json({ url: fileUrl });
+  }
+  catch (error) {
+    console.error('Upload error:', error);
+    res.status(400).json({
+      error: error instanceof Error ? error.message : 'Upload failed'
+    });
+  }
 });
