@@ -99,6 +99,11 @@ export async function uploadSingle(session: SessionInfo,
     page.$eval('button[type="submit"]', btn => btn.click())
   ]);
 
+  try {
+    await fs.unlink(file.path);
+  }
+  catch (err) {}
+
   return extractLinkFromPageContent(await page.content(), comment);
 }
 
