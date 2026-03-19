@@ -230,9 +230,9 @@ app.post('/api/upload', async (req, res) => {
   let session = sessions.get(req.sessionID);
 
   try {
-    const file = await uploadSingle(session, req, res);
-    const fileUrl = `/uploads/${file.filename}`;
-    res.json({ url: fileUrl });
+    const url = await uploadSingle(session, req, res);
+
+    res.json({ url });
   }
   catch (error) {
     console.error('Upload error:', error);

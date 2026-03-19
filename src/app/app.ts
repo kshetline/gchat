@@ -261,8 +261,8 @@ export class App implements OnInit {
     });
   }
 
-  protected upload(evt: FileUploadEvent): void {
-    this.uploader.upload(evt.file, evt.quill, this.tripCode());
+  protected async upload(evt: FileUploadEvent): Promise<void> {
+    await this.uploader.upload(evt.file, evt.quill, this.tripCode());
   }
 
   protected toggleNotifySound(): void {

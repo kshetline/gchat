@@ -5,8 +5,11 @@ import crypto from 'crypto';
 import fs from 'fs/promises';
 import os from 'os';
 import { SessionInfo } from './session-info';
+import { HtmlParser,  } from 'fortissimo-html';
 
 const domain = process.env.CHAT_DOMAIN;
+const parser = new HtmlParser();
+let fileIndex = 0;
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -42,8 +45,27 @@ const upload = multer({
   }
 });
 
+function extractLinkFromPageContent(content: string, comment: string): string  {
+  const dom = parser.parse(content).domRoot;
+  const body = dom.querySelector('body');
+  const tableRows = body?.querySelectorAll('tr');
+
+  for (const row of tableRows || []) {
+    const cells = row.querySelectorAll('td');
+
+    if (cells[2]?.textContent === comment) {
+      const url = cells[1].querySelector('a')?.getAttribute('href')[1] || '';
+
+      if (url)
+        return `https://${domain}/${url}`;
+    }
+  }
+
+  return ''
+}
+
 export async function uploadSingle(session: SessionInfo,
-    req: express.Request, res: express.Response): Promise<Express.Multer.File>
+    req: express.Request, res: express.Response): Promise<string>
 {
   const file = await new Promise<Express.Multer.File> ((resolve, reject) => {
     upload.single('image')(req, res, (err) => {
@@ -57,6 +79,7 @@ export async function uploadSingle(session: SessionInfo,
   });
 
   let page = session.uploaderPage;
+  const pwd = req.body.password;
 
   if (!page) {
     page = session.uploaderPage = await session.context.newPage();
@@ -64,6 +87,18 @@ export async function uploadSingle(session: SessionInfo,
     await page.waitForSelector('form');
   }
 
-  return file;
+  const fileInput = await page.waitForSelector('input[type="file"]');
+  await fileInput.uploadFile(file.path);
+  await page.$eval('input[name="password"]', (input, pwd) => input.value = pwd, pwd || '');
+  const comment = 'chat-paste-' + new Date().toISOString() + '-' + (++fileIndex);
+  await page.$eval('#comment', (input, comment) => input.value = comment, comment);
+  await page.$eval('button[type="submit"]', btn => btn.click());
+
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'networkidle0' }),
+    page.$eval('button[type="submit"]', btn => btn.click())
+  ]);
+
+  return extractLinkFromPageContent(await page.content(), comment);
 }
 
