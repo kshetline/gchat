@@ -58,3 +58,34 @@ export function startClickSuppress(): void {
 export function shouldIgnoreClick(): boolean {
   return !!clickSuppress;
 }
+
+type NotificationType = 'info' | 'success' | 'warning' | 'error';
+
+export type NotificationHandler = (type: NotificationType, message: string) => void;
+
+let notificationHandler: NotificationHandler;
+
+export function registerNotificationHandler(handler: NotificationHandler): void {
+  notificationHandler = handler;
+}
+
+export function notify(type: NotificationType, message: string): void {
+  if (notificationHandler)
+    notificationHandler(type, message);
+  else {
+    switch (type) {
+      case 'info':
+        console.info(message);
+        break;
+      case 'success':
+        console.log(message);
+        break;
+      case 'warning':
+        console.warn(message);
+        break;
+      case 'error':
+        console.error(message);
+        break;
+    }
+  }
+}

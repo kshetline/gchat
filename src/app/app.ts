@@ -5,7 +5,7 @@ import { forEach, isAndroid } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { FileUploadEvent, MessageEntry } from '../message-entry/message-entry';
-import { shouldIgnoreClick, startClickSuppress } from '../main';
+import { NotificationHandler, registerNotificationHandler, shouldIgnoreClick, startClickSuppress } from '../main';
 import { applyTheme, getThemeMenuStyle, getThemes, resetDefaultThemeBackground } from '../themes';
 import { MessageList } from '../message-list/message-list';
 import { ColorSelector } from '../color-selector/color-selector';
@@ -42,13 +42,17 @@ export class App implements OnInit {
   protected email= signal('');
   protected inChat = signal(false);
   protected localTime = signal(true);
+  protected maxFileSizeInMb = signal(15000);
   protected messageEntrySignal = signal<MessageEntry>(undefined);
   protected messages = signal([] as Message[]);
   protected name = signal('');
   protected newOnBottom = signal(true);
   protected navigation = signal([] as { name: string, url: string; target?: string }[]);
+  protected notificationMessage = signal('');
+  protected notificationType = signal('');
   protected notifySound = signal(true);
   protected participants = signal([] as string[]);
+  protected showNotification = signal(false);
   protected showThemes = signal(false);
   protected title = signal(this.baseTitle);
   protected tripCode = signal('');
@@ -92,6 +96,7 @@ export class App implements OnInit {
         this.title.set(config.title);
         root.style.setProperty('--primary-background', config.backgroundColor || '#DDD');
         this.navigation.set(config.navigation);
+        this.maxFileSizeInMb.set(config.fileSizeLimitInMb || 15000);
       }
       catch {}
     }
@@ -107,13 +112,18 @@ export class App implements OnInit {
         document.title = config.title;
         this.title.set(config.title);
         this.navigation.set(config.navigation);
+        this.maxFileSizeInMb.set(config.fileSizeLimitInMb || 15000);
         localStorage.setItem('gchat-config', JSON.stringify(config));
       },
       error: (_error): void => this.connectionTrouble.set(true)
     });
 
     document.addEventListener('keydown', (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && this.showThemes()) {
+      if (event.key === 'Escape' && this.showNotification()) {
+        this.showNotification.set(false);
+        event.preventDefault();
+      }
+      else if (event.key === 'Escape' && this.showThemes()) {
         this.showThemes.set(false);
         event.preventDefault();
       }
@@ -137,7 +147,18 @@ export class App implements OnInit {
   }
 
   ngOnInit(): void {
+    registerNotificationHandler(this.notify)
     this.getMessages();
+  }
+
+  notify: NotificationHandler = (type, message): void => {
+    this.notificationType.set(type);
+    this.notificationMessage.set(message);
+    this.showNotification.set(true);
+  }
+
+  protected hideNotification() {
+    this.showNotification.set(false);
   }
 
   private checkChatActive(): void {
@@ -268,7 +289,7 @@ export class App implements OnInit {
   }
 
   protected async upload(evt: FileUploadEvent): Promise<void> {
-    await this.uploader.upload(evt.file, evt.quill, this.tripCode());
+    await this.uploader.upload(evt.file, evt.quill, this.name(), this.tripCode());
   }
 
   protected toggleNotifySound(): void {

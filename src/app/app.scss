@@ -156,6 +156,43 @@ main {
   height: 16px;
 }
 
+.notification {
+  background-color: white;
+  border: 2px solid var(--main-border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  color: black;
+  display: flex;
+  flex-direction: column;
+  gap: 1em;
+  left: 50%;
+  justify-content: space-between;
+  max-width: 33dvw;
+  min-height: 150px;
+  min-width: 250px;
+  padding: 1em;
+  position: fixed;
+  top: 33%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+
+  &.error {
+    background-color: var(--main-notification-error-background);;
+  }
+
+  &.info {
+    background-color: var(--main-notification-info-background);;
+  }
+
+  &.warning {
+    background-color: var(--main-notification-warning-background);;
+  }
+
+  button {
+    align-self: center;
+    min-width: 60px;
+  }
+}
+
 @media (max-width: 900px) {
   .form-h1 {
     display: inline-block;

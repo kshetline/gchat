@@ -6,6 +6,8 @@ import fs from 'fs/promises';
 import os from 'os';
 import { SessionInfo } from './session-info';
 import { HtmlParser,  } from 'fortissimo-html';
+import { toInt } from '@tubular/util';
+import { allowedExtensions, allowedTypes, MB } from './shared-types';
 
 const domain = process.env.CHAT_DOMAIN;
 const parser = new HtmlParser();
@@ -31,10 +33,9 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB limit
+  limits: { fileSize: toInt(process.env.UPLOAD_MAX_SIZE_MB) * MB },
   fileFilter: (_req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|webp/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const extname = allowedExtensions.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
 
     if (mimetype && extname) {
@@ -90,7 +91,7 @@ export async function uploadSingle(session: SessionInfo,
   const fileInput = await page.waitForSelector('input[type="file"]');
   await fileInput.uploadFile(file.path);
   await page.$eval('input[name="password"]', (input, pwd) => input.value = pwd, pwd || '');
-  const comment = 'chat-paste-' + new Date().toISOString() + '-' + (++fileIndex);
+  const comment = `${req.body.name || 'x'}-paste-` + new Date().toISOString() + '-' + (++fileIndex);
   await page.$eval('#comment', (input, comment) => input.value = comment, comment);
   await page.$eval('button[type="submit"]', btn => btn.click());
 

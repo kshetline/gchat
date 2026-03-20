@@ -3,10 +3,11 @@ import { FormsModule } from '@angular/forms';
 import Quill from 'quill';
 import { QuillModule  } from 'ngx-quill';
 import { forEach } from '@tubular/util';
-import { colorByIndex, getTextBackground, kaomoji, shouldIgnoreClick, startClickSuppress } from '../main';
+import { colorByIndex, getTextBackground, kaomoji, notify, shouldIgnoreClick, startClickSuppress } from '../main';
 import { PickerComponent } from '@ctrl/ngx-emoji-mart';
 import { Emoji, EmojiData } from '@ctrl/ngx-emoji-mart/ngx-emoji';
 import { ColorSelector } from '../color-selector/color-selector';
+import { allowedExtensions, MB } from '../../server/src/shared-types';
 
 export interface FileUploadEvent {
   file: File;
@@ -138,6 +139,7 @@ export class MessageEntry {
   };
 
   darkMode = input(false);
+  maxFileSizeInMb = input(15000);
   changeColor = output<number>();
   newMessage = output<string>();
   uploadFile = output<FileUploadEvent>();
@@ -202,17 +204,24 @@ export class MessageEntry {
       if (!files)
         return;
 
-      const images: File[] = [];
+      const uploads: File[] = [];
+      let tooBig = false;
 
       for (let i = 0; i < files.length; i++) {
-        if (/\bimage\b/.test(files[i].type))
-          images.push(files[i]);
+        if (files[i].size > this.maxFileSizeInMb() * MB)
+          tooBig = true;
+        else if (allowedExtensions.test(files[i].name))
+          uploads.push(files[i]);
       }
 
-      if (images.length === 1)
-        this.insertImage(images[0]);
-      else if (images.length > 1)
-        alert('Only one image can be dropped at a time.');
+      if (tooBig)
+        notify('error', `File too big. Maximum size is ${this.maxFileSizeInMb()} MB.`);
+      else if (uploads.length === 1 && !tooBig)
+        this.insertImage(uploads[0]);
+      else if (uploads.length > 1)
+        notify('error', 'Only one file can be sent at a time.');
+      else if (files.length > 0)
+        notify('error', 'File type is not supported.');
     });
   }
 

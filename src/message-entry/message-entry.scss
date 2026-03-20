@@ -73,6 +73,25 @@ chat-color-selector {
   }
 }
 
+#kaomoji-panel {
+  background-color: var(--main-toolbar-background);
+  border: 1px solid var(--main-border);
+  display: none;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.25em;
+  justify-items: stretch;
+  padding: 0.5em;
+  position: fixed;
+
+  .kaomoji-item {
+    background-color: var(--main-toolbar-item-background);
+    cursor: pointer;
+    padding: 0.25em;
+    text-align: center;
+    white-space: nowrap;
+  }
+}
+
 emoji-mart {
   display: none;
   position: fixed;
@@ -82,6 +101,11 @@ emoji-mart {
 @media (max-width: 800px) {
   #my-toolbar {
     justify-content: center;
+  }
+
+  #kaomoji-panel .kaomoji-item {
+    font-size: 0.9em;
+    padding: 0.1em;
   }
 }
 

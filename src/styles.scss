@@ -8,6 +8,9 @@
   --main-link-visited: #528;
   --main-link-hover: #06F;
   --main-link-active: #F00;
+  --main-notification-error-background: #F69;
+  --main-notification-info-background: #6AF;
+  --main-notification-warning-background: #FF9;
   --main-participant-background: #CCC;
   --main-toolbar-background: #DDD;
   --main-toolbar-item-background: #FFF;
@@ -114,24 +117,6 @@ a {
 
 .kaomoji {
   font-family: "MS PGothic", "Mona", "Monapo", "IPAMonaPGothic", "IPAPGothic", "saitamaar_light", "submona", sans-serif !important;
-}
-
-#kaomoji-panel {
-  background-color: var(--main-toolbar-background);
-  border: 1px solid var(--main-border);
-  display: none;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.25em;
-  justify-items: stretch;
-  padding: 0.5em;
-  position: fixed;
-
-  > div {
-    background-color: var(--main-toolbar-item-background);
-    cursor: pointer;
-    padding: 0.25em;
-    text-align: center;
-  }
 }
 
 @media (max-width: 900px) {
