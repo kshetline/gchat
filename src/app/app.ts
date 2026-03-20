@@ -1,12 +1,12 @@
 import { Component, OnInit, signal, ViewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Config, Message, Messages, Preferences } from '../../server/src/shared-types';
-import { forEach } from '@tubular/util';
+import { forEach, isAndroid } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { FileUploadEvent, MessageEntry } from '../message-entry/message-entry';
 import { shouldIgnoreClick, startClickSuppress } from '../main';
-import { applyTheme, getThemeMenuStyle, getThemes } from '../themes';
+import { applyTheme, getThemeMenuStyle, getThemes, resetDefaultThemeBackground } from '../themes';
 import { MessageList } from '../message-list/message-list';
 import { ColorSelector } from '../color-selector/color-selector';
 import { Uploader } from '../uploader';
@@ -67,12 +67,12 @@ export class App implements OnInit {
       this._messageEntry = value;
       setTimeout(() => this.messageEntrySignal.set(value), 0);
 
-      if (this.pendingFocus) {
-        this.pendingFocus = false;
+      if (this.pendingFocus && !isAndroid())
         this.messageEntry?.focus(this.color);
-      }
       else
         this.messageEntry?.setColor(this.color);
+
+      this.pendingFocus = false;
     }
   }
 
@@ -90,8 +90,8 @@ export class App implements OnInit {
 
         document.title = this.baseTitle = config.title;
         this.title.set(config.title);
-        this.navigation.set(config.navigation);
         root.style.setProperty('--primary-background', config.backgroundColor || '#DDD');
+        this.navigation.set(config.navigation);
       }
       catch {}
     }
@@ -100,11 +100,13 @@ export class App implements OnInit {
 
     httpClient.get<Config>('/api/config').subscribe({
       next: (config: Config): void => {
+        root.style.setProperty('--primary-background', config.backgroundColor || '#DDD');
+        resetDefaultThemeBackground();
+        this.setTheme(this.prefs.theme);
         this.connectionTrouble.set(false);
         document.title = config.title;
         this.title.set(config.title);
         this.navigation.set(config.navigation);
-        root.style.setProperty('--primary-background', config.backgroundColor || '#DDD');
         localStorage.setItem('gchat-config', JSON.stringify(config));
       },
       error: (_error): void => this.connectionTrouble.set(true)
@@ -113,6 +115,10 @@ export class App implements OnInit {
     document.addEventListener('keydown', (event: KeyboardEvent) => {
       if (event.key === 'Escape' && this.showThemes()) {
         this.showThemes.set(false);
+        event.preventDefault();
+      }
+      else if (event.key === 'Enter' && this.name().trim() && !this.inChat()) {
+        this.enterChat();
         event.preventDefault();
       }
     })
@@ -297,8 +303,12 @@ export class App implements OnInit {
     setTimeout(() => {
       const messages = document.querySelector('chat-message-list');
 
-      if (this.newOnBottom())
+      if (this.newOnBottom()) {
         messages.scrollTop = messages.scrollHeight;
+
+        if (isAndroid())
+          setTimeout(() => messages.scrollTop = messages.scrollHeight, 250);
+      }
       else
         messages.scrollTop = 0;
     });

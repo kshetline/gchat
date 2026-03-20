@@ -135,3 +135,7 @@ export function getThemeMenuStyle(themeName: string): ThemeMenuStyle {
 
   return result;
 }
+
+export function resetDefaultThemeBackground(): void {
+  themes['default']._background = '*';
+}
