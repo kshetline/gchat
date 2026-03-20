@@ -45,7 +45,7 @@ chat-color-selector {
   top: -1px;
 }
 
-.moji {
+.inserts {
   display: flex;
   gap: 1em;
 }
@@ -53,14 +53,13 @@ chat-color-selector {
 #emoji-button {
   appearance: none;
   float: none !important;
-  margin-right: 1em;
   position: relative;
   top: -1px;
   transform: scale(1.75);
   width: auto;
 }
 
-#kaomoji-button {
+#kaomoji-button, #upload-button {
   appearance: none;
   color: var(--main-quill-color);
   float: none !important;
@@ -92,6 +91,38 @@ chat-color-selector {
   }
 }
 
+#upload-panel {
+  align-items: center;
+  background-color: #EEE;
+  border: 2px solid #222;
+  color: black;
+  display: none;
+  flex-direction: column;
+  gap: 1em;
+  min-width: 300px;
+  padding: 0.5em;
+  position: fixed;
+
+  input::file-selector-button {
+    background-color: white;
+    border: 1px solid gray;
+    border-radius: 0.25em;
+  }
+
+  .buttons {
+    display: flex;
+    gap: 1em;
+
+    button {
+      all: revert;
+      background-color: white;
+      border: 1px solid gray;
+      border-radius: 0.25em;
+      min-width: 75px;
+    }
+  }
+}
+
 emoji-mart {
   display: none;
   position: fixed;
@@ -110,7 +141,7 @@ emoji-mart {
 }
 
 @media (max-width: 400px) {
-  #my-toolbar, .moji {
+  #my-toolbar, .inserts {
     column-gap: 0;
   }
 

@@ -22,12 +22,22 @@
       <div class="kaomoji-item kaomoji" (click)="insertKaomoji(kaomoji)">{{ kaomoji }}</div>
     }
   </div>
-  <div class="moji">
+  <div id="upload-panel" [style.top]="filePromptPosition().top" [style.left]="filePromptPosition().left"
+       [style.display]="showFilePrompt() ? 'flex' : 'none'">
+    <label for="file-upload">Choose a file to upload:</label>
+    <input type="file" id="file-upload" (change)="onFileSelected($event)">
+    <div class="buttons">
+      <button (click)="toggleFileUpload()">Cancel</button>
+      <button (click)="uploadSelectedFile()" [disabled]="!this.lastSelectedFiles">Upload</button>
+    </div>
+  </div>
+  <div class="inserts">
     <button id="emoji-button" (click)="toggleEmoji()">😀</button>
     <button id="kaomoji-button" class=" kaomoji" (click)="toggleKaomoji()">ヽ(´∇`)ノ</button>
     <emoji-mart emoji="" [style.display]="showEmoji() ? 'block' : 'none'" [darkMode]="darkMode()"
         [style.top]="pickerPosition().top" [style.left]="pickerPosition().left" [totalFrequentLines]="2"
         (emojiClick)="emojiClick($event)"></emoji-mart>
+    <button id="upload-button" (click)="toggleFileUpload()"><i class="fa-solid fa-upload"></i></button>
   </div>
 </div>
 <quill-editor [formats]="formats" [modules]="modules" [sanitize]="true"

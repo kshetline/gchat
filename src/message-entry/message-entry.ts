@@ -103,7 +103,10 @@ export class MessageEntry {
   private quill: Quill;
 
   protected enabled = signal(true);
+  protected filePromptPosition = signal({ top: '0', left: '0' });
+  protected lastSelectedFiles: File[];
   protected showEmoji = signal(false);
+  protected showFilePrompt = signal(false);
   protected showKaomoji = signal(false);
   protected kaomojiPosition = signal({ top: '0', left: '0' });
   protected pickerPosition = signal({ top: '0', left: '0' });
@@ -161,7 +164,12 @@ export class MessageEntry {
     });
 
     document.addEventListener('mousedown', (evt: MouseEvent) => {
-      if (!document.querySelector('emoji-mart')?.contains(evt.target as Node) && this.showEmoji()) {
+      if (!document.querySelector('#upload-panel')?.contains(evt.target as Node) && this.showFilePrompt()) {
+        this.showFilePrompt.set(false);
+        evt.preventDefault();
+        startClickSuppress();
+      }
+      else if (!document.querySelector('emoji-mart')?.contains(evt.target as Node) && this.showEmoji()) {
         this.showEmoji.set(false);
         evt.preventDefault();
         startClickSuppress();
@@ -189,7 +197,9 @@ export class MessageEntry {
           e.preventDefault();
           const blob = items[i].getAsFile();
 
-          if (blob) {
+          if (blob?.size > this.maxFileSizeInMb() * MB)
+            notify('error', `Image too big. Maximum size is ${this.maxFileSizeInMb()} MB.`);
+          else if (blob) {
             this.insertImage(blob);
             break;
           }
@@ -199,30 +209,33 @@ export class MessageEntry {
 
     this.quill.root.addEventListener('drop', (e: DragEvent) => {
       e.preventDefault();
-      const files = e.dataTransfer?.files;
-
-      if (!files)
-        return;
-
-      const uploads: File[] = [];
-      let tooBig = false;
-
-      for (let i = 0; i < files.length; i++) {
-        if (files[i].size > this.maxFileSizeInMb() * MB)
-          tooBig = true;
-        else if (allowedExtensions.test(files[i].name))
-          uploads.push(files[i]);
-      }
-
-      if (tooBig)
-        notify('error', `File too big. Maximum size is ${this.maxFileSizeInMb()} MB.`);
-      else if (uploads.length === 1 && !tooBig)
-        this.insertImage(uploads[0]);
-      else if (uploads.length > 1)
-        notify('error', 'Only one file can be sent at a time.');
-      else if (files.length > 0)
-        notify('error', 'File type is not supported.');
+      this.processFiles(Array.from(e.dataTransfer?.files));
     });
+  }
+
+  private processFiles(files: File[]): void {
+    if (!files)
+      return;
+
+    const uploads: File[] = [];
+    let tooBig = false;
+
+    for (let i = 0; i < files.length; i++) {
+      if (files[i].size > this.maxFileSizeInMb() * MB)
+        tooBig = true;
+      else if (allowedExtensions.test(files[i].name))
+        uploads.push(files[i]);
+    }
+
+    if (tooBig)
+      notify('error', `File too big. Maximum size is ${this.maxFileSizeInMb()} MB.`);
+    else if (uploads.length === 1 && !tooBig)
+      this.insertImage(uploads[0]);
+    else if (uploads.length > 1)
+      notify('error', 'Only one file can be sent at a time.');
+    else if (files.length > 0)
+      notify('error', 'File type is not supported.');
+
   }
 
   private insertImage(file: File): void {
@@ -332,6 +345,25 @@ export class MessageEntry {
       return;
 
     this.togglePanel(this.showKaomoji, this.kaomojiPosition, '#kaomoji-button', '#kaomoji-panel');
+  }
+
+  protected toggleFileUpload(): void {
+    if (shouldIgnoreClick())
+      return;
+
+    if (!this.showFilePrompt())
+      this.lastSelectedFiles = undefined;
+
+    this.togglePanel(this.showFilePrompt, this.filePromptPosition, '#upload-button', '#upload-panel');
+  }
+
+  protected onFileSelected(evt: Event): void {
+    this.lastSelectedFiles = Array.from((evt.target as HTMLInputElement).files);
+  }
+
+  protected uploadSelectedFile(): void {
+    this.showFilePrompt.set(false);
+    this.processFiles(this.lastSelectedFiles);
   }
 
   protected emojiClick(emoji: Emoji): void {

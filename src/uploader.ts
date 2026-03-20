@@ -8,7 +8,7 @@ export class Uploader {
   async upload(file: File, quill: Quill, name: string, tripCode: string): Promise<void> {
     const formData = new FormData();
     const range = quill.getSelection(true);
-    const placeholderUrl = '🖼️';
+    const placeholderUrl = '🔗';
 
     formData.append('image', file);
     formData.append('name', name);
