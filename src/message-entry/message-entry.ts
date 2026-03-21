@@ -182,11 +182,19 @@ export class MessageEntry {
     });
 
     // Make sure direct user typing clears the kaomoji font.
-    document.addEventListener('keydown', () => this.quill?.format('font', undefined));
+    document.addEventListener('keydown', evt => {
+      if ([...(evt.key || '')].length === 1) {
+        const range = this.quill?.getSelection();
+
+        if (range && (this.quill.getFormat(range) || {})['font'])
+          this.quill?.format('font', undefined);
+      }
+    });
   }
 
   protected editorCreated(quill: Quill): void {
     this.quill = quill;
+    this.quill.setText('');
     this.updateColor(false);
 
     this.quill.root.addEventListener('paste', (e: ClipboardEvent) => {
