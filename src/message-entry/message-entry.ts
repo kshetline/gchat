@@ -15,13 +15,13 @@ export interface FileUploadEvent {
 }
 
 const Size = Quill.import('attributors/style/size') as any;
-const sizeMap : Record<string, string>= { '0.625em': 's1', '0.8125em': 's2', '1em': 's3', '1.125em': 's4', '1.5em': 's5' };
+const sizeMap: Record<string, string> = { '0.625em': 's1', '0.8125em': 's2', '1em': 's3', '1.125em': 's4', '1.5em': 's5' };
 
 Size.whitelist = Object.keys(sizeMap);
 Quill.register(Size, true);
 
 const tagMap: Record<string, string> = {
-  'bold': 'b', 'code': 'code', 'italic': 'i', 'size': '', 'strike': 's', 'underline': 'u'
+  bold: 'b', code: 'code', italic: 'i', size: '', strike: 's', underline: 'u'
 };
 const recognizedAttributes = new Set(Object.keys(tagMap));
 
@@ -120,7 +120,7 @@ export class MessageEntry {
             forEach(op.attributes, (key, value) => {
               if ((key === 'font' && value !== 'ms-pgothic') || !formatSet.has(key))
                 delete op.attributes[key];
-            })
+            });
           });
           return delta;
         }]
@@ -130,11 +130,11 @@ export class MessageEntry {
       bindings: {
         enter: {
           key: 'Enter',
-          'handler': () => this.sendMessage()
+          'handler': () => this.sendMessage() // eslint-disable-line @stylistic/quote-props
         },
         tab: {
           key: 'Tab',
-          'handler': () => true
+          'handler': () => true // eslint-disable-line @stylistic/quote-props
         }
       }
     },
@@ -246,7 +246,6 @@ export class MessageEntry {
       notify('error', 'Only one file can be sent at a time.');
     else if (files.length > 0)
       notify('error', 'File type is not supported.');
-
   }
 
   private insertImage(file: File): void {
@@ -408,7 +407,7 @@ export class MessageEntry {
     if (range.length > 0)
       this.quill.deleteText(range.index, range.length);
 
-    text = '\u2000' + text + '\u2000'
+    text = '\u2000' + text + '\u2000';
     this.quill.insertText(range.index, text, { font: 'ms-pgothic' });
     this.quill.setSelection(range.index + text.length);
     this.quill.format('font', undefined);

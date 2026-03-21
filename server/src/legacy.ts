@@ -29,7 +29,7 @@ function getTextAndMarkup(elems: DomElement[], domain: string): string {
       else if (elem.tag === 'img') {
         const alt = elem.valuesLookup['alt'];
 
-        if ([...(alt || '')].length == 1)
+        if ([...(alt || '')].length === 1)
           fromElem = alt;
         else {
           const src = elem.valuesLookup['src']?.replace(/^\/(.*)$/, `https://${domain}/$1`);
@@ -53,7 +53,7 @@ function extractMessage(messageRow: DomNode): Message {
   const style = nameElem?.valuesLookup['style'];
   let nameIndex = 1;
   let email: string;
-  const firstNode = (nameElem?.children?.at(0) as DomNode);
+  const firstNode = nameElem?.children?.at(0) as DomNode;
 
   if (firstNode?.tag === 'a') {
     email = firstNode.valuesLookup['href'];
@@ -62,7 +62,7 @@ function extractMessage(messageRow: DomNode): Message {
 
   const name = (nameElem?.children?.at(nameIndex) as DomNode)?.children?.at(0)?.content;
   const timestamp = messageRow.querySelector('.messageDate')?.children?.at(0)?.content?.slice(1, -1)
-  .replace('-', 'T').replace(/\//g, '-').replace(/\b(\d)\b/g, '0$1');
+    .replace('-', 'T').replace(/\//g, '-').replace(/\b(\d)\b/g, '0$1');
   const trip = (nameElem?.children?.at(nameIndex + 1) as DomNode)?.content?.substring(1);
   const hash = checksum53(`${name};${trip || ''};${timestamp}`);
 
@@ -75,7 +75,7 @@ export async function legacyBrowserSetup(): Promise<SessionInfo> {
   // sessions.set(req.sessionID, sesh);
   session.page = await session.context.newPage();
   session.page.on('console', msg => {
-    console.log('Puppeteer %s: %s', msg.type, msg.text());
+    console.log('Puppeteer %s: %s', msg.type, msg.text()); // eslint-disable-line @typescript-eslint/unbound-method
   });
   await loadEnterForm(session.page);
 

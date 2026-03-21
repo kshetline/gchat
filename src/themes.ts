@@ -28,7 +28,7 @@ const lightDefaults = {
   _quill_color: '#444',
   _quill_code_background: '#EEE',
   _quill_picker_background: '#333'
-}
+};
 
 const darkDefaults = {
   _background: '#004',
@@ -47,7 +47,7 @@ const darkDefaults = {
   _quill_background: '#333',
   _quill_code_background: '#666',
   _quill_picker_background: '#666'
-}
+};
 
 const themes: Record<string, any> = {
   default: {
@@ -85,7 +85,7 @@ const themes: Record<string, any> = {
     darkMode: true,
     _background: '#111',
   }
-}
+};
 
 export function getThemes(): Theme[] {
   return Object.keys(themes).map(key => ({
@@ -104,7 +104,7 @@ export function applyTheme(themeName: string): void {
   else
     forEach(lightDefaults, (key, value) => !theme[key] && (theme[key] = value));
 
-  forEach(theme, ((key, value) => {
+  forEach(theme, (key, value) => {
     if (key === '_background' && value === '*')
       value = window.getComputedStyle(root).getPropertyValue('--primary-background');
 
@@ -113,7 +113,7 @@ export function applyTheme(themeName: string): void {
 
       root.style.setProperty(propName, value as string);
     }
-  }));
+  });
 
   Array.from(document.body.classList).forEach(c => c.startsWith('theme-') && document.body.classList.remove(c));
   document.body.classList.add(`theme-${themeName}`);

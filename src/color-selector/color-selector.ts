@@ -1,6 +1,6 @@
 import { Component, input, model } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { colorByIndex, colors,  } from '../main';
+import { colorByIndex, colors } from '../main';
 
 let nextIDN = 0;
 

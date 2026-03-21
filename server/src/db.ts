@@ -1,8 +1,6 @@
 import { AsyncDatabase } from 'promised-sqlite3';
 
-
 let db: AsyncDatabase;
-
 
 export async function getDb(): Promise<AsyncDatabase> {
   if (db)

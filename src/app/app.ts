@@ -39,7 +39,7 @@ export class App implements OnInit {
 
   protected connectionTrouble = signal(false);
   protected darkMode = signal(false);
-  protected email= signal('');
+  protected email = signal('');
   protected inChat = signal(false);
   protected localTime = signal(true);
   protected maxFileSizeInMb = signal(15000);
@@ -47,7 +47,7 @@ export class App implements OnInit {
   protected messages = signal([] as Message[]);
   protected name = signal('');
   protected newOnBottom = signal(true);
-  protected navigation = signal([] as { name: string, url: string; target?: string }[]);
+  protected navigation = signal([] as { name: string; url: string; target?: string }[]);
   protected notificationMessage = signal('');
   protected notificationType = signal('');
   protected notifySound = signal(true);
@@ -131,7 +131,7 @@ export class App implements OnInit {
         this.enterChat();
         event.preventDefault();
       }
-    })
+    });
 
     document.addEventListener('mousedown', (evt: MouseEvent) => {
       if (!document.getElementById('theme-select')?.contains(evt.target as Node) && this.showThemes()) {
@@ -139,7 +139,7 @@ export class App implements OnInit {
         evt.preventDefault();
         startClickSuppress();
       }
-    })
+    });
 
     document.addEventListener('visibilitychange', () => this.checkChatActive());
     window.addEventListener('blur', () => this.checkChatActive());
@@ -147,7 +147,7 @@ export class App implements OnInit {
   }
 
   ngOnInit(): void {
-    registerNotificationHandler(this.notify)
+    registerNotificationHandler(this.notify);
     this.getMessages();
   }
 
@@ -155,7 +155,7 @@ export class App implements OnInit {
     this.notificationType.set(type);
     this.notificationMessage.set(message);
     this.showNotification.set(true);
-  }
+  };
 
   protected hideNotification() {
     this.showNotification.set(false);
@@ -180,7 +180,7 @@ export class App implements OnInit {
       this.messageTimer = undefined;
     }
 
-    this.httpClient.get<Messages>('/api/messages', { params: { name: this.name() }}).subscribe({
+    this.httpClient.get<Messages>('/api/messages', { params: { name: this.name() } }).subscribe({
       next: (messages: Messages): void => {
         if (!messages.errorMessage) {
           this.connectionTrouble.set(false);
@@ -243,7 +243,7 @@ export class App implements OnInit {
 
     this.httpClient.post('/api/enter', {}, { params: this.prefs as any }).subscribe({
       next: (): void => {
-        this.connectionTrouble.set(false)
+        this.connectionTrouble.set(false);
         this.pendingFocus = true;
         this.inChat.set(true);
         setTimeout(() => this.adjustScrolling(), 250);
@@ -258,7 +258,7 @@ export class App implements OnInit {
   protected leaveChat(): void {
     this.httpClient.post('/api/leave', {}, { params: this.prefs as any }).subscribe({
       next: (): void => {
-        this.connectionTrouble.set(false)
+        this.connectionTrouble.set(false);
         this.inChat.set(false);
         setTimeout(() => this.adjustScrolling());
       },
@@ -276,7 +276,7 @@ export class App implements OnInit {
 
     this.httpClient.post('/api/send', {}, { params }).subscribe({
       next: (): void => {
-        this.connectionTrouble.set(false)
+        this.connectionTrouble.set(false);
         this.inChat.set(true);
         this.messageEntry.reset();
         setTimeout(() => this.getMessages(), 500);

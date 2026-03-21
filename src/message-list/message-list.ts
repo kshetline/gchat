@@ -45,9 +45,9 @@ export class MessageList {
 
   protected adjustMarkup(text: string): string {
     return text.replace(matchEmoji, '<span class="big-emoji">$1</span>')
-    .replace(/(\u2000(.+?)\u2000)/g, (_$0, $1, $2) =>
-      kaomoji.includes($2) ? `<span class="kaomoji">${$1}</span>` : $1
-    );
+      .replace(/(\u2000(.+?)\u2000)/g, (_$0, $1, $2) =>
+        kaomoji.includes($2) ? `<span class="kaomoji">${$1}</span>` : $1
+      );
   }
 
   protected formatLocal(timestamp: string): string {

@@ -16,8 +16,8 @@ export class Uploader {
     quill.enable(false);
     quill.insertText(range.index, placeholderUrl);
 
-    this.httpClient.post<{ error?: string, url?: string }>('/api/upload', formData).subscribe({
-      next: (response) => {
+    this.httpClient.post<{ error?: string; url?: string }>('/api/upload', formData).subscribe({
+      next: response => {
         quill.deleteText(range.index, placeholderUrl.length);
         quill.insertText(range.index, response.url);
         quill.setSelection(range.index + response.url.length);

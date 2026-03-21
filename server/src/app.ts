@@ -34,7 +34,7 @@ app.use(async (req, _res, next) => {
   }
 
   next();
-})
+});
 
 app.use(cookieParser());
 

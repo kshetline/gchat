@@ -4,7 +4,7 @@ import { App } from './app/app';
 import { parseColor } from '@tubular/util';
 
 bootstrapApplication(App, appConfig)
-  .catch((err) => console.error(err));
+  .catch(err => console.error(err));
 
 export const colors = ['#000000', '#000080', '#4444CC', '#44CC44', '#CC9911', '#CC4444', '#CC6600', '',
                        '#008040', '#33AAAA', '#CC44CC', '#800000', '#FF80C0', '#B87333', '#8CA9D9', '#4682B4'];

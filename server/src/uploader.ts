@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import fs from 'fs/promises';
 import os from 'os';
 import { SessionInfo } from './session-info';
-import { HtmlParser,  } from 'fortissimo-html';
+import { HtmlParser  } from 'fortissimo-html';
 import { toInt } from '@tubular/util';
 import { allowedExtensions, allowedTypes, MB } from './shared-types.js';
 
@@ -38,11 +38,10 @@ const upload = multer({
     const extname = allowedExtensions.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
 
-    if (mimetype && extname) {
+    if (mimetype && extname)
       cb(null, true);
-    } else {
+    else
       cb(new Error('Only image files are allowed'));
-    }
   }
 });
 
@@ -62,16 +61,15 @@ function extractLinkFromPageContent(content: string, comment: string): string  {
     }
   }
 
-  return ''
+  return '';
 }
 
 export async function uploadSingle(session: SessionInfo,
-    req: express.Request, res: express.Response): Promise<string>
-{
+    req: express.Request, res: express.Response): Promise<string> {
   const file = await new Promise<Express.Multer.File> ((resolve, reject) => {
-    upload.single('image')(req, res, (err) => {
+    upload.single('image')(req, res, err => {
       if (err)
-        reject(err);
+        reject(err as Error);
       else if (!req.file)
         reject(new Error('No file uploaded'));
       else
@@ -103,8 +101,7 @@ export async function uploadSingle(session: SessionInfo,
   try {
     await fs.unlink(file.path);
   }
-  catch (err) {}
+  catch {}
 
   return extractLinkFromPageContent(await page.content(), comment);
 }
-
