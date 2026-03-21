@@ -2,7 +2,7 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",
-    "module": "commonjs",
+    "module": "ESNext",
     "target": "ES2022",
     "types": ["node"],
     "lib": ["esnext"],
@@ -23,7 +23,11 @@
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
     "skipLibCheck": true,
+    "moduleResolution": "node",
     "esModuleInterop": true,
     "resolveJsonModule": true
+  },
+  "ts-node": {
+    "esm": true
   }
 }

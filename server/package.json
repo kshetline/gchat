@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "description": "",
   "main": "app.js",
+  "type": "module",
   "scripts": {
-    "start": "ts-node src/app.ts",
+    "start": "node --import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"ts-node/esm\", pathToFileURL(\"./\"));' src/app.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -17,7 +18,9 @@
     "express-session": "^1.19.0",
     "http-status-codes": "^2.3.0",
     "multer": "^2.1.1",
-    "puppeteer": "^24.39.0"
+    "promised-sqlite3": "^2.1.0",
+    "puppeteer": "^24.39.0",
+    "sqlite3": "^6.0.1"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
@@ -27,9 +30,15 @@
     "@types/multer": "^2.1.0",
     "@types/node": "^25.4.0",
     "@types/puppeteer": "^5.4.7",
+    "@types/sqlite3": "^3.1.11",
     "express": "^5.2.1",
     "fortissimo-html": "^1.0.0-alpha.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "promised-sqlite3": {
+      "sqlite3": "$sqlite3"
+    }
   }
 }

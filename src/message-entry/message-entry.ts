@@ -179,7 +179,10 @@ export class MessageEntry {
         evt.preventDefault();
         startClickSuppress();
       }
-    })
+    });
+
+    // Make sure direct user typing clears the kaomoji font.
+    document.addEventListener('keydown', () => this.quill?.format('font', undefined));
   }
 
   protected editorCreated(quill: Quill): void {

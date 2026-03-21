@@ -7,7 +7,7 @@ import os from 'os';
 import { SessionInfo } from './session-info';
 import { HtmlParser,  } from 'fortissimo-html';
 import { toInt } from '@tubular/util';
-import { allowedExtensions, allowedTypes, MB } from './shared-types';
+import { allowedExtensions, allowedTypes, MB } from './shared-types.js';
 
 const domain = process.env.CHAT_DOMAIN;
 const parser = new HtmlParser();

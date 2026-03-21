@@ -3,11 +3,11 @@ import cookieParser from 'cookie-parser';
 import express from 'express';
 import session from 'express-session';
 import { HtmlParser } from 'fortissimo-html';
-import { DomElement, DomNode } from 'fortissimo-html/dist/dom';
+import { DomElement, DomNode } from 'fortissimo-html/dist/dom.js';
 import * as puppeteer from 'puppeteer';
-import { Config, Message, Messages } from './shared-types';
+import { Config, Message, Messages } from './shared-types.js';
 import { checksum53, encodeForUri, toBoolean, toInt } from '@tubular/util';
-import { uploadSingle } from './uploader';
+import { uploadSingle } from './uploader.js';
 import { SessionInfo } from './session-info';
 
 let browser: puppeteer.Browser;
@@ -93,7 +93,11 @@ async function getMessages(name: string): Promise<Messages> {
     const participants = Array.from(new Set(participantDiv.children[0].content.trim().replace(/^.*:\s*/g, '').split(/[◆◇]/)
       .map(p => p.trim()).filter(p => !!p)).values()).sort();
     const messageRows = body?.querySelectorAll('.messageRow').reverse();
-    const messages = messageRows.map(row => extractMessage(row));
+    let messages = messageRows.map(row => extractMessage(row));
+    const hashes = new Set<string>();
+
+    // Filter duplicate messages by hashcode.
+    messages = messages.filter(m => !hashes.has(m.hash) && hashes.add(m.hash));
 
     return { messages, participants };
   }
