@@ -7,7 +7,7 @@ import { colorByIndex, getTextBackground, kaomoji, notify, shouldIgnoreClick, st
 import { PickerComponent } from '@ctrl/ngx-emoji-mart';
 import { Emoji, EmojiData } from '@ctrl/ngx-emoji-mart/ngx-emoji';
 import { ColorSelector } from '../color-selector/color-selector';
-import { allowedExtensions, MB } from '../../server/src/shared-types';
+import { allowedExtensions, MB, sizeMap } from '../../server/src/shared-types';
 
 export interface FileUploadEvent {
   file: File;
@@ -15,7 +15,6 @@ export interface FileUploadEvent {
 }
 
 const Size = Quill.import('attributors/style/size') as any;
-const sizeMap: Record<string, string> = { '0.625em': 's1', '0.8125em': 's2', '1em': 's3', '1.125em': 's4', '1.5em': 's5' };
 
 Size.whitelist = Object.keys(sizeMap);
 Quill.register(Size, true);

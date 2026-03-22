@@ -1,5 +1,5 @@
 import { Message, Messages } from './shared-types';
-import { checksum53, encodeForUri } from '@tubular/util';
+import { checksum53, encodeForUri, htmlEscape, htmlUnescape } from '@tubular/util';
 import axios from 'axios';
 import { HtmlParser } from 'fortissimo-html';
 import { DomElement, DomNode } from 'fortissimo-html/dist/dom.js';
@@ -11,7 +11,7 @@ const parser = new HtmlParser();
 
 let browser: puppeteer.Browser;
 
-function getTextAndMarkup(elems: DomElement[], domain: string): string {
+function getTextAndMarkupAsBBCode(elems: DomElement[], domain: string): string {
   if (!elems)
     return '';
 
@@ -19,13 +19,22 @@ function getTextAndMarkup(elems: DomElement[], domain: string): string {
 
   for (const elem of elems) {
     if (elem instanceof DomNode) {
-      const inner = getTextAndMarkup(elem.children, domain);
-      let fromElem = `<${elem.tag}>${inner}</${elem.tag}>`;
+      const inner = getTextAndMarkupAsBBCode(elem.children, domain);
+      let fromElem = `[${elem.tag}]${inner}[/${elem.tag}]`;
 
       if (elem.tag === 'a')
-        fromElem = fromElem.replace(/^<a>/, `<a href="${inner}" target="_blank">`);
-      else if (elem.tag === 'span')
-        fromElem = fromElem.replace(/^<span>/, `<span class="${elem.valuesLookup['class']}">`);
+        fromElem = `[url=${inner}]${inner}[/url]`;
+      else if (elem.tag === 'span') {
+        const qlass = elem.valuesLookup['class'];
+
+        if (/^fontSize\d/.test(qlass)) {
+          const size = qlass.slice(-1);
+
+          fromElem = `[s${size}]${inner}[/s${size}]`;
+        }
+        else
+          fromElem = inner; // No other styling supported
+      }
       else if (elem.tag === 'img') {
         const alt = elem.valuesLookup['alt'];
 
@@ -34,21 +43,32 @@ function getTextAndMarkup(elems: DomElement[], domain: string): string {
         else {
           const src = elem.valuesLookup['src']?.replace(/^\/(.*)$/, `https://${domain}/$1`);
 
-          fromElem = fromElem.replace(/>.*/, ` src=${src} alt=${alt || ''}>`);
+          fromElem = `[img]${src}[/img]`;
         }
       }
 
       text += fromElem;
     }
     else
-      text += elem.content || '';
+      text += htmlUnescape(elem.content || '');
   }
 
   return text;
 }
 
+function convertBBCodeToHtml(text: string): string {
+  text = text.replace(/\[(\/?)(b|code|i|img|s|s1|s2|s3|s4|s5|u|url=.*?|url)]/g, '<$1$2>')
+    .replace(/<s(\d)>/g, '<span class="fontSize$1">').replace(/<\/s\d>/g, '</span>')
+    .replace(/<url=(.*?)>(.*?)<\/url>/g,  (_$0, $1, $2) => `<a href="${$1}">${$2}</a>`)
+    .replace(/<img>(.*?)<\/img>/g, '<img src="$1" alt="">')
+    .replace(/(^|>)(.*?)(<|$)/g, (_$0, $1, $2, $3) => `${$1}${htmlEscape($2)}${$3}`);
+
+  return text;
+}
+
 function extractMessage(messageRow: DomNode): Message {
-  const text = getTextAndMarkup(messageRow.querySelector('.messageComment').children, domain);
+  const bbCode = getTextAndMarkupAsBBCode(messageRow.querySelector('.messageComment').children, domain);
+  const html = convertBBCodeToHtml(bbCode);
   const nameElem = messageRow.querySelector('.messageName');
   const style = nameElem?.valuesLookup['style'];
   let nameIndex = 1;
@@ -66,7 +86,7 @@ function extractMessage(messageRow: DomNode): Message {
   const trip = (nameElem?.children?.at(nameIndex + 1) as DomNode)?.content?.substring(1);
   const hash = checksum53(`${name};${trip || ''};${timestamp}`);
 
-  return { email, hash, name, style, text, timestamp, trip };
+  return { email, hash, name, style, text: html, timestamp, trip };
 }
 
 export async function legacyBrowserSetup(): Promise<SessionInfo> {

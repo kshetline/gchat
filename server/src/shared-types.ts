@@ -64,3 +64,5 @@ const types = `(dat|htm|torrent|deb|lzh|ogm|doc|class|js|swift|cc|tga|ape|woff2|
 export const allowedExtensions = new RegExp('\\.' + types + '$', 'i');
 export const allowedTypes = new RegExp('\\b' + types + '\\b', 'i');
 export const MB = 1024 * 1024;
+
+export const sizeMap: Record<string, string> = { '0.625em': 's1', '0.8125em': 's2', '1em': 's3', '1.125em': 's4', '1.5em': 's5' };
