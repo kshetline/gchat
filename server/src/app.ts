@@ -109,6 +109,7 @@ app.post('/api/enter', async (req, res) => {
     await db.run('UPDATE participants SET trip = ?, email = ?, ip = ?, session_id = ?, remote = ?, last_active = ? WHERE id = ?',
       q.tripCode, q.email, session.ip, q.sessionID, 0, now, participant.id);
     session.inChat = true;
+    await db.run('DELETE FROM participants WHERE name = ? AND remote = 0', q.name);
   }
   else {
     res.status(400).json({

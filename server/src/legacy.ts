@@ -48,7 +48,12 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
       if (participant === proxyName)
         continue;
 
-      const row = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 1 LIMIT 1', participant);
+      let row = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', participant);
+
+      if (row)
+        continue;
+
+      row = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 1 LIMIT 1', participant);
 
       if (!row)
         await db.run('INSERT INTO participants (name, remote, last_active, last_post) VALUES (?, ?, ?, ?)',
@@ -135,8 +140,9 @@ function extractMessage(messageRow: DomNode): Message {
 
 export async function legacyBrowserSetup(): Promise<SessionInfo> {
   browser = browser || (await puppeteer.launch());
+
   const session: SessionInfo = { context: await browser.createBrowserContext() };
-  // sessions.set(req.sessionID, sesh);
+
   session.page = await session.context.newPage();
   session.page.on('console', msg => {
     console.log('Puppeteer %s: %s', msg.type, msg.text()); // eslint-disable-line @typescript-eslint/unbound-method
@@ -160,13 +166,27 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
     const body = dom.querySelector('body');
     const participantDiv = body?.querySelector('#participantList');
     const participants = Array.from(new Set(participantDiv.children[0].content.trim().replace(/^.*:\s*/g, '').split(/[◆◇]/)
-    .map(p => p.trim()).filter(p => !!p)).values()).sort();
+      .map(p => p.trim()).filter(p => !!p)).values()).sort();
     const messageRows = body?.querySelectorAll('.messageRow').reverse();
     let messages = messageRows.map(row => extractMessage(row));
     const hashes = new Set<string>();
 
     // Filter duplicate messages by hashcode.
     messages = messages.filter(m => !hashes.has(m.hash) && hashes.add(m.hash));
+
+    const latestPosts = new Map<string, string>();
+
+    for (const message of messages) {
+      const latest = latestPosts.get(message.name) || message.timestamp;
+
+      latestPosts.set(message.name, message.timestamp > latest ? message.timestamp : latest);
+    }
+
+    const db = await getDb();
+
+    for (const participant of Array.from(latestPosts.keys()))
+      await db.run('UPDATE participants SET last_post = ?1, last_active = MAX(last_active, ?1) WHERE name = ?2 and remote = 1',
+        latestPosts.get(participant), participant);
 
     return { messages, participants };
   }
