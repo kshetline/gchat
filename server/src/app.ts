@@ -1,11 +1,12 @@
 import cookieParser from 'cookie-parser';
 import express from 'express';
 import session from 'express-session';
-import { Config } from './shared-types.js';
+import { Config, DbMessage, DbParticipant, Message } from './shared-types.js';
 import { toBoolean, toInt } from '@tubular/util';
 import { uploadSingle } from './uploader.js';
 import { SessionInfo } from './session-info';
-import { enterLegacyChat, getLegacyMessages, leaveLegacyChat, legacyBrowserSetup, legacySendMessage } from './legacy.js';
+import { enterLegacyChat, leaveLegacyChat, legacyBrowserSetup, legacySendMessage } from './legacy.js';
+import { convertBBCodeToHtml, getDb } from './db.js';
 
 const app = express();
 const port = toInt(process.env.HTTP_PORT) || 3000;
@@ -46,8 +47,26 @@ app.get('/api/config', (_req, res) => {
   res.json(config);
 });
 
-app.get('/api/messages', async (req, res) => {
-  res.json(await getLegacyMessages(req.query.name as string));
+app.get('/api/messages', async (_req, res) => {
+  const db = await getDb();
+  const rows = await db.all<DbMessage>('SELECT * FROM messages ORDER BY time LIMIT 1000');
+  const messages = rows.filter(row => !row.deleted).map(row => ({
+    email: row.email,
+    hash: row.hash,
+    html: convertBBCodeToHtml(row.message),
+    msgId: row.id,
+    name: row.name,
+    remote: !!row.remote,
+    style: row.style,
+    timestamp: row.time,
+    trip: row.trip
+  } as Message));
+
+  const hourAgo = new Date(Date.now() - 3_600_000).toISOString();
+  const participants = (await db.all<DbParticipant>('SELECT * FROM participants'))
+    .filter(row => row.last_active > hourAgo || row.last_post > hourAgo).map(row => row.name).sort();
+
+  res.json({ messages, participants });
 });
 
 app.post('/api/enter', async (req, res) => {

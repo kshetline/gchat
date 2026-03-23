@@ -9,11 +9,41 @@ export interface Message {
   bbCode?: string;
   email?: string;
   hash: string;
-  name: string;
-  style: string;
   html: string;
+  name: string;
+  msgId: number;
+  remote: boolean;
+  style: string;
   timestamp: string;
   trip: string;
+}
+
+export interface DbMessage {
+  deleted: boolean;
+  edit_count: number;
+  email: string;
+  hash: string;
+  id: number;
+  ip: string;
+  message: string;
+  name: string;
+  remote: boolean;
+  session_id: string;
+  style: string;
+  time: string;
+  trip: string;
+}
+
+export interface DbParticipant {
+  email: string;
+  id: number;
+  ip: string;
+  last_active: string;
+  last_post: string;
+  name: string;
+  remote: boolean;
+  trip: string;
+  session_id: string;
 }
 
 export interface Messages {

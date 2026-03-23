@@ -19,6 +19,7 @@ export async function getDb(): Promise<AsyncDatabase> {
       "remote" BOOLEAN NOT NULL,
       "ip" TEXT,
       "session_id" TEXT,
+      "style" TEXT,
       "message" TEXT NOT NULL,
       "hash" TEXT NOT NULL,
       "edit_count" INTEGER NOT NULL DEFAULT 0,

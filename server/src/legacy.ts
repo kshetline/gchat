@@ -1,4 +1,4 @@
-import { Message, Messages } from './shared-types';
+import { DbMessage, DbParticipant, Message, Messages } from './shared-types';
 import { checksum53, encodeForUri, htmlUnescape, processMillis } from '@tubular/util';
 import axios from 'axios';
 import { HtmlParser } from 'fortissimo-html';
@@ -16,15 +16,15 @@ let lastLegacyPoll = -1;
 
 async function pollLegacyMessages(overrideCount?: number): Promise<void> {
   const now = processMillis();
-  const count = overrideCount ??
+  const retrieveCount = overrideCount ??
     (lastLegacyPoll < 0 || now > lastLegacyPoll + 3_600_000 ? 1000 : now > lastLegacyPoll + 600_000 ? 200 : 30);
 
   try {
-    const messages = await getLegacyMessages(proxyName, count);
+    const messages = await getLegacyMessages(proxyName, retrieveCount);
     let earliest = Number.MAX_SAFE_INTEGER;
     let latest = 0;
     const db = await getDb();
-    const row = await db.get<any>('SELECT time FROM messages ORDER BY time DESC LIMIT 1');
+    const row = await db.get<DbMessage>('SELECT time FROM messages ORDER BY time DESC LIMIT 1');
     const latestInDb = new Date(row?.time || 0).getTime();
 
     for (const message of messages.messages || []) {
@@ -34,14 +34,25 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
         earliest = Math.min(ts, earliest);
         latest = Math.max(ts, latest);
 
-        if (ts > latestInDb - 300_000) {
-          const row = await db.get<any>('SELECT hash FROM messages WHERE hash = ? LIMIT 1', [message.hash]);
+        if (ts > latestInDb - 300_000 || retrieveCount >= 1000) {
+          const row = await db.get<DbMessage>('SELECT hash FROM messages WHERE hash = ? LIMIT 1', [message.hash]);
 
           if (!row)
-            await db.run('INSERT INTO messages (time, name, trip, email, remote, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?)',
-              message.timestamp, message.name, message.trip, message.email, 1, message.bbCode, message.hash);
+            await db.run('INSERT INTO messages (time, name, trip, email, remote, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+              message.timestamp, message.name, message.trip, message.email, 1, message.style, message.bbCode, message.hash);
         }
       }
+    }
+
+    for (const participant of messages.participants || []) {
+      if (participant === proxyName)
+        continue;
+
+      const row = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 1 LIMIT 1', [participant]);
+
+      if (!row)
+        await db.run('INSERT INTO participants (name, remote, last_active, last_post) VALUES (?, ?, ?, ?)',
+          [participant, 1, new Date().toISOString(), 0]);
     }
   }
   catch (err) {
@@ -119,7 +130,7 @@ function extractMessage(messageRow: DomNode): Message {
   const trip = (nameElem?.children?.at(nameIndex + 1) as DomNode)?.content?.substring(1);
   const hash = checksum53(`${name};${trip || ''};${timestamp}`);
 
-  return { bbCode, email, hash, name, style, html, timestamp, trip };
+  return { bbCode, email, hash, msgId: -1, name, style, html, remote: true, timestamp, trip };
 }
 
 export async function legacyBrowserSetup(): Promise<SessionInfo> {

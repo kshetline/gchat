@@ -5,6 +5,7 @@ import { htmlUnescape } from '@tubular/util';
 import { MessageEntry } from '../message-entry/message-entry';
 
 const matchEmoji = /(\uD83C[\uD000-\uDFFF]|\uD83D[\uD000-\uDFFF]|\uD83E[\uD000-\uDFFF])/g;
+const QUOTE_MARKER = '\u00A0◀︎ ';
 
 @Component({
   selector: 'chat-message-list',
@@ -44,10 +45,21 @@ export class MessageList {
   }
 
   protected adjustMarkup(text: string): string {
-    return text.replace(matchEmoji, '<span class="big-emoji">$1</span>')
-      .replace(/(\u2000(.+?)\u2000)/g, (_$0, $1, $2) =>
-        kaomoji.includes($2) ? `<span class="kaomoji">${$1}</span>` : $1
-      );
+    let start = '';
+    let end = text;
+    const pos = text.indexOf(QUOTE_MARKER);
+
+    if (pos >= 0) {
+      start = text.substring(0, pos + QUOTE_MARKER.length);
+      end = text.substring(pos + QUOTE_MARKER.length);
+    }
+
+    end = end.replace(matchEmoji, '<span class="big-emoji">$1</span>');
+    text = start + end;
+
+    return text.replace(/(\u2000(.+?)\u2000)/g, (_$0, $1, $2) =>
+      kaomoji.includes($2) ? `<span class="kaomoji">${$1}</span>` : $1
+    );
   }
 
   protected formatLocal(timestamp: string): string {
