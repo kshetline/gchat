@@ -3,15 +3,18 @@ import { checksum53, encodeForUri, htmlUnescape, processMillis } from '@tubular/
 import axios from 'axios';
 import { HtmlParser } from 'fortissimo-html';
 import { DomElement, DomNode } from 'fortissimo-html/dist/dom.js';
-import { SessionInfo } from './session-info';
 import * as puppeteer from 'puppeteer';
 import { convertBBCodeToHtml, getDb } from './db.js';
 
 const domain = process.env.CHAT_DOMAIN;
 const proxyName = process.env.CHAT_PROXY;
+const proxyTrip = process.env.CHAT_PROXY_TRIPCODE;
 const parser = new HtmlParser();
 
-let browser: puppeteer.Browser;
+export let browser: puppeteer.Browser;
+
+let messagePage: puppeteer.Page;
+let inChat = false;
 let lastLegacyPoll = -1;
 
 async function pollLegacyMessages(overrideCount?: number): Promise<void> {
@@ -69,6 +72,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
 }
 
 pollLegacyMessages().finally();
+legacyBrowserSetup().finally();
 
 function getTextAndMarkupAsBBCode(elems: DomElement[], domain: string): string {
   if (!elems)
@@ -138,18 +142,14 @@ function extractMessage(messageRow: DomNode): Message {
   return { bbCode, email, hash, msgId: -1, name, style, html, remote: true, timestamp, trip };
 }
 
-export async function legacyBrowserSetup(): Promise<SessionInfo> {
+async function legacyBrowserSetup(): Promise<void> {
   browser = browser || (await puppeteer.launch());
 
-  const session: SessionInfo = { context: await browser.createBrowserContext() };
-
-  session.page = await session.context.newPage();
-  session.page.on('console', msg => {
+  messagePage = messagePage || await browser.newPage();
+  messagePage.on('console', msg => {
     console.log('Puppeteer %s: %s', msg.type, msg.text()); // eslint-disable-line @typescript-eslint/unbound-method
   });
-  await loadEnterForm(session.page);
-
-  return session;
+  await loadEnterForm(messagePage);
 }
 
 async function loadEnterForm(page: puppeteer.Page): Promise<void> {
@@ -195,45 +195,46 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
   }
 }
 
-export async function enterLegacyChat(session: SessionInfo, name: string, email: string, color: number): Promise<void> {
-  if (session?.inChat)
-    return;
+export async function enterLegacyChat(name: string, email: string, color: number): Promise<void> {
+  messagePage = messagePage || await browser.newPage();
 
-  const page = session.page;
-
-  await page.waitForSelector('input[name="name"]');
-  await page.$eval('input[name="name"]', (input, name) => input.value = name, name);
-  await page.$eval('input[name="email"]', (input, email) => input.value = email || '', email);
+  await messagePage.waitForSelector('input[name="name"]');
+  await messagePage.$eval('input[name="name"]', (input, name) => input.value = name, name);
+  await messagePage.$eval('input[name="email"]', (input, email) => input.value = email || '', email);
 
   try {
-    await page.$eval(`input[type="radio"][value="${color}"]`, btn => btn.click());
+    await messagePage.$eval(`input[type="radio"][value="${color}"]`, btn => btn.click());
   }
   catch {}
 
-  await page.$eval('input[type="submit"]', btn => btn.click());
-  await page.waitForSelector('input[name="comment"]');
-  await page.$eval('form', form => form.setAttribute('target', '_blank'));
-  session.inChat = true;
+  await messagePage.$eval('input[type="submit"]', btn => btn.click());
+  await messagePage.waitForSelector('input[name="comment"]');
+  await messagePage.$eval('form', form => form.setAttribute('target', '_blank'));
+
+  inChat = true;
 }
 
-export async function leaveLegacyChat(session: SessionInfo): Promise<void> {
-  const page = session.page;
+export async function leaveLegacyChat(): Promise<void> {
+  if (!messagePage)
+    return;
 
-  await page.waitForSelector('input[type="button"]');
-  await page.$eval('input[type="button"]', btn => btn.click());
-  session.inChat = false;
-  const oldPage = page;
-  session.page = await session.context.newPage();
+  await messagePage.waitForSelector('input[type="button"]');
+  await messagePage.$eval('input[type="button"]', btn => btn.click());
+
+  const oldPage = messagePage;
+  messagePage = await browser.newPage();
   await oldPage.close();
-  await loadEnterForm(session.page);
+  await loadEnterForm(messagePage);
+  inChat = false;
 }
 
-export async function legacySendMessage(session: SessionInfo, name: string, email: string,
-                           comment: string, color: number, tripCode: string): Promise<void> {
-  if (!session?.inChat)
-    await enterLegacyChat(session, name, email, color);
+export async function legacySendMessage(name: string, _email: string, comment: string, color: number, _tripCode: string): Promise<void> {
+  if (!inChat)
+    await enterLegacyChat(proxyName, null, 0);
 
-  const page = session.page;
+  messagePage = messagePage || await browser.newPage();
+  comment = `《${name}》${comment}`;
+
   let face = '';
   const $ = /^(.*)(\u2000(.+)\u2000)\s*$/.exec(comment);
 
@@ -242,11 +243,11 @@ export async function legacySendMessage(session: SessionInfo, name: string, emai
     face = $[3];
   }
 
-  await page.waitForSelector('input[name="comment"]');
-  await page.$eval('select[name="color"]', (sel, c) => sel.value = c, color);
-  await page.$eval('#face', (sel, face) => sel.value = face, face);
-  await page.$eval('input[name="comment"]', (input, comment) => input.value = comment, comment || '\u00A0');
-  await page.$eval('input[name="password"]', (input, tripCode) => input.value = tripCode, tripCode || '');
-  await page.focus('input[name="comment"]');
-  await page.keyboard.press('Enter');
+  await messagePage.waitForSelector('input[name="comment"]');
+  await messagePage.$eval('select[name="color"]', (sel, c) => sel.value = c, color);
+  await messagePage.$eval('#face', (sel, face) => sel.value = face, face);
+  await messagePage.$eval('input[name="comment"]', (input, comment) => input.value = comment, comment || '\u00A0');
+  await messagePage.$eval('input[name="password"]', (input, tripCode) => input.value = tripCode, proxyTrip || '');
+  await messagePage.focus('input[name="comment"]');
+  await messagePage.keyboard.press('Enter');
 }

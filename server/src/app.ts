@@ -1,11 +1,11 @@
 import cookieParser from 'cookie-parser';
 import express from 'express';
 import session from 'express-session';
-import { Config, DbMessage, DbParticipant, Message } from './shared-types.js';
-import { toBoolean, toInt } from '@tubular/util';
+import { colors, Config, DbMessage, DbParticipant, Message } from './shared-types.js';
+import { checksum53, toBoolean, toInt } from '@tubular/util';
 import { uploadSingle } from './uploader.js';
 import { SessionInfo } from './session-info';
-import { legacyBrowserSetup, legacySendMessage } from './legacy.js';
+import { enterLegacyChat, legacySendMessage } from './legacy.js';
 import { convertBBCodeToHtml, getDb } from './db.js';
 import ip_ from 'ip';
 import axios from 'axios';
@@ -13,6 +13,8 @@ import axios from 'axios';
 const app = express();
 const port = toInt(process.env.HTTP_PORT) || 3000;
 const sessions = new Map<string, SessionInfo>();
+const proxyName = process.env.CHAT_PROXY;
+let proxyStarted = false;
 const config: Config = {
   backgroundColor: process.env.CHAT_BACKGROUND || '#DDD',
   fileSizeLimitInMb: toInt(process.env.UPLOAD_MAX_SIZE_MB),
@@ -47,8 +49,7 @@ app.use(async (req, _res, next) => {
   const ip = getIp(req);
 
   if (!session) {
-    session = await legacyBrowserSetup();
-    session.ip = ip_.isPrivate(ip) ? await getServerIp() : ip;
+    session = ({ ip: ip_.isPrivate(ip) ? await getServerIp() : ip, inChat: false } as SessionInfo);
     sessions.set(req.sessionID, session);
   }
 
@@ -141,17 +142,29 @@ app.post('/api/leave', async (req, res) => {
 });
 
 app.post('/api/send', async (req, res) => {
+  const session = sessions.get(req.sessionID);
+  const db = await getDb();
+  const now = new Date().toISOString();
   const q = req.query as any;
+  const style = `color:${colors[q.color].trim()}`;
+  const hash = checksum53(`${q.name};${q.tripCode || ''};${now}`);
 
-  await legacySendMessage(sessions.get(req.sessionID), q.name, q.email, q.comment, q.color, q.tripCode);
+  await db.run('INSERT INTO messages (time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    now, q.name, q.tripCode, q.email, 0, session.ip, req.sessionID, style, q.comment, hash);
+  await db.run('UPDATE participants SET last_post = ?1, last_active = ?1 WHERE name = ?2 and remote = 0', now, q.name);
+
+  if (!proxyStarted) {
+    await enterLegacyChat(proxyName, null, 0);
+    proxyStarted = true;
+  }
+
+  await legacySendMessage(q.name, null, q.comment, q.color, q.trip);
   res.send('null');
 });
 
 app.post('/api/upload', async (req, res) => {
-  let session = sessions.get(req.sessionID);
-
   try {
-    const url = await uploadSingle(session, req, res);
+    const url = await uploadSingle(req, res);
 
     res.json({ url });
   }

@@ -4,13 +4,15 @@ import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import os from 'os';
-import { SessionInfo } from './session-info';
 import { HtmlParser  } from 'fortissimo-html';
 import { toInt } from '@tubular/util';
 import { allowedExtensions, allowedTypes, MB } from './shared-types.js';
+import * as puppeteer from 'puppeteer';
+import { browser } from './legacy.js';
 
 const domain = process.env.CHAT_DOMAIN;
 const parser = new HtmlParser();
+let uploadPage: puppeteer.Page;
 let fileIndex = 0;
 
 // Configure multer for file uploads
@@ -64,8 +66,7 @@ function extractLinkFromPageContent(content: string, comment: string): string  {
   return '';
 }
 
-export async function uploadSingle(session: SessionInfo,
-    req: express.Request, res: express.Response): Promise<string> {
+export async function uploadSingle(req: express.Request, res: express.Response): Promise<string> {
   const file = await new Promise<Express.Multer.File> ((resolve, reject) => {
     upload.single('image')(req, res, err => {
       if (err)
@@ -77,25 +78,24 @@ export async function uploadSingle(session: SessionInfo,
     });
   });
 
-  let page = session.uploaderPage;
   const pwd = req.body.password;
 
-  if (!page) {
-    page = session.uploaderPage = await session.context.newPage();
-    await page.goto(`http://${domain}/up.php`);
-    await page.waitForSelector('form');
+  if (!uploadPage) {
+    uploadPage = uploadPage = await browser.newPage();
+    await uploadPage.goto(`http://${domain}/up.php`);
+    await uploadPage.waitForSelector('form');
   }
 
-  const fileInput = await page.waitForSelector('input[type="file"]');
+  const fileInput = await uploadPage.waitForSelector('input[type="file"]');
   await fileInput.uploadFile(file.path);
-  await page.$eval('input[name="password"]', (input, pwd) => input.value = pwd, pwd || '');
+  await uploadPage.$eval('input[name="password"]', (input, pwd) => input.value = pwd, pwd || '');
   const comment = `${req.body.name || 'x'}-paste-` + new Date().toISOString() + '-' + (++fileIndex);
-  await page.$eval('#comment', (input, comment) => input.value = comment, comment);
-  await page.$eval('button[type="submit"]', btn => btn.click());
+  await uploadPage.$eval('#comment', (input, comment) => input.value = comment, comment);
+  await uploadPage.$eval('button[type="submit"]', btn => btn.click());
 
   await Promise.all([
-    page.waitForNavigation({ waitUntil: 'networkidle0' }),
-    page.$eval('button[type="submit"]', btn => btn.click())
+    uploadPage.waitForNavigation({ waitUntil: 'networkidle0' }),
+    uploadPage.$eval('button[type="submit"]', btn => btn.click())
   ]);
 
   try {
@@ -103,5 +103,5 @@ export async function uploadSingle(session: SessionInfo,
   }
   catch {}
 
-  return extractLinkFromPageContent(await page.content(), comment);
+  return extractLinkFromPageContent(await uploadPage.content(), comment);
 }

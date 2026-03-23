@@ -1,6 +1,7 @@
 import { Component, input, model } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { colorByIndex, colors } from '../main';
+import { colorByIndex } from '../main';
+import { colors } from '../../server/src/shared-types';
 
 let nextIDN = 0;
 
