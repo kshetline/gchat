@@ -48,11 +48,11 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
       if (participant === proxyName)
         continue;
 
-      const row = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 1 LIMIT 1', [participant]);
+      const row = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 1 LIMIT 1', participant);
 
       if (!row)
         await db.run('INSERT INTO participants (name, remote, last_active, last_post) VALUES (?, ?, ?, ?)',
-          [participant, 1, new Date().toISOString(), 0]);
+          participant, 1, new Date().toISOString(), 0);
     }
   }
   catch (err) {

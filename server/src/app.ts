@@ -5,7 +5,7 @@ import { Config, DbMessage, DbParticipant, Message } from './shared-types.js';
 import { toBoolean, toInt } from '@tubular/util';
 import { uploadSingle } from './uploader.js';
 import { SessionInfo } from './session-info';
-import { enterLegacyChat, leaveLegacyChat, legacyBrowserSetup, legacySendMessage } from './legacy.js';
+import { legacyBrowserSetup, legacySendMessage } from './legacy.js';
 import { convertBBCodeToHtml, getDb } from './db.js';
 import ip_ from 'ip';
 import axios from 'axios';
@@ -49,8 +49,6 @@ app.use(async (req, _res, next) => {
   if (!session) {
     session = await legacyBrowserSetup();
     session.ip = ip_.isPrivate(ip) ? await getServerIp() : ip;
-    console.log(session.ip);
-
     sessions.set(req.sessionID, session);
   }
 
@@ -69,7 +67,7 @@ app.get('/api/config', (_req, res) => {
 
 app.get('/api/messages', async (_req, res) => {
   const db = await getDb();
-  const rows = await db.all<DbMessage>('SELECT * FROM messages ORDER BY time LIMIT 1000');
+  const rows = (await db.all<DbMessage>('SELECT * FROM messages ORDER BY time')).slice(-1000);
   const messages = rows.filter(row => !row.deleted).map(row => ({
     email: row.email,
     hash: row.hash,
@@ -83,21 +81,61 @@ app.get('/api/messages', async (_req, res) => {
   } as Message));
 
   const hourAgo = new Date(Date.now() - 3_600_000).toISOString();
-  const participants = (await db.all<DbParticipant>('SELECT * FROM participants'))
-    .filter(row => row.last_active > hourAgo || row.last_post > hourAgo).map(row => row.name).sort();
+  const participants = Array.from(new Set((await db.all<DbParticipant>('SELECT * FROM participants'))
+    .filter(row => row.last_active > hourAgo || row.last_post > hourAgo).map(row => row.name)).values()).sort();
 
   res.json({ messages, participants });
 });
 
 app.post('/api/enter', async (req, res) => {
   const q = req.query as any;
+  const session = sessions.get(req.sessionID);
 
-  await enterLegacyChat(sessions.get(req.sessionID), q.name, q.email, q.color);
+  if (session?.inChat) {
+    res.send('null');
+    return;
+  }
+
+  const db = await getDb();
+  const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', q.name);
+  const now = new Date().toISOString();
+
+  if (!participant) {
+    await db.run('INSERT INTO participants (name, trip, email, ip, session_id, remote, last_active, last_post) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      q.name, q.tripCode, q.email, session.ip, q.sessionID, 0, now, 0);
+    session.inChat = true;
+  }
+  else if (q.tripCode === participant.trip || session.ip === participant.ip || q.sessionID === participant.session_id) {
+    await db.run('UPDATE participants SET trip = ?, email = ?, ip = ?, session_id = ?, remote = ?, last_active = ? WHERE id = ?',
+      q.tripCode, q.email, session.ip, q.sessionID, 0, now, participant.id);
+    session.inChat = true;
+  }
+  else {
+    res.status(400).json({
+      error: new Error(`Chat name '${q.name}' is already in use by another user.`)
+    });
+  }
+
   res.send('null');
 });
 
 app.post('/api/leave', async (req, res) => {
-  await leaveLegacyChat(sessions.get(req.sessionID));
+  const q = req.query as any;
+  const session = sessions.get(q.sessionID);
+
+  if (!session?.inChat) {
+    res.send('null');
+    return;
+  }
+
+  const db = await getDb();
+  const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? LIMIT 1', q.name);
+
+  if (participant && (q.tripCode === participant.trip || session.ip === participant.ip || q.sessionID === participant.session_id)) {
+    await db.run('DELETE FROM participants WHERE id = ?', participant.id);
+    session.inChat = false;
+  }
+
   res.send('null');
 });
 
