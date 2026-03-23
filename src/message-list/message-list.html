@@ -12,7 +12,7 @@
   <div class="bubble-wrap" [class.me]="isMe(message)"
        (mouseenter)="focusMessage(message, true)" (mouseleave)="focusMessage(message, false)"
        (click)="focusMessage(message, true)" [class.show-tools]="isFocused(message)">
-    <div class="bubble" [innerHTML]="adjustMarkup(message.text)"
+    <div class="bubble" [innerHTML]="adjustMarkup(message.html)"
          [class.local-light]="isLight(message)" [class.local-dark]="!isLight(message)"
          [style.color]="getColor(message)" [style.background-color]="getBackground(message)"></div>
     @if (inChat()) {

@@ -6,11 +6,12 @@ export interface Config {
 }
 
 export interface Message {
+  bbCode?: string;
   email?: string;
   hash: string;
   name: string;
   style: string;
-  text: string;
+  html: string;
   timestamp: string;
   trip: string;
 }

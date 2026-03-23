@@ -1,4 +1,5 @@
 import { AsyncDatabase } from 'promised-sqlite3';
+import { htmlEscape } from '@tubular/util';
 
 let db: AsyncDatabase;
 
@@ -20,8 +21,8 @@ export async function getDb(): Promise<AsyncDatabase> {
       "session_id" TEXT,
       "message" TEXT NOT NULL,
       "hash" TEXT NOT NULL,
-      "edit_count" INTEGER NOT NULL,
-      "deleted" BOOLEAN NOT NULL,
+      "edit_count" INTEGER NOT NULL DEFAULT 0,
+      "deleted" BOOLEAN NOT NULL DEFAULT 0,
       PRIMARY KEY("id" AUTOINCREMENT)
     )`);
 
@@ -40,4 +41,14 @@ export async function getDb(): Promise<AsyncDatabase> {
     )`);
 
   return db;
+}
+
+export function convertBBCodeToHtml(text: string): string {
+  text = text.replace(/\[(\/?)(b|code|i|img|s|s1|s2|s3|s4|s5|u|url=.*?|url)]/g, '<$1$2>')
+    .replace(/<s(\d)>/g, '<span class="fontSize$1">').replace(/<\/s\d>/g, '</span>')
+    .replace(/<url=(.*?)>(.*?)<\/url>/g,  (_$0, $1, $2) => `<a href="${$1}">${$2}</a>`)
+    .replace(/<img>(.*?)<\/img>/g, '<img src="$1" alt="">')
+    .replace(/(^|>)(.*?)(<|$)/g, (_$0, $1, $2, $3) => `${$1}${htmlEscape($2)}${$3}`);
+
+  return text;
 }

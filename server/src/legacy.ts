@@ -1,15 +1,58 @@
 import { Message, Messages } from './shared-types';
-import { checksum53, encodeForUri, htmlEscape, htmlUnescape } from '@tubular/util';
+import { checksum53, encodeForUri, htmlUnescape, processMillis } from '@tubular/util';
 import axios from 'axios';
 import { HtmlParser } from 'fortissimo-html';
 import { DomElement, DomNode } from 'fortissimo-html/dist/dom.js';
 import { SessionInfo } from './session-info';
 import * as puppeteer from 'puppeteer';
+import { convertBBCodeToHtml, getDb } from './db.js';
 
 const domain = process.env.CHAT_DOMAIN;
+const proxyName = process.env.CHAT_PROXY;
 const parser = new HtmlParser();
 
 let browser: puppeteer.Browser;
+let lastLegacyPoll = -1;
+
+async function pollLegacyMessages(overrideCount?: number): Promise<void> {
+  const now = processMillis();
+  const count = overrideCount ??
+    (lastLegacyPoll < 0 || now > lastLegacyPoll + 3_600_000 ? 1000 : now > lastLegacyPoll + 600_000 ? 200 : 30);
+
+  try {
+    const messages = await getLegacyMessages(proxyName, count);
+    let earliest = Number.MAX_SAFE_INTEGER;
+    let latest = 0;
+    const db = await getDb();
+    const row = await db.get<any>('SELECT time FROM messages ORDER BY time DESC LIMIT 1');
+    const latestInDb = new Date(row?.time || 0).getTime();
+
+    for (const message of messages.messages || []) {
+      if (message.timestamp) {
+        const ts = new Date(message.timestamp).getTime();
+
+        earliest = Math.min(ts, earliest);
+        latest = Math.max(ts, latest);
+
+        if (ts > latestInDb - 300_000) {
+          const row = await db.get<any>('SELECT hash FROM messages WHERE hash = ? LIMIT 1', [message.hash]);
+
+          if (!row)
+            await db.run('INSERT INTO messages (time, name, trip, email, remote, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?)',
+              message.timestamp, message.name, message.trip, message.email, 1, message.bbCode, message.hash);
+        }
+      }
+    }
+  }
+  catch (err) {
+    console.error('Error polling legacy chat:', err);
+  }
+
+  setTimeout(pollLegacyMessages, 10_000);
+  lastLegacyPoll = processMillis();
+}
+
+pollLegacyMessages().finally();
 
 function getTextAndMarkupAsBBCode(elems: DomElement[], domain: string): string {
   if (!elems)
@@ -56,16 +99,6 @@ function getTextAndMarkupAsBBCode(elems: DomElement[], domain: string): string {
   return text;
 }
 
-function convertBBCodeToHtml(text: string): string {
-  text = text.replace(/\[(\/?)(b|code|i|img|s|s1|s2|s3|s4|s5|u|url=.*?|url)]/g, '<$1$2>')
-    .replace(/<s(\d)>/g, '<span class="fontSize$1">').replace(/<\/s\d>/g, '</span>')
-    .replace(/<url=(.*?)>(.*?)<\/url>/g,  (_$0, $1, $2) => `<a href="${$1}">${$2}</a>`)
-    .replace(/<img>(.*?)<\/img>/g, '<img src="$1" alt="">')
-    .replace(/(^|>)(.*?)(<|$)/g, (_$0, $1, $2, $3) => `${$1}${htmlEscape($2)}${$3}`);
-
-  return text;
-}
-
 function extractMessage(messageRow: DomNode): Message {
   const bbCode = getTextAndMarkupAsBBCode(messageRow.querySelector('.messageComment').children, domain);
   const html = convertBBCodeToHtml(bbCode);
@@ -86,7 +119,7 @@ function extractMessage(messageRow: DomNode): Message {
   const trip = (nameElem?.children?.at(nameIndex + 1) as DomNode)?.content?.substring(1);
   const hash = checksum53(`${name};${trip || ''};${timestamp}`);
 
-  return { email, hash, name, style, text: html, timestamp, trip };
+  return { bbCode, email, hash, name, style, html, timestamp, trip };
 }
 
 export async function legacyBrowserSetup(): Promise<SessionInfo> {
@@ -101,15 +134,16 @@ export async function legacyBrowserSetup(): Promise<SessionInfo> {
 
   return session;
 }
+
 async function loadEnterForm(page: puppeteer.Page): Promise<void> {
   await page.goto(`http://${domain}/comchat.cgi?mode=form&nam=&eml=&col=&retime=40&line=20`);
   await page.waitForSelector('form');
   await page.$eval('form', form => form.setAttribute('target', '_self'));
 }
 
-export async function getLegacyMessages(name: string): Promise<Messages> {
+export async function getLegacyMessages(name: string, count = 200): Promise<Messages> {
   try {
-    const url = `https://${domain}/comchat.cgi?retime=20&lines=200&name=${encodeForUri(name, true)}`;
+    const url = `https://${domain}/comchat.cgi?retime=120&lines=${count}&name=${encodeForUri(name, true)}`;
     const raw = (await axios.get(url)).data;
     const dom = parser.parse(raw).domRoot;
     const body = dom.querySelector('body');

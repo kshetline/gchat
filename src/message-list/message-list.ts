@@ -80,7 +80,7 @@ export class MessageList {
   }
 
   protected quoteMessage(message: Message): void {
-    let quote = htmlUnescape(message.text.replace(/<.+?>/g, '')).replace(/\s+/g, ' ');
+    let quote = htmlUnescape(message.html.replace(/<.+?>/g, '')).replace(/\s+/g, ' ');
 
     if (this.lastSelectedText && quote.includes(this.lastSelectedText))
       quote = this.lastSelectedText;
