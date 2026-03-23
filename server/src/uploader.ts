@@ -89,7 +89,7 @@ export async function uploadSingle(req: express.Request, res: express.Response):
   const fileInput = await uploadPage.waitForSelector('input[type="file"]');
   await fileInput.uploadFile(file.path);
   await uploadPage.$eval('input[name="password"]', (input, pwd) => input.value = pwd, pwd || '');
-  const comment = `${req.body.name || 'x'}-paste-` + new Date().toISOString() + '-' + (++fileIndex);
+  const comment = `${req.body.name || 'x'}-paste-` + new Date().toISOString().substring(0, 19) + '-' + (++fileIndex);
   await uploadPage.$eval('#comment', (input, comment) => input.value = comment, comment);
   await uploadPage.$eval('button[type="submit"]', btn => btn.click());
 

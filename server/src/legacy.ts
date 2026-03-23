@@ -28,21 +28,19 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
     let latest = 0;
     const db = await getDb();
     const row = await db.get<DbMessage>('SELECT time FROM messages ORDER BY time DESC LIMIT 1');
-    const latestInDb = new Date(row?.time || 0).getTime();
+    const latestInDb = row?.time;
 
     for (const message of messages.messages || []) {
-      if (message.timestamp) {
-        const ts = new Date(message.timestamp).getTime();
+      if (message.time) {
+        earliest = Math.min(message.time, earliest);
+        latest = Math.max(message.time, latest);
 
-        earliest = Math.min(ts, earliest);
-        latest = Math.max(ts, latest);
-
-        if (ts > latestInDb - 300_000 || retrieveCount >= 1000) {
+        if (message.time > latestInDb - 300_000 || retrieveCount >= 1000) {
           const row = await db.get<DbMessage>('SELECT hash FROM messages WHERE hash = ? LIMIT 1', [message.hash]);
 
           if (!row)
             await db.run('INSERT INTO messages (time, name, trip, email, remote, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-              message.timestamp, message.name, message.trip, message.email, 1, message.style, message.bbCode, message.hash);
+              message.time, message.name, message.trip, message.email, 1, message.style, message.bbCode, message.hash);
         }
       }
     }
@@ -60,7 +58,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
 
       if (!row)
         await db.run('INSERT INTO participants (name, remote, last_active, last_post) VALUES (?, ?, ?, ?)',
-          participant, 1, new Date().toISOString(), 0);
+          participant, 1, Math.floor(Date.now() / 1000), 0);
     }
   }
   catch (err) {
@@ -136,10 +134,11 @@ function extractMessage(messageRow: DomNode): Message {
   const name = (nameElem?.children?.at(nameIndex) as DomNode)?.children?.at(0)?.content;
   const timestamp = messageRow.querySelector('.messageDate')?.children?.at(0)?.content?.slice(1, -1)
     .replace('-', 'T').replace(/\//g, '-').replace(/\b(\d)\b/g, '0$1');
+  const time = Math.floor(new Date(timestamp).getTime() / 1000);
   const trip = (nameElem?.children?.at(nameIndex + 1) as DomNode)?.content?.substring(1);
   const hash = checksum53(`${name};${trip || ''};${timestamp}`);
 
-  return { bbCode, email, hash, msgId: -1, name, style, html, remote: true, timestamp, trip };
+  return { bbCode, email, hash, msgId: -1, name, style, html, remote: true, time, trip };
 }
 
 async function legacyBrowserSetup(): Promise<void> {
@@ -168,18 +167,18 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
     const participants = Array.from(new Set(participantDiv.children[0].content.trim().replace(/^.*:\s*/g, '').split(/[◆◇]/)
       .map(p => p.trim()).filter(p => !!p)).values()).sort();
     const messageRows = body?.querySelectorAll('.messageRow').reverse();
-    let messages = messageRows.map(row => extractMessage(row));
+    let messages = messageRows.map(row => extractMessage(row)).filter(m => m.name !== proxyName);
     const hashes = new Set<string>();
 
     // Filter duplicate messages by hashcode.
     messages = messages.filter(m => !hashes.has(m.hash) && hashes.add(m.hash));
 
-    const latestPosts = new Map<string, string>();
+    const latestPosts = new Map<string, number>();
 
     for (const message of messages) {
-      const latest = latestPosts.get(message.name) || message.timestamp;
+      const latest = latestPosts.get(message.name) || message.time;
 
-      latestPosts.set(message.name, message.timestamp > latest ? message.timestamp : latest);
+      latestPosts.set(message.name, message.time > latest ? message.time : latest);
     }
 
     const db = await getDb();

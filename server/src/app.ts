@@ -77,11 +77,11 @@ app.get('/api/messages', async (_req, res) => {
     name: row.name,
     remote: !!row.remote,
     style: row.style,
-    timestamp: row.time,
-    trip: row.trip
+    time: row.time,
+    trip: row.remote ? row.trip : Buffer.from(checksum53(row.trip), 'hex').toString('base64').replace(/=+$/, '')
   } as Message));
 
-  const hourAgo = new Date(Date.now() - 3_600_000).toISOString();
+  const hourAgo = Date.now() - 3_600_000;
   const participants = Array.from(new Set((await db.all<DbParticipant>('SELECT * FROM participants'))
     .filter(row => row.last_active > hourAgo || row.last_post > hourAgo).map(row => row.name)).values()).sort();
 
@@ -99,7 +99,7 @@ app.post('/api/enter', async (req, res) => {
 
   const db = await getDb();
   const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', q.name);
-  const now = new Date().toISOString();
+  const now = Math.floor(Date.now() / 1000);
 
   if (!participant) {
     await db.run('INSERT INTO participants (name, trip, email, ip, session_id, remote, last_active, last_post) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -144,7 +144,7 @@ app.post('/api/leave', async (req, res) => {
 app.post('/api/send', async (req, res) => {
   const session = sessions.get(req.sessionID);
   const db = await getDb();
-  const now = new Date().toISOString();
+  const now = Math.floor(Date.now() / 1000);
   const q = req.query as any;
   const style = `color:${colors[q.color].trim()}`;
   const hash = checksum53(`${q.name};${q.tripCode || ''};${now}`);

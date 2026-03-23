@@ -62,8 +62,11 @@ export class MessageList {
     );
   }
 
-  protected formatLocal(timestamp: string): string {
-    return new Date(timestamp + 'Z').toLocaleString();
+  protected formatTime(time: number): string {
+    if (this.localTime())
+      return new Date(time * 1000).toLocaleString();
+    else
+      return new Date(time * 1000).toISOString().substring(0, 19).replace('T', ' ');
   }
 
   protected getBackground(message: Message): string {

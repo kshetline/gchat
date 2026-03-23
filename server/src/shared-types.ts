@@ -17,7 +17,7 @@ export interface Message {
   msgId: number;
   remote: boolean;
   style: string;
-  timestamp: string;
+  time: number;
   trip: string;
 }
 
@@ -33,7 +33,7 @@ export interface DbMessage {
   remote: boolean;
   session_id: string;
   style: string;
-  time: string;
+  time: number;
   trip: string;
 }
 
@@ -41,8 +41,8 @@ export interface DbParticipant {
   email: string;
   id: number;
   ip: string;
-  last_active: string;
-  last_post: string;
+  last_active: number;
+  last_post: number;
   name: string;
   remote: boolean;
   trip: string;

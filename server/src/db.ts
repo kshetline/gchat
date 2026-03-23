@@ -12,18 +12,18 @@ export async function getDb(): Promise<AsyncDatabase> {
   await db.exec(
     `CREATE TABLE IF NOT EXISTS "messages" (
       "id" INTEGER NOT NULL UNIQUE,
-      "time" DATETIME NOT NULL,
+      "time" INTEGER NOT NULL DEFAULT 0,
       "name" TEXT NOT NULL,
       "trip" TEXT,
       "email" TEXT,
-      "remote" BOOLEAN NOT NULL,
+      "remote" INTEGER NOT NULL,
       "ip" TEXT,
       "session_id" TEXT,
       "style" TEXT,
       "message" TEXT NOT NULL,
       "hash" TEXT NOT NULL,
       "edit_count" INTEGER NOT NULL DEFAULT 0,
-      "deleted" BOOLEAN NOT NULL DEFAULT 0,
+      "deleted" INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY("id" AUTOINCREMENT)
     )`);
 
@@ -35,9 +35,9 @@ export async function getDb(): Promise<AsyncDatabase> {
       "email" TEXT,
       "ip" TEXT,
       "session_id" TEXT,
-      "remote" boolean NOT NULL,
-      "last_active" datetime,
-      "last_post" datetime,
+      "remote" INTEGER NOT NULL,
+      "last_active" INTEGER NOT NULL DEFAULT 0,
+      "last_post" INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY("id" AUTOINCREMENT)
     )`);
 
@@ -47,7 +47,7 @@ export async function getDb(): Promise<AsyncDatabase> {
 export function convertBBCodeToHtml(text: string): string {
   text = text.replace(/\[(\/?)(b|code|i|img|s|s1|s2|s3|s4|s5|u|url=.*?|url)]/g, '<$1$2>')
     .replace(/<s(\d)>/g, '<span class="fontSize$1">').replace(/<\/s\d>/g, '</span>')
-    .replace(/<url=(.*?)>(.*?)<\/url>/g,  (_$0, $1, $2) => `<a href="${$1}">${$2}</a>`)
+    .replace(/<url=(.*?)>(.*?)<\/url>/g,  (_$0, $1, $2) => `<a href="${$1}" target="_blank">${$2}</a>`)
     .replace(/<img>(.*?)<\/img>/g, '<img src="$1" alt="">')
     .replace(/(^|>)(.*?)(<|$)/g, (_$0, $1, $2, $3) => `${$1}${htmlEscape($2)}${$3}`);
 

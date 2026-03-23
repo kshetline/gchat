@@ -5,8 +5,8 @@
     @if (message.trip) {
       <span class="trip">{{ message.trip }}</span>
     }
-    @if (message.timestamp) {
-      <span class="time">{{ localTime() ? formatLocal(message.timestamp) : message.timestamp }}</span>
+    @if (message.time) {
+      <span class="time">{{ formatTime(message.time) }}</span>
     }
   </div>
   <div class="bubble-wrap" [class.me]="isMe(message)"
