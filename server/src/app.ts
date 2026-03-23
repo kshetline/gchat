@@ -7,6 +7,8 @@ import { uploadSingle } from './uploader.js';
 import { SessionInfo } from './session-info';
 import { enterLegacyChat, leaveLegacyChat, legacyBrowserSetup, legacySendMessage } from './legacy.js';
 import { convertBBCodeToHtml, getDb } from './db.js';
+import ip_ from 'ip';
+import axios from 'axios';
 
 const app = express();
 const port = toInt(process.env.HTTP_PORT) || 3000;
@@ -19,6 +21,20 @@ const config: Config = {
   title: process.env.CHAT_TITLE,
 };
 
+function getIp(req: express.Request): string {
+  return req.ip || req.socket?.remoteAddress || (req as any).connection?.remoteAddress || (req as any).connection?.socket?.remoteAddress;
+}
+
+let serverIp: string;
+const IP_MATCHER = /(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/;
+
+async function getServerIp(): Promise<string> {
+  if (!serverIp)
+    serverIp = (IP_MATCHER.exec((await axios.get(process.env.GET_IP_SERVICE)).data) || [])[0] || '127.0.0.1';
+
+  return serverIp;
+}
+
 app.use(session({
   secret: process.env.SESSION_KEY,
   resave: true,
@@ -28,9 +44,13 @@ app.use(session({
 
 app.use(async (req, _res, next) => {
   let session = sessions.get(req.sessionID);
+  const ip = getIp(req);
 
   if (!session) {
     session = await legacyBrowserSetup();
+    session.ip = ip_.isPrivate(ip) ? await getServerIp() : ip;
+    console.log(session.ip);
+
     sessions.set(req.sessionID, session);
   }
 
