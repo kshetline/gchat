@@ -91,12 +91,6 @@ app.get('/api/messages', async (_req, res) => {
 app.post('/api/enter', async (req, res) => {
   const q = req.query as any;
   const session = sessions.get(req.sessionID);
-
-  if (session?.inChat) {
-    res.send('null');
-    return;
-  }
-
   const db = await getDb();
   const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', q.name);
   const now = Math.floor(Date.now() / 1000);
@@ -106,7 +100,7 @@ app.post('/api/enter', async (req, res) => {
       q.name, q.tripCode, q.email, session.ip, q.sessionID, 0, now, 0);
     session.inChat = true;
   }
-  else if (q.tripCode === participant.trip || session.ip === participant.ip || q.sessionID === participant.session_id) {
+  else if (!session?.inChat && (q.tripCode === participant.trip || session.ip === participant.ip || q.sessionID === participant.session_id)) {
     await db.run('UPDATE participants SET trip = ?, email = ?, ip = ?, session_id = ?, remote = ?, last_active = ? WHERE id = ?',
       q.tripCode, q.email, session.ip, q.sessionID, 0, now, participant.id);
     session.inChat = true;

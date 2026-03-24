@@ -266,11 +266,6 @@ export class App implements OnInit {
 
     const params = { ...this.prefs, comment };
 
-    if (Date.now() > 0) {
-      console.log('Color:', this.color(), this.prefs.color);
-      return;
-    }
-
     this.httpClient.post('/api/send', {}, { params }).subscribe({
       next: (): void => {
         this.connectionTrouble.set(false);
