@@ -35,8 +35,8 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
         earliest = Math.min(message.time, earliest);
         latest = Math.max(message.time, latest);
 
-        if (message.time > latestInDb - 300_000 || retrieveCount >= 1000) {
-          const row = await db.get<DbMessage>('SELECT hash FROM messages WHERE hash = ? LIMIT 1', [message.hash]);
+        if (message.time > latestInDb - 300 || retrieveCount >= 1000) {
+          const row = await db.get<DbMessage>('SELECT hash FROM messages WHERE hash = ? LIMIT 1', message.hash);
 
           if (!row)
             await db.run('INSERT INTO messages (time, synced_time, name, trip, email, remote, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -189,7 +189,8 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
       const [_$0, name, msg] = /^《(.+?)》(.*)$/.exec(message.bbCode) || [];
 
       if (name && msg)
-        await db.run('UPDATE messages SET synced_time = ? WHERE name = ? AND message = ? AND synced_time = time AND ABS(synced_time - time) < 120', message.time, name, msg);
+        await db.run('UPDATE messages SET synced_time = ? WHERE name = ? AND message = ? AND synced_time = time AND ABS(synced_time - ?) < 120',
+          message.time, name, msg, message.time);
     }
 
     for (const participant of Array.from(latestPosts.keys()))
