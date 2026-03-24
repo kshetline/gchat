@@ -33,6 +33,7 @@ export interface DbMessage {
   remote: boolean;
   session_id: string;
   style: string;
+  synced_time: number;
   time: number;
   trip: string;
 }

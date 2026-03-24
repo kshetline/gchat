@@ -13,6 +13,7 @@ export async function getDb(): Promise<AsyncDatabase> {
     `CREATE TABLE IF NOT EXISTS "messages" (
       "id" INTEGER NOT NULL UNIQUE,
       "time" INTEGER NOT NULL DEFAULT 0,
+      "synced_time" INTEGER NOT NULL DEFAULT 0,
       "name" TEXT NOT NULL,
       "trip" TEXT,
       "email" TEXT,

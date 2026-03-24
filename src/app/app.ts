@@ -1,7 +1,7 @@
 import { Component, OnInit, signal, ViewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Config, Message, Messages, Preferences } from '../../server/src/shared-types';
-import { forEach, isAndroid } from '@tubular/util';
+import { forEach, isAndroid, isEqual } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { FileUploadEvent, MessageEntry } from '../message-entry/message-entry';
@@ -198,7 +198,9 @@ export class App implements OnInit {
           if (!this.newOnBottom())
             messages.messages.reverse();
 
-          if (previousLastMessageIndex !== messages.messages.length - 1) {
+          const changed = !isEqual(messages.messages, this.messages());
+
+          if (changed || previousLastMessageIndex !== messages.messages.length - 1) {
             if (this.messages().length > 0 && !this.chatActive) {
               this.unseenMessages += newMessageCount;
               document.title = `(${this.unseenMessages}) ${this.baseTitle}`;

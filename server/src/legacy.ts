@@ -39,8 +39,8 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
           const row = await db.get<DbMessage>('SELECT hash FROM messages WHERE hash = ? LIMIT 1', [message.hash]);
 
           if (!row)
-            await db.run('INSERT INTO messages (time, name, trip, email, remote, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-              message.time, message.name, message.trip, message.email, 1, message.style, message.bbCode, message.hash);
+            await db.run('INSERT INTO messages (time, synced_time, name, trip, email, remote, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+              message.time, message.time, message.name, message.trip, message.email, 1, message.style, message.bbCode, message.hash);
         }
       }
     }
@@ -134,7 +134,7 @@ function extractMessage(messageRow: DomNode): Message {
   const name = (nameElem?.children?.at(nameIndex) as DomNode)?.children?.at(0)?.content;
   const timestamp = messageRow.querySelector('.messageDate')?.children?.at(0)?.content?.slice(1, -1)
     .replace('-', 'T').replace(/\//g, '-').replace(/\b(\d)\b/g, '0$1');
-  const time = Math.floor(new Date(timestamp).getTime() / 1000);
+  const time = Math.floor(new Date(timestamp + 'Z').getTime() / 1000);
   const trip = (nameElem?.children?.at(nameIndex + 1) as DomNode)?.content?.substring(1);
   const hash = checksum53(`${name};${trip || ''};${timestamp}`);
 
@@ -168,6 +168,7 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
       .map(p => p.trim()).filter(p => !!p)).values()).sort();
     const messageRows = body?.querySelectorAll('.messageRow').reverse();
     let messages = messageRows.map(row => extractMessage(row)).filter(m => m.name !== proxyName);
+    const proxyMessages = messageRows.map(row => extractMessage(row)).filter(m => m.name === proxyName);
     const hashes = new Set<string>();
 
     // Filter duplicate messages by hashcode.
@@ -182,6 +183,14 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
     }
 
     const db = await getDb();
+
+    for (const message of proxyMessages) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const [_$0, name, msg] = /^《(.+?)》(.*)$/.exec(message.bbCode) || [];
+
+      if (name && msg)
+        await db.run('UPDATE messages SET synced_time = ? WHERE name = ? AND message = ? AND synced_time = time AND ABS(synced_time - time) < 120', message.time, name, msg);
+    }
 
     for (const participant of Array.from(latestPosts.keys()))
       await db.run('UPDATE participants SET last_post = ?1, last_active = MAX(last_active, ?1) WHERE name = ?2 and remote = 1',

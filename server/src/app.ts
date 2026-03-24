@@ -68,7 +68,7 @@ app.get('/api/config', (_req, res) => {
 
 app.get('/api/messages', async (_req, res) => {
   const db = await getDb();
-  const rows = (await db.all<DbMessage>('SELECT * FROM messages ORDER BY time')).slice(-1000);
+  const rows = (await db.all<DbMessage>('SELECT * FROM messages ORDER BY messages.synced_time')).slice(-1000);
   const messages = rows.filter(row => !row.deleted).map(row => ({
     email: row.email,
     hash: row.hash,
@@ -77,11 +77,11 @@ app.get('/api/messages', async (_req, res) => {
     name: row.name,
     remote: !!row.remote,
     style: row.style,
-    time: row.time,
+    time: row.synced_time,
     trip: row.remote ? row.trip : Buffer.from(checksum53(row.trip), 'hex').toString('base64').replace(/=+$/, '')
   } as Message));
 
-  const hourAgo = Date.now() - 3_600_000;
+  const hourAgo = Math.floor(Date.now() / 1000) - 3600;
   const participants = Array.from(new Set((await db.all<DbParticipant>('SELECT * FROM participants'))
     .filter(row => row.last_active > hourAgo || row.last_post > hourAgo).map(row => row.name)).values()).sort();
 
@@ -147,10 +147,10 @@ app.post('/api/send', async (req, res) => {
   const now = Math.floor(Date.now() / 1000);
   const q = req.query as any;
   const style = `color:${colors[q.color].trim()}`;
-  const hash = checksum53(`${q.name};${q.tripCode || ''};${now}`);
+  const hash = checksum53(`${q.name};${q.tripCode || ''};${new Date(now * 1000).toISOString().substring(0, 19)}`);
 
-  await db.run('INSERT INTO messages (time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    now, q.name, q.tripCode, q.email, 0, session.ip, req.sessionID, style, q.comment, hash);
+  await db.run('INSERT INTO messages (time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    now, now, q.name, q.tripCode, q.email, 0, session.ip, req.sessionID, style, q.comment, hash);
   await db.run('UPDATE participants SET last_post = ?1, last_active = ?1 WHERE name = ?2 and remote = 0', now, q.name);
 
   if (!proxyStarted) {
