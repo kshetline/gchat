@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, effect, OnInit, signal, ViewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Config, Message, Messages, Preferences } from '../../server/src/shared-types';
 import { forEach, isAndroid, isEqual } from '@tubular/util';
@@ -29,7 +29,6 @@ export class App implements OnInit {
   // noinspection TypeScriptFieldCanBeMadeReadonly
   private baseTitle = 'Chat';
   private chatActive = true;
-  private _color = 0;
   private lastMessageId: string;
   private _messageEntry: MessageEntry;
   private messageTimer: any;
@@ -37,6 +36,7 @@ export class App implements OnInit {
   private unseenMessages = 0;
   private uploader: Uploader;
 
+  protected color = signal(0);
   protected connectionTrouble = signal(false);
   protected darkMode = signal(false);
   protected email = signal('');
@@ -57,14 +57,6 @@ export class App implements OnInit {
   protected title = signal(this.baseTitle);
   protected tripCode = signal('');
 
-  get color(): number { return this._color; }
-  set color(value: number) {
-    if (this._color !== value) {
-      this._color = value;
-      this.updateColor();
-    }
-  }
-
   get messageEntry(): MessageEntry { return this._messageEntry; }
   @ViewChild(MessageEntry) set messageEntry(value: MessageEntry) {
     if (this._messageEntry !== value) {
@@ -72,15 +64,15 @@ export class App implements OnInit {
       setTimeout(() => this.messageEntrySignal.set(value), 0);
 
       if (this.pendingFocus && !isAndroid())
-        this.messageEntry?.focus(this.color);
+        this.messageEntry?.focus(this.color());
       else
-        this.messageEntry?.setColor(this.color);
+        this.messageEntry?.setColor(this.color());
 
       this.pendingFocus = false;
     }
   }
 
-  constructor(private httpClient: HttpClient, private prefService: PreferencesService) {
+  constructor(private httpClient: HttpClient, private prefService: PreferencesService, private changeRef: ChangeDetectorRef) {
     this.uploader = new Uploader(this.httpClient);
     this.prefs = this.prefService.get();
     forEach(this.prefs as Record<string, any>, (key, value) => (this as any)[key] && (this as any)[key]?.set(value));
@@ -144,6 +136,8 @@ export class App implements OnInit {
     document.addEventListener('visibilitychange', () => this.checkChatActive());
     window.addEventListener('blur', () => this.checkChatActive());
     window.addEventListener('focus', () => this.checkChatActive());
+
+    effect(() => this.prefs.color = this.color());
   }
 
   ngOnInit(): void {
@@ -227,11 +221,6 @@ export class App implements OnInit {
     });
   }
 
-  protected updateColor(): void {
-    this.prefs.color = this.color;
-    this.prefService.set(this.prefs);
-  }
-
   protected enterChat(): void {
     this.prefs.name = this.name();
     this.prefs.email = this.email();
@@ -248,6 +237,7 @@ export class App implements OnInit {
         this.connectionTrouble.set(false);
         this.pendingFocus = true;
         this.inChat.set(true);
+        this.changeRef.detectChanges();
         setTimeout(() => this.adjustScrolling(), 250);
       },
       error: (_error): void => {
@@ -276,10 +266,16 @@ export class App implements OnInit {
 
     const params = { ...this.prefs, comment };
 
+    if (Date.now() > 0) {
+      console.log('Color:', this.color(), this.prefs.color);
+      return;
+    }
+
     this.httpClient.post('/api/send', {}, { params }).subscribe({
       next: (): void => {
         this.connectionTrouble.set(false);
         this.inChat.set(true);
+        this.changeRef.detectChanges();
         this.messageEntry.reset();
         setTimeout(() => this.getMessages(), 500);
       },
@@ -305,7 +301,7 @@ export class App implements OnInit {
   }
 
   protected setColor(color: number): void {
-    this.color = color;
+    this.color.set(color);
     this.prefs.color = color;
     this.prefService.set(this.prefs);
   }
