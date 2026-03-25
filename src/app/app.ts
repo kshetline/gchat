@@ -142,6 +142,7 @@ export class App implements OnInit {
     window.addEventListener('blur', () => this.checkChatActive(true));
     window.addEventListener('focus', () => this.checkChatActive(true));
     window.addEventListener('mousemove', () => this.activity = true);
+    window.addEventListener('beforeunload', () => this.inChat() && this.leaveChat());
 
     effect(() => this.prefs.color = this.color());
   }

@@ -6,9 +6,10 @@ import { checksum53, isEqual, processMillis, toBoolean, toInt } from '@tubular/u
 import { uploadSingle } from './uploader.js';
 import { SessionInfo } from './session-info';
 import { enterLegacyChat, legacySendMessage } from './legacy.js';
-import { convertBBCodeToHtml, getDb } from './db.js';
+import { getDb, getNamedParticipantRecord } from './db.js';
 import ip_ from 'ip';
 import axios from 'axios';
+import { convertBBCodeToHtml, getIp } from './chat-util.js';
 
 const app = express();
 const port = toInt(process.env.HTTP_PORT) || 3000;
@@ -27,10 +28,6 @@ let proxyStarted = false;
 let lastContentUpdate = 0;
 let lastMessages: Message[] = null;
 
-function getIp(req: express.Request): string {
-  return req.ip || req.socket?.remoteAddress || (req as any).connection?.remoteAddress || (req as any).connection?.socket?.remoteAddress;
-}
-
 let serverIp: string;
 const IP_MATCHER = /(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/;
 
@@ -39,6 +36,21 @@ async function getServerIp(): Promise<string> {
     serverIp = (IP_MATCHER.exec((await axios.get(process.env.GET_IP_SERVICE)).data) || [])[0] || '127.0.0.1';
 
   return serverIp;
+}
+
+async function sessionsCheck(): Promise<void> {
+  const now = Math.floor(Date.now() / 1000);
+
+  for (const sessionId of sessions.keys()) {
+    const session = sessions.get(sessionId);
+
+    if (session.name && session.lastAlive < now - 1800) {
+      const db = await getDb();
+
+      await db.run('DELETE FROM participants WHERE name = ? AND remote = 0', session.name);
+      sessions.delete(sessionId);
+    }
+  }
 }
 
 app.use(session({
@@ -69,16 +81,6 @@ app.listen(port, () => {
 app.get('/api/config', (_req, res) => {
   res.json(config);
 });
-
-async function getNamedParticipantRecord(name: string): Promise<DbParticipant> {
-  const db = await getDb();
-  let participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', name);
-
-  if (!participant)
-    participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? LIMIT 1', name);
-
-  return participant;
-}
 
 app.get('/api/messages', async (req, res) => {
   const session = sessions.get(req.sessionID);
@@ -122,11 +124,17 @@ app.get('/api/messages', async (req, res) => {
     lastContentUpdate = processMillis();
   }
 
+  if (session) {
+    session.lastAlive = now;
+    session.name = name;
+  }
+
   if (force || (session && session.lastContentUpdate !== lastContentUpdate))
     session.lastContentUpdate = lastContentUpdate;
   else
     messages = [null];
 
+  await sessionsCheck();
   res.json({ messages, participants });
 });
 

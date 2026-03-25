@@ -1,10 +1,11 @@
-import { DbMessage, DbParticipant, Message, Messages, ParticipantInfo } from './shared-types';
-import { checksum53, encodeForUri, htmlUnescape, processMillis } from '@tubular/util';
+import { DbMessage, DbParticipant, Message, Messages, ParticipantInfo } from './shared-types.js';
+import { checksum53, encodeForUri, processMillis } from '@tubular/util';
 import axios from 'axios';
 import { HtmlParser } from 'fortissimo-html';
-import { DomElement, DomNode } from 'fortissimo-html/dist/dom.js';
+import { DomNode } from 'fortissimo-html/dist/dom.js';
 import * as puppeteer from 'puppeteer';
-import { convertBBCodeToHtml, getDb } from './db.js';
+import { getDb } from './db.js';
+import { convertBBCodeToHtml, getTextAndMarkupAsBBCode } from './chat-util.js';
 
 const domain = process.env.CHAT_DOMAIN;
 const proxyName = process.env.CHAT_PROXY;
@@ -88,51 +89,6 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
 
 pollLegacyMessages().finally();
 legacyBrowserSetup().finally();
-
-function getTextAndMarkupAsBBCode(elems: DomElement[], domain: string): string {
-  if (!elems)
-    return '';
-
-  let text = '';
-
-  for (const elem of elems) {
-    if (elem instanceof DomNode) {
-      const inner = getTextAndMarkupAsBBCode(elem.children, domain);
-      let fromElem = `[${elem.tag}]${inner}[/${elem.tag}]`;
-
-      if (elem.tag === 'a')
-        fromElem = `[url=${inner}]${inner}[/url]`;
-      else if (elem.tag === 'span') {
-        const qlass = elem.valuesLookup['class'];
-
-        if (/^fontSize\d/.test(qlass)) {
-          const size = qlass.slice(-1);
-
-          fromElem = `[s${size}]${inner}[/s${size}]`;
-        }
-        else
-          fromElem = inner; // No other styling supported
-      }
-      else if (elem.tag === 'img') {
-        const alt = elem.valuesLookup['alt'];
-
-        if ([...(alt || '')].length === 1)
-          fromElem = alt;
-        else {
-          const src = elem.valuesLookup['src']?.replace(/^\/(.*)$/, `https://${domain}/$1`);
-
-          fromElem = `[img]${src}[/img]`;
-        }
-      }
-
-      text += fromElem;
-    }
-    else
-      text += htmlUnescape(elem.content || '');
-  }
-
-  return text;
-}
 
 function extractMessage(messageRow: DomNode): Message {
   const bbCode = getTextAndMarkupAsBBCode(messageRow.querySelector('.messageComment').children, domain);

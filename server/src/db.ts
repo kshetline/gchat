@@ -1,5 +1,5 @@
 import { AsyncDatabase } from 'promised-sqlite3';
-import { htmlEscape } from '@tubular/util';
+import { DbParticipant } from './shared-types.js';
 
 let db: AsyncDatabase;
 
@@ -45,12 +45,12 @@ export async function getDb(): Promise<AsyncDatabase> {
   return db;
 }
 
-export function convertBBCodeToHtml(text: string): string {
-  text = text.replace(/\[(\/?)(b|code|i|img|s|s1|s2|s3|s4|s5|u|url=.*?|url)]/g, '<$1$2>')
-    .replace(/<s(\d)>/g, '<span class="fontSize$1">').replace(/<\/s\d>/g, '</span>')
-    .replace(/<url=(.*?)>(.*?)<\/url>/g,  (_$0, $1, $2) => `<a href="${$1}" target="_blank">${$2}</a>`)
-    .replace(/<img>(.*?)<\/img>/g, '<img src="$1" alt="">')
-    .replace(/(^|>)(.*?)(<|$)/g, (_$0, $1, $2, $3) => `${$1}${htmlEscape($2)}${$3}`);
+export async function getNamedParticipantRecord(name: string): Promise<DbParticipant> {
+  const db = await getDb();
+  let participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', name);
 
-  return text;
+  if (!participant)
+    participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? LIMIT 1', name);
+
+  return participant;
 }
