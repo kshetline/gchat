@@ -62,6 +62,13 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
           participant, 1, Math.floor(Date.now() / 1000), 0);
     }
 
+    const rows = await db.all<DbParticipant>('SELECT * FROM participants where remote = 1');
+
+    for (const row of rows) {
+      if (messages.participants.findIndex(p => p.name === row.name) < 0)
+        await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', row.name);
+    }
+
     const latestPosts = new Map<string, number>();
 
     for (const message of messages.messages || [])

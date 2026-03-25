@@ -11,7 +11,7 @@ import { MessageList } from '../message-list/message-list';
 import { ColorSelector } from '../color-selector/color-selector';
 import { Uploader } from '../uploader';
 
-const REPOLL_RATE = 10000;
+const REPOLL_RATE = 5000;
 
 @Component({
   selector: 'chat-root',
@@ -186,37 +186,40 @@ export class App implements OnInit {
     const wasActive = this.activity;
     this.activity = false;
 
-    this.httpClient.get<Messages>('/api/messages', { params: { name: this.name(), active: wasActive } }).subscribe({
+    this.httpClient.get<Messages>('/api/messages',
+      { params: { name: this.name(), active: wasActive, force: this.messages().length < 1 } }).subscribe({
       next: (messages: Messages): void => {
         if (!messages.errorMessage) {
           this.connectionTrouble.set(false);
           this.checkChatActive();
 
-          let newMessageCount = 1;
-          const previousLastMessageIndex = this.lastMessageId ?
-            messages.messages.findIndex(m => m.hash === this.lastMessageId) : -1;
+          if (!isEqual(messages.messages, [null])) {
+            let newMessageCount = 1;
+            const previousLastMessageIndex = this.lastMessageId ?
+              messages.messages.findIndex(m => m.hash === this.lastMessageId) : -1;
 
-          if (previousLastMessageIndex >= 0)
-            newMessageCount = messages.messages.length - previousLastMessageIndex - 1;
+            if (previousLastMessageIndex >= 0)
+              newMessageCount = messages.messages.length - previousLastMessageIndex - 1;
 
-          this.lastMessageId = messages.messages.at(-1).hash;
+            this.lastMessageId = messages.messages.at(-1).hash;
 
-          if (!this.newOnBottom())
-            messages.messages.reverse();
+            if (!this.newOnBottom())
+              messages.messages.reverse();
 
-          const changed = !isEqual(messages.messages, this.messages());
+            const changed = !isEqual(messages.messages, this.messages());
 
-          if (changed || previousLastMessageIndex !== messages.messages.length - 1) {
-            if (this.messages().length > 0 && !this.chatActive) {
-              this.unseenMessages += newMessageCount;
-              document.title = `(${this.unseenMessages}) ${this.baseTitle}`;
+            if (changed || previousLastMessageIndex !== messages.messages.length - 1) {
+              if (this.messages().length > 0 && !this.chatActive) {
+                this.unseenMessages += newMessageCount;
+                document.title = `(${this.unseenMessages}) ${this.baseTitle}`;
 
-              if (this.prefs.notifySound)
-                this.chime.play().finally();
+                if (this.prefs.notifySound)
+                  this.chime.play().finally();
+              }
+
+              this.messages.set(messages.messages);
+              this.adjustScrolling();
             }
-
-            this.messages.set(messages.messages);
-            this.adjustScrolling();
           }
 
           this.participants.set(messages.participants);

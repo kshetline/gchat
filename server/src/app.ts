@@ -2,7 +2,7 @@ import cookieParser from 'cookie-parser';
 import express from 'express';
 import session from 'express-session';
 import { colors, Config, DbMessage, DbParticipant, Message, ParticipantInfo } from './shared-types.js';
-import { checksum53, toBoolean, toInt } from '@tubular/util';
+import { checksum53, isEqual, processMillis, toBoolean, toInt } from '@tubular/util';
 import { uploadSingle } from './uploader.js';
 import { SessionInfo } from './session-info';
 import { enterLegacyChat, legacySendMessage } from './legacy.js';
@@ -14,7 +14,6 @@ const app = express();
 const port = toInt(process.env.HTTP_PORT) || 3000;
 const sessions = new Map<string, SessionInfo>();
 const proxyName = process.env.CHAT_PROXY;
-let proxyStarted = false;
 const config: Config = {
   backgroundColor: process.env.CHAT_BACKGROUND || '#DDD',
   fileSizeLimitInMb: toInt(process.env.UPLOAD_MAX_SIZE_MB),
@@ -22,8 +21,11 @@ const config: Config = {
     .map(link => ({ name: link[0], url: link[1], target: link[2] || '_blank' })),
   title: process.env.CHAT_TITLE,
 };
-
 const URL_MATCHER = /\b(https?:\/\/[-A-Za-z0-9+&@#/%?=~_()|!:,.;]*[-A-Za-z0-9+&@#/%=~_()|])/g;
+
+let proxyStarted = false;
+let lastContentUpdate = 0;
+let lastMessages: Message[] = null;
 
 function getIp(req: express.Request): string {
   return req.ip || req.socket?.remoteAddress || (req as any).connection?.remoteAddress || (req as any).connection?.socket?.remoteAddress;
@@ -79,9 +81,10 @@ async function getNamedParticipantRecord(name: string): Promise<DbParticipant> {
 }
 
 app.get('/api/messages', async (req, res) => {
+  const session = sessions.get(req.sessionID);
   const db = await getDb();
   const rows = (await db.all<DbMessage>('SELECT * FROM messages ORDER BY messages.synced_time')).slice(-1000);
-  const messages = rows.filter(row => !row.deleted).map(row => ({
+  let messages = rows.filter(row => !row.deleted).map(row => ({
     email: row.email,
     hash: row.hash,
     html: convertBBCodeToHtml(row.message),
@@ -95,6 +98,7 @@ app.get('/api/messages', async (req, res) => {
 
   const name = req.query.name as string;
   const active = toBoolean(req.query.active);
+  const force = toBoolean(req.query.force);
   const now = Math.floor(Date.now() / 1000);
   const hourAgo = now - 3600;
   let participant = await getNamedParticipantRecord(name);
@@ -112,6 +116,16 @@ app.get('/api/messages', async (req, res) => {
     if (participant)
       participantInfo.idle = now - participant.last_active > (participant.remote ? 1800 : 600) ? 1 : 0;
   }
+
+  if (!isEqual(lastMessages, messages)) {
+    lastMessages = messages;
+    lastContentUpdate = processMillis();
+  }
+
+  if (force || (session && session.lastContentUpdate !== lastContentUpdate))
+    session.lastContentUpdate = lastContentUpdate;
+  else
+    messages = [null];
 
   res.json({ messages, participants });
 });
