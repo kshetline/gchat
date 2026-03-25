@@ -50,10 +50,15 @@ export interface DbParticipant {
   session_id: string;
 }
 
+export interface ParticipantInfo {
+  name: string;
+  idle?: number;
+}
+
 export interface Messages {
   errorMessage?: string;
   messages?: Message[];
-  participants?: string[];
+  participants?: ParticipantInfo[];
 }
 
 export interface Preferences {
@@ -67,7 +72,7 @@ export interface Preferences {
   tripCode: string;
 }
 
-const types = `(dat|htm|torrent|deb|lzh|ogm|doc|class|js|swift|cc|tga|ape|woff2|cab|
+const types = `dat|htm|torrent|deb|lzh|ogm|doc|class|js|swift|cc|tga|ape|woff2|cab|
                whl|mpe|rmvb|srt|pdf|xz|exe|m4a|crx|vob|tif|gz|roq|m4v|gif|rb|3g2|m4a|
                rvb|sid|ai|wma|pea|bmp|py|mp4|m4p|ods|jpeg|command|azw4|otf|ebook|rtf|
                ttf|mobi|ra|flv|ogv|mpg|xls|jpg|mkv|nsv|mp3|kmz|java|lua|m2v|deb|rst|
@@ -95,9 +100,9 @@ const types = `(dat|htm|torrent|deb|lzh|ogm|doc|class|js|swift|cc|tga|ape|woff2|
                scss|mpv|webp|war|pl|xlsx|mpeg|aaf|avchd|mod|rm|it|wasm|el|eps|nes|smc|
                sfc|md|smd|gen|gg|z64|v64|n64|gb|gbc|gba|srl|gcm|gcz|nds|dsi|wbfs|wad|
                cia|3ds|ngp|ngc|pce|vb|ws|wsc|dsv|sav|ps2|mcr|mpk|eep|st0|dta|srm|afa|
-               zpaq|arc|paq|lpaq|swf|pdn|lol|php|sh|img|ico|asc|m2ts|nzb|appimage|json)`.replace(/\s*/g, '');
-export const allowedExtensions = new RegExp('\\.' + types + '$', 'i');
-export const allowedTypes = new RegExp('\\b' + types + '\\b', 'i');
+               zpaq|arc|paq|lpaq|swf|pdn|lol|php|sh|img|ico|asc|m2ts|nzb|appimage|json`.replace(/\s*/g, '');
+export const allowedExtensions = new RegExp('\\.(' + types + ')$', 'i');
+export const allowedTypes = new RegExp('\\b(' + types + ')\\b', 'i');
 export const MB = 1024 * 1024;
 
 export const sizeMap: Record<string, string> = { '0.625em': 's1', '0.8125em': 's2', '1em': 's3', '1.125em': 's4', '1.5em': 's5' };

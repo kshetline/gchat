@@ -1,4 +1,4 @@
-import { DbMessage, DbParticipant, Message, Messages } from './shared-types';
+import { DbMessage, DbParticipant, Message, Messages, ParticipantInfo } from './shared-types';
 import { checksum53, encodeForUri, htmlUnescape, processMillis } from '@tubular/util';
 import axios from 'axios';
 import { HtmlParser } from 'fortissimo-html';
@@ -25,7 +25,6 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
   try {
     const messages = await getLegacyMessages(proxyName, retrieveCount);
     let earliest = Number.MAX_SAFE_INTEGER;
-    let latest = 0;
     const db = await getDb();
     const row = await db.get<DbMessage>('SELECT time FROM messages ORDER BY time DESC LIMIT 1');
     const latestInDb = row?.time;
@@ -33,7 +32,6 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
     for (const message of messages.messages || []) {
       if (message.time) {
         earliest = Math.min(message.time, earliest);
-        latest = Math.max(message.time, latest);
 
         if (message.time > latestInDb - 300 || retrieveCount >= 1000) {
           const row = await db.get<DbMessage>('SELECT hash FROM messages WHERE hash = ? LIMIT 1', message.hash);
@@ -45,7 +43,10 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
       }
     }
 
-    for (const participant of messages.participants || []) {
+    if (retrieveCount < 1000 && latestInDb && earliest > latestInDb)
+      return pollLegacyMessages(1000);
+
+    for (const participant of (messages.participants || []).map(p => p.name)) {
       if (participant === proxyName)
         continue;
 
@@ -60,6 +61,15 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
         await db.run('INSERT INTO participants (name, remote, last_active, last_post) VALUES (?, ?, ?, ?)',
           participant, 1, Math.floor(Date.now() / 1000), 0);
     }
+
+    const latestPosts = new Map<string, number>();
+
+    for (const message of messages.messages || [])
+      latestPosts.set(message.name, message.time);
+
+    for (const participant of Array.from(latestPosts.keys()))
+      await db.run('UPDATE participants SET last_active = ?1, last_post = ?1 WHERE name = ?2 AND remote = 1',
+        latestPosts.get(participant), participant);
   }
   catch (err) {
     console.error('Error polling legacy chat:', err);
@@ -165,7 +175,7 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
     const body = dom.querySelector('body');
     const participantDiv = body?.querySelector('#participantList');
     const participants = Array.from(new Set(participantDiv.children[0].content.trim().replace(/^.*:\s*/g, '').split(/[◆◇]/)
-      .map(p => p.trim()).filter(p => !!p)).values()).sort();
+      .map(p => p.trim()).filter(p => !!p)).values()).sort().map(p => ({ name: p }) as ParticipantInfo);
     const messageRows = body?.querySelectorAll('.messageRow').reverse();
     let messages = messageRows.map(row => extractMessage(row)).filter(m => m.name !== proxyName);
     const proxyMessages = messageRows.map(row => extractMessage(row)).filter(m => m.name === proxyName);
@@ -189,7 +199,8 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
       const [_$0, name, msg] = /^《(.+?)》(.*)$/.exec(message.bbCode) || [];
 
       if (name && msg)
-        await db.run('UPDATE messages SET synced_time = ? WHERE name = ? AND message = ? AND synced_time = time AND ABS(synced_time - ?) < 120',
+        await db.run(`UPDATE messages SET synced_time = ? WHERE name = ? AND message = ? AND synced_time = time
+                                      AND ABS(synced_time - ?) < 120 AND ABS(synced_time - ?) > 2`,
           message.time, name, msg, message.time);
     }
 

@@ -1,11 +1,11 @@
 import { ChangeDetectorRef, Component, effect, OnInit, signal, ViewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Config, Message, Messages, Preferences } from '../../server/src/shared-types';
+import { Config, Message, Messages, ParticipantInfo, Preferences } from '../../server/src/shared-types';
 import { forEach, isAndroid, isEqual } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { FileUploadEvent, MessageEntry } from '../message-entry/message-entry';
-import { NotificationHandler, registerNotificationHandler, shouldIgnoreClick, startClickSuppress } from '../main';
+import { NotificationHandler, notify, registerNotificationHandler, shouldIgnoreClick, startClickSuppress } from '../main';
 import { applyTheme, getThemeMenuStyle, getThemes, resetDefaultThemeBackground } from '../themes';
 import { MessageList } from '../message-list/message-list';
 import { ColorSelector } from '../color-selector/color-selector';
@@ -26,6 +26,7 @@ export class App implements OnInit {
   private readonly chime = new Audio('assets/notify.wav');
   private readonly prefs: Preferences;
 
+  private activity = false;
   // noinspection TypeScriptFieldCanBeMadeReadonly
   private baseTitle = 'Chat';
   private chatActive = true;
@@ -51,7 +52,7 @@ export class App implements OnInit {
   protected notificationMessage = signal('');
   protected notificationType = signal('');
   protected notifySound = signal(true);
-  protected participants = signal([] as string[]);
+  protected participants = signal([] as ParticipantInfo[]);
   protected showNotification = signal(false);
   protected showThemes = signal(false);
   protected title = signal(this.baseTitle);
@@ -111,6 +112,8 @@ export class App implements OnInit {
     });
 
     document.addEventListener('keydown', (event: KeyboardEvent) => {
+      this.activity = true;
+
       if (event.key === 'Escape' && this.showNotification()) {
         this.showNotification.set(false);
         event.preventDefault();
@@ -126,6 +129,8 @@ export class App implements OnInit {
     });
 
     document.addEventListener('mousedown', (evt: MouseEvent) => {
+      this.activity = true;
+
       if (!document.getElementById('theme-select')?.contains(evt.target as Node) && this.showThemes()) {
         this.showThemes.set(false);
         evt.preventDefault();
@@ -133,9 +138,10 @@ export class App implements OnInit {
       }
     });
 
-    document.addEventListener('visibilitychange', () => this.checkChatActive());
-    window.addEventListener('blur', () => this.checkChatActive());
-    window.addEventListener('focus', () => this.checkChatActive());
+    document.addEventListener('visibilitychange', () => this.checkChatActive(true));
+    window.addEventListener('blur', () => this.checkChatActive(true));
+    window.addEventListener('focus', () => this.checkChatActive(true));
+    window.addEventListener('mousemove', () => this.activity = true);
 
     effect(() => this.prefs.color = this.color());
   }
@@ -155,7 +161,10 @@ export class App implements OnInit {
     this.showNotification.set(false);
   }
 
-  private checkChatActive(): void {
+  private checkChatActive(active?: boolean): void {
+    if (active)
+      this.chatActive = active;
+
     this.chatActive = document.hasFocus() && !document.hidden;
 
     if (this.chatActive) {
@@ -174,7 +183,10 @@ export class App implements OnInit {
       this.messageTimer = undefined;
     }
 
-    this.httpClient.get<Messages>('/api/messages', { params: { name: this.name() } }).subscribe({
+    const wasActive = this.activity;
+    this.activity = false;
+
+    this.httpClient.get<Messages>('/api/messages', { params: { name: this.name(), active: wasActive } }).subscribe({
       next: (messages: Messages): void => {
         if (!messages.errorMessage) {
           this.connectionTrouble.set(false);
@@ -240,9 +252,13 @@ export class App implements OnInit {
         this.changeRef.detectChanges();
         setTimeout(() => this.adjustScrolling(), 250);
       },
-      error: (_error): void => {
-        this.connectionTrouble.set(true);
-        this.inChat.set(false);
+      error: (error): void => {
+        if (error.status === 400 && error.error?.error)
+          notify('error', error.error.error);
+        else
+          this.connectionTrouble.set(true);
+
+        this.repollMessages();
       }
     });
   }

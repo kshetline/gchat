@@ -47,6 +47,10 @@ main {
     background-color: var(--main-participant-background);
     border-radius: 4px;
     padding: 4px;
+
+    &.idle {
+      opacity: 0.6;
+    }
   }
 
   .empty-chat {
