@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import Quill from 'quill';
 import { QuillModule  } from 'ngx-quill';
 import { forEach } from '@tubular/util';
-import { colorByIndex, getTextBackground, kaomoji, notify, shouldIgnoreClick, startClickSuppress } from '../main';
+import { colorByIndex, getTextBackground, kaomoji, kaomojiRegex, notify, shouldIgnoreClick, startClickSuppress } from '../main';
 import { PickerComponent } from '@ctrl/ngx-emoji-mart';
 import { Emoji, EmojiData } from '@ctrl/ngx-emoji-mart/ngx-emoji';
 import { ColorSelector } from '../color-selector/color-selector';
@@ -393,8 +393,19 @@ export class MessageEntry {
     index += name.length;
     this.quill.insertText(index, QUOTE_NAME_DELIM, { underline: false });
     index += QUOTE_NAME_DELIM.length;
-    this.quill.insertText(index, quote, { italic: true });
-    index += quote.length;
+
+    const parts = quote.split(kaomojiRegex);
+
+    for (let i = 0; i < parts.length; ++i) {
+      const part = parts[i];
+
+      if (!part)
+        continue;
+
+      this.quill.insertText(index, part, i % 2 === 0 ? { italic: true } : { font: 'ms-pgothic' });
+      index += part.length;
+    }
+
     this.quill.insertText(index, QUOTE_MARKER, { italic: false });
     index += QUOTE_MARKER.length;
     this.quill.setSelection(index);

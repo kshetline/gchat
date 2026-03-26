@@ -1,6 +1,6 @@
 import { forEach } from '@tubular/util';
 
-interface Theme {
+export interface Theme {
   displayName: string;
   darkMode: boolean;
   name: string;

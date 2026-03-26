@@ -1,4 +1,11 @@
 :host {
+  align-items: stretch;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+.message-content {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -108,4 +115,37 @@
       overflow: visible;
     }
   }
+}
+
+.scroll-to-bottom, .scroll-to-top {
+  align-items: center;
+  align-self: flex-end;
+  background-color: #00F;
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  font-size: 2em;
+  height: 1.2em;
+  justify-content: center;
+  opacity: 0;
+  position: absolute;
+  right: 1em;
+  transition: opacity 0.5s ease, visibility 0s 0.5s;
+  visibility: hidden;
+  width: 1.2em;
+
+  &.show {
+    opacity: 1;
+    transition: opacity 0.5s ease, visibility 0.5s;
+    visibility: visible;
+  }
+}
+
+.scroll-to-bottom {
+  bottom: 0.25em;
+}
+
+.scroll-to-top {
+  top: 0.25em;
 }

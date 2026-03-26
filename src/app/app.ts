@@ -219,7 +219,7 @@ export class App implements OnInit {
               }
 
               this.messages.set(messages.messages);
-              this.adjustScrolling();
+              this.adjustScrolling(true);
             }
           }
 
@@ -333,17 +333,21 @@ export class App implements OnInit {
     return false;
   }
 
-  private adjustScrolling(): void {
-    setTimeout(() => {
-      const messages = document.querySelector('chat-message-list');
+  private adjustScrolling(onlyWhenClose = false): void {
+    const messages = document.querySelector('chat-message-list .message-content');
+    // Need to check closeness before any new messages are added.
+    const close = this.newOnBottom() ?
+      messages.scrollTop >= messages.scrollHeight - messages.clientHeight - 30 :
+      messages.scrollTop <= 30;
 
-      if (this.newOnBottom()) {
+    setTimeout(() => {
+      if (this.newOnBottom() && (!onlyWhenClose || close)) {
         messages.scrollTop = messages.scrollHeight;
 
         if (isAndroid())
           setTimeout(() => messages.scrollTop = messages.scrollHeight, 250);
       }
-      else
+      else if (!this.newOnBottom() && (!onlyWhenClose || close))
         messages.scrollTop = 0;
     });
   }

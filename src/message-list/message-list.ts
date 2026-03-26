@@ -1,4 +1,4 @@
-import { Component, input, signal } from '@angular/core';
+import { Component, ElementRef, input, OnInit, signal } from '@angular/core';
 import { Message } from '../../server/src/shared-types';
 import { colorFromStyle, getLuminance, getTextBackground, kaomoji } from '../main';
 import { htmlUnescape } from '@tubular/util';
@@ -13,22 +13,35 @@ const QUOTE_MARKER = '\u00A0◀︎ ';
   templateUrl: './message-list.html',
   styleUrl: './message-list.scss',
 })
-export class MessageList {
+export class MessageList implements OnInit {
   private lastSelectedText = '';
 
+  protected showScrollToBottom = signal(false);
+  protected showScrollToTop = signal(false);
   protected toolHash = signal('');
   protected toolTimer: any;
 
   darkMode = input.required<boolean>();
   inChat = input.required<boolean>();
   isAdmin = input.required<boolean>();
+  isAtBottom = input.required<boolean>();
   localTime = input.required<boolean>();
   messageEntry = input.required<MessageEntry>();
   messages = input.required<Message[]>();
   name = input.required<string>();
 
-  constructor() {
+  constructor(private elemRef: ElementRef) {
     document.addEventListener('mouseup', () => setTimeout(() => this.lastSelectedText = window.getSelection().toString()));
+  }
+
+  ngOnInit(): void {
+    const messages = this.elemRef?.nativeElement?.querySelector('.message-content');
+
+    if (messages)
+      messages.addEventListener('scroll', () => {
+        this.showScrollToBottom.set(this.isAtBottom() && messages.scrollTop < messages.scrollHeight - messages.clientHeight - 10);
+        this.showScrollToTop.set(!this.isAtBottom() && messages.scrollTop > 10);
+      });
   }
 
   protected focusMessage(message: Message, state: boolean): void {
@@ -109,5 +122,19 @@ export class MessageList {
 
   protected deleteMessage(_message: Message): void {
     alert('Delete not yet implemented');
+  }
+
+  protected scrollToBottom() {
+    const messages = document.querySelector('chat-message-list .message-content');
+
+    if (messages)
+      messages.scrollTop = messages.scrollHeight;
+  }
+
+  protected scrollToTop() {
+    const messages = document.querySelector('chat-message-list .message-content');
+
+    if (messages)
+      messages.scrollTop = 0;
   }
 }

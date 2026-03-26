@@ -1,7 +1,7 @@
 import { bootstrapApplication } from '@angular/platform-browser';
 import { appConfig } from './app/app.config';
 import { App } from './app/app';
-import { parseColor } from '@tubular/util';
+import { parseColor, regexEscape } from '@tubular/util';
 import { colors } from '../server/src/shared-types';
 
 bootstrapApplication(App, appConfig)
@@ -13,6 +13,7 @@ export const kaomoji = [
   '(;^Д^)', '(;ﾟ∇ﾟ)', '(;ﾟДﾟ)', 'ヽ(`Д´)ノ', '(ρ_;)', '(´￢`)', 'ヽ(ﾟρﾟ)ノ', 'ヽ(´π｀)ノ',
   '(ﾟДﾟ)', '(´人｀)', 'ъ( ﾟｰ^)', '(⌒∇⌒ゞ)', '(^^;ﾜﾗ', '┐(´∀｀)┌', '(｀∩´)σ'
 ];
+export const kaomojiRegex = new RegExp(`(${kaomoji.map(regexEscape).join('|')})`, 'g');
 
 export function colorByIndex(index: number, darkMode = false): string {
   if (index === 0 && darkMode)
