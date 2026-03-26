@@ -117,10 +117,16 @@ function extractMessage(messageRow: DomNode): Message {
 async function legacyBrowserSetup(): Promise<void> {
   browser = browser || (await puppeteer.launch());
 
-  messagePage = messagePage || await browser.newPage();
-  messagePage.on('console', msg => {
-    console.log('Puppeteer %s: %s', msg.type, msg.text()); // eslint-disable-line @typescript-eslint/unbound-method
-  });
+  if (!messagePage) {
+    messagePage = await browser.newPage();
+    messagePage.on('console', msg => {
+      const type = msg.type();
+
+      if (type !== 'verbose')
+        console.log('Puppeteer (%s): %s', type, msg.text());
+    });
+  }
+
   await loadEnterForm(messagePage);
 }
 

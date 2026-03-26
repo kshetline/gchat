@@ -5,7 +5,7 @@ import { colors, Config, DbMessage, DbParticipant, Message, ParticipantInfo } fr
 import { checksum53, isEqual, processMillis, toBoolean, toInt } from '@tubular/util';
 import { uploadSingle } from './uploader.js';
 import { SessionInfo } from './session-info';
-import { enterLegacyChat, legacySendMessage } from './legacy.js';
+import { enterLegacyChat, leaveLegacyChat, legacySendMessage } from './legacy.js';
 import { getDb, getNamedParticipantRecord } from './db.js';
 import ip_ from 'ip';
 import axios from 'axios';
@@ -112,11 +112,23 @@ app.get('/api/messages', async (req, res) => {
     .filter(row => row.last_active > hourAgo || row.last_post > hourAgo).map(row => row.name);
   const participants = [...new Set(participantNames)].sort().map(p => ({ name: p } as ParticipantInfo));
 
-  for (const participantInfo of participants) {
+  for (let i = participants.length - 1; i >= 0; --i) {
+    const participantInfo = participants[i];
     const participant = await getNamedParticipantRecord(participantInfo.name);
 
-    if (participant)
+    if (!participant.remote) {
+      const session = sessions.get(participant.session_id);
+
+      if (session && !session.inChat) {
+        participants.splice(i, 1);
+        continue;
+      }
+    }
+
+    if (participant) {
       participantInfo.idle = now - participant.last_active > (participant.remote ? 1800 : 600) ? 1 : 0;
+      participantInfo.remote = !!participant.remote;
+    }
   }
 
   if (!isEqual(lastMessages, messages)) {
@@ -164,12 +176,17 @@ app.post('/api/enter', async (req, res) => {
     return;
   }
 
+  if (!proxyStarted) {
+    await enterLegacyChat(proxyName, null, 0);
+    proxyStarted = true;
+  }
+
   res.send('null');
 });
 
 app.post('/api/leave', async (req, res) => {
   const q = req.query as any;
-  const session = sessions.get(q.sessionID);
+  const session = sessions.get(req.sessionID);
 
   if (!session?.inChat) {
     res.send('null');
@@ -182,6 +199,11 @@ app.post('/api/leave', async (req, res) => {
   if (participant && (q.tripCode === participant.trip || session.ip === participant.ip || q.sessionID === participant.session_id)) {
     await db.run('DELETE FROM participants WHERE id = ?', participant.id);
     session.inChat = false;
+  }
+
+  if (Array.from(sessions.values()).findIndex(s => s.inChat) < 0) {
+    await leaveLegacyChat();
+    proxyStarted = false;
   }
 
   res.send('null');

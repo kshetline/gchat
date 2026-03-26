@@ -51,8 +51,9 @@ export interface DbParticipant {
 }
 
 export interface ParticipantInfo {
-  name: string;
   idle?: number;
+  name: string;
+  remote?: boolean;
 }
 
 export interface Messages {
