@@ -124,7 +124,7 @@ export class App implements OnInit {
         event.preventDefault();
       }
       else if (event.key === 'Enter' && this.name().trim() && !this.inChat()) {
-        this.enterChat();
+        this.enterChat().finally();
         event.preventDefault();
       }
     });
@@ -278,7 +278,17 @@ export class App implements OnInit {
     });
   }
 
-  protected leaveChat(): void {
+  protected async leaveChat(): Promise<void> {
+    if (this.framed) {
+      setTimeout(() => parent.postMessage(['leaveChatRoom'], '*'));
+      const error = await awaitMessage('leaveChatRoom', 5000);
+
+      if (error) {
+        notify('error', error);
+        return;
+      }
+    }
+
     this.httpClient.post('/api/leave', {}, { params: this.prefs as any }).subscribe({
       next: (): void => {
         this.connectionTrouble.set(false);

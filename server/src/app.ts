@@ -10,6 +10,7 @@ import { getDb, getNamedParticipantRecord } from './db.js';
 import ip_ from 'ip';
 import axios from 'axios';
 import { convertBBCodeToHtml, getIp } from './chat-util.js';
+import tripcode from 'tripcode';
 
 const app = express();
 const port = toInt(process.env.HTTP_PORT) || 3000;
@@ -120,7 +121,7 @@ app.get('/api/messages', async (req, res) => {
     remote: !!row.remote,
     style: row.style,
     time: row.synced_time,
-    trip: row.remote ? row.trip : Buffer.from(checksum53(row.trip), 'hex').toString('base64').replace(/=+$/, '')
+    trip: row.remote ? row.trip : tripcode(row.trip)
   } as Message));
 
   const name = req.query.name as string;
@@ -130,7 +131,7 @@ app.get('/api/messages', async (req, res) => {
   const hourAgo = now - 3600;
   let participant = await getNamedParticipantRecord(name);
 
-  if (participant && active)
+  if (participant && active && session.inChat)
     await db.run('UPDATE participants SET last_active = ?, remote = 0 WHERE id = ?', now, participant.id);
 
   const participantNames = (await db.all<DbParticipant>('SELECT * FROM participants'))
@@ -226,7 +227,7 @@ app.post('/api/leave', async (req, res) => {
     session.inChat = false;
   }
 
-  if (Array.from(sessions.values()).findIndex(s => s.inChat) < 0) {
+  if (!toBoolean(q.framed) && Array.from(sessions.values()).findIndex(s => s.inChat) < 0) {
     await leaveLegacyChat();
     proxyStarted = false;
   }
