@@ -5,7 +5,7 @@ import { colors, Config, DbMessage, DbParticipant, Message, ParticipantInfo } fr
 import { checksum53, isEqual, processMillis, toBoolean, toInt } from '@tubular/util';
 import { uploadSingle } from './uploader.js';
 import { SessionInfo } from './session-info';
-import { enterLegacyChat, leaveLegacyChat, legacySendMessage } from './legacy.js';
+import { addPendingDuplicate, enterLegacyChat, leaveLegacyChat, legacySendMessage } from './legacy.js';
 import { getDb, getNamedParticipantRecord } from './db.js';
 import ip_ from 'ip';
 import axios from 'axios';
@@ -243,9 +243,14 @@ app.post('/api/send', async (req, res) => {
   const style = `color:${colors[q.color].trim()}`;
   const comment = q.comment.replace(URL_MATCHER, '[url=$1]$1[/url]');
   const hash = checksum53(`${q.name};${q.tripCode || ''};${new Date(now * 1000).toISOString().substring(0, 19)}`);
+  const framed = toBoolean(q.framed);
 
-  await db.run('INSERT INTO messages (time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+  const result = await db.run('INSERT INTO messages (time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     now, now, q.name, q.tripCode, q.email, 0, session.ip, req.sessionID, style, comment, hash);
+
+  if (framed)
+    addPendingDuplicate(result.lastID, now, q.name, comment);
+
   await db.run('UPDATE participants SET last_post = ?1, last_active = ?1 WHERE name = ?2 and remote = 0', now, q.name);
 
   const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', q.name);
@@ -253,7 +258,7 @@ app.post('/api/send', async (req, res) => {
   if (participant)
     await db.run('UPDATE participants SET last_post = ?1, last_active = ?1 WHERE id = ?2', now, participant.id);
 
-  if (!toBoolean(q.framed)) {
+  if (!framed) {
     if (!proxyStarted) {
       await enterLegacyChat(proxyName, null, 0);
       proxyStarted = true;

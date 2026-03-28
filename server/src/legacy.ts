@@ -18,6 +18,19 @@ let messagePage: puppeteer.Page;
 let inChat = false;
 let lastLegacyPoll = -1;
 
+interface PendingDuplicate {
+  id: number;
+  time: number;
+  name: string;
+  comment: string;
+}
+
+export const pendingDuplicates: PendingDuplicate[] = [];
+
+export function addPendingDuplicate(id: number, time: number, name: string, comment: string): void {
+  pendingDuplicates.push({ id, time, name, comment });
+}
+
 async function pollLegacyMessages(overrideCount?: number): Promise<void> {
   const now = processMillis();
   const retrieveCount = overrideCount ??
@@ -29,6 +42,29 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
     const db = await getDb();
     const row = await db.get<DbMessage>('SELECT time FROM messages ORDER BY time DESC LIMIT 1');
     const latestInDb = row?.time;
+    const clockNow = Math.floor(Date.now() / 1000);
+
+    for (let i = pendingDuplicates.length - 1; i >= 0; --i) {
+      const time = pendingDuplicates[i].time;
+
+      if (time < clockNow - 60)
+        pendingDuplicates.splice(i, 1);
+    }
+
+    for (let i = messages.messages.length - 1; i >= 0; --i) {
+      const message = messages.messages[i];
+      const dupIndex = pendingDuplicates.findIndex(d => d.name === message.name && d.comment === message.bbCode &&
+        Math.abs(d.time - message.time) < 60);
+
+      if (dupIndex >= 0) {
+        const duplicate = pendingDuplicates[dupIndex];
+
+        messages.messages.splice(i, 1);
+        pendingDuplicates.splice(dupIndex, 1);
+
+        await db.run('UPDATE messages SET synced_time = ?, hash = ? WHERE id = ?', message.time, message.hash, duplicate.id);
+      }
+    }
 
     for (const message of messages.messages || []) {
       if (message.time) {

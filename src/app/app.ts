@@ -259,7 +259,9 @@ export class App implements OnInit {
       this.tripCode.set(this.prefs.tripCode);
     }
 
-    this.httpClient.post('/api/enter', {}, { params: this.prefs as any }).subscribe({
+    const params = { ...this.prefs, framed: this.framed };
+
+    this.httpClient.post('/api/enter', {}, { params }).subscribe({
       next: (): void => {
         this.connectionTrouble.set(false);
         this.pendingFocus = true;
@@ -289,7 +291,9 @@ export class App implements OnInit {
       }
     }
 
-    this.httpClient.post('/api/leave', {}, { params: this.prefs as any }).subscribe({
+    const params = { ...this.prefs, framed: this.framed };
+
+    this.httpClient.post('/api/leave', {}, { params }).subscribe({
       next: (): void => {
         this.connectionTrouble.set(false);
         this.inChat.set(false);
@@ -316,7 +320,7 @@ export class App implements OnInit {
       }
     }
 
-   const params = { ...this.prefs, comment };
+    const params = { ...this.prefs, comment, framed: this.framed };
 
     this.httpClient.post('/api/send', {}, { params }).subscribe({
       next: (): void => {

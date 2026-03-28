@@ -32,11 +32,11 @@
   frames.setAttribute('framespacing', '0');
   logFrame.src = '%%ENHANCED_CHAT_URL%%';
 
-  const iframe = document.createElement('iframe');
+  const hiddenFrame = document.createElement('iframe');
 
-  iframe.name = 'hidden_frame';
-  iframe.style.display = 'none';
-  document.body.appendChild(iframe);
+  hiddenFrame.name = 'hidden_frame';
+  hiddenFrame.style.display = 'none';
+  document.body.appendChild(hiddenFrame);
 
   function extractError(body) {
     if (!body)
@@ -44,24 +44,22 @@
 
     const html = body.innerHTML;
 
-    if (!html.includes('<form')) // No form? Probably an error page.
-      return (/<h1>([3-5]\d\d\b.+)<\/h2>/.exec(html) || [])[1] || 'Unknown error';
+    if (html && !html.includes('<(form|div)')) // No form or div? Might be error page.
+      return (/<h1>([3-5]\d\d\b.+)<\/h2>/.exec(html) || [])[1];
 
     return null;
   }
 
-  function formCheck(action, selector, tries = 0) {
-    formDoc = formFrame.contentDocument;
-    form = formDoc.querySelector('form');
+  function documentCheck(frame, action, selector, tries = 0) {
+    const doc = frame.contentDocument;
+    const formError = extractError(doc?.body);
 
-    const formError = extractError(formDoc.body);
-
-    if (formError)
+    if (formError && formError !== 'Page not loaded')
       logFrame.contentWindow.postMessage([action, formError], '*');
-    else if (formDoc.querySelector(selector))
+    else if (doc.querySelector(selector))
       logFrame.contentWindow.postMessage([action, null], '*');
-    else if (++tries < 30)
-      setTimeout(() => formCheck(action, selector, ++tries), 100);
+    else if (++tries < 50)
+      setTimeout(() => documentCheck(frame, action, selector, ++tries), 100);
     else
       logFrame.contentWindow.postMessage([action, 'Timed out'], '*');
   }
@@ -93,7 +91,7 @@
     colorButton?.click();
     submitButton.click();
 
-    formCheck('enterChatRoom', 'input[name="comment"]');
+    documentCheck(formFrame, 'enterChatRoom', 'input[name="comment"]');
   }
 
   function leaveChatRoom() {
@@ -106,30 +104,8 @@
     }
 
     formFrame.src = formSrc;
-    formCheck('leaveChatRoom', 'input[name="name"]');
+    documentCheck(formFrame, 'leaveChatRoom', 'input[name="name"]');
   }
-
-  const messageSubmitter = evt => {
-    evt.preventDefault();
-
-    const formData = new FormData(form);
-
-    fetch(form.action, {
-      method: form.method,
-      body: formData,
-    })
-      .then(response => {
-        if (response.ok) {
-          formDoc.querySelector('input[name="comment"]').value = '';
-          logFrame.contentWindow.postMessage(['sendChatMessage', null], '*');
-        }
-        else
-          logFrame.contentWindow.postMessage(['sendChatMessage', `Sending message failed with status ${response.status}`], '*');
-      })
-      .catch(error => {
-        logFrame.contentWindow.postMessage(['sendChatMessage', `Sending message failed with error: ${error.message || error.toString()}`], '*');
-      });
-  };
 
   function sendChatMessage(comment, color, tripCode) {
     let face = '';
@@ -146,10 +122,10 @@
     formDoc.querySelector('input[name="password"]').value = tripCode;
     formDoc.querySelector('form').setAttribute('target', 'hidden_frame');
 
-    form.setAttribute('onsubmit', null);
-    form.removeEventListener('submit', messageSubmitter); // Make sure we don't double-submit
-    form.addEventListener('submit', messageSubmitter);
-    form.requestSubmit();
+    hiddenFrame.contentDocument.body.innerHTML = '';
+    form.submit();
+
+    documentCheck(hiddenFrame, 'sendChatMessage', 'div[class="messageRow"]');
   }
 
   window.addEventListener('message', evt => {
