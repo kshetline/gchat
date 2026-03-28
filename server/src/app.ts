@@ -188,7 +188,8 @@ app.post('/api/enter', async (req, res) => {
       q.name, q.tripCode, q.email, session.ip, req.sessionID, 0, now, 0);
     session.inChat = true;
   }
-  else if (q.tripCode === participant.trip || session.ip === participant.ip || req.sessionID === participant.session_id) {
+  else if (q.tripCode === participant.trip || !participant.ip || session.ip === participant.ip ||
+           !participant.session_id || req.sessionID === participant.session_id) {
     await db.run('UPDATE participants SET trip = ?, email = ?, ip = ?, session_id = ?, remote = ?, last_active = ? WHERE id = ?',
       q.tripCode, q.email, session.ip, req.sessionID, 0, now, participant.id);
     session.inChat = true;
@@ -220,7 +221,7 @@ app.post('/api/leave', async (req, res) => {
   }
 
   const db = await getDb();
-  const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? LIMIT 1', q.name);
+  const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', q.name);
 
   if (participant && (q.tripCode === participant.trip || session.ip === participant.ip || q.sessionID === participant.session_id)) {
     await db.run('DELETE FROM participants WHERE id = ?', participant.id);

@@ -50,16 +50,20 @@
     return null;
   }
 
-  function documentCheck(frame, action, selector, tries = 0) {
+  function documentCheck(frame, action, selector, callback = null, tries = 0) {
     const doc = frame.contentDocument;
     const formError = extractError(doc?.body);
 
     if (formError && formError !== 'Page not loaded')
       logFrame.contentWindow.postMessage([action, formError], '*');
-    else if (doc.querySelector(selector))
+    else if (doc.querySelector(selector)) {
       logFrame.contentWindow.postMessage([action, null], '*');
+
+      if (callback)
+        callback();
+    }
     else if (++tries < 50)
-      setTimeout(() => documentCheck(frame, action, selector, ++tries), 100);
+      setTimeout(() => documentCheck(frame, action, selector, callback, ++tries), 100);
     else
       logFrame.contentWindow.postMessage([action, 'Timed out'], '*');
   }
@@ -91,7 +95,11 @@
     colorButton?.click();
     submitButton.click();
 
-    documentCheck(formFrame, 'enterChatRoom', 'input[name="comment"]');
+    documentCheck(formFrame, 'enterChatRoom', 'input[name="comment"]', () => {
+      formDoc = formFrame.contentDocument;
+      formDoc.getElementById('notificationSoundCheckbox').checked = false;
+      localStorage.setItem('notificationSoundEnabled', 'false');
+    });
   }
 
   function leaveChatRoom() {

@@ -17,6 +17,7 @@ export let browser: puppeteer.Browser;
 let messagePage: puppeteer.Page;
 let inChat = false;
 let lastLegacyPoll = -1;
+let firstParticipantPoll = true;
 
 interface PendingDuplicate {
   id: number;
@@ -89,15 +90,21 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
 
       let row = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', participant);
 
-      if (row)
+      if (row) {
+        if (firstParticipantPoll)
+          await db.run('UPDATE participants SET last_active = ? WHERE id = ?', clockNow, row.id);
+
         continue;
+      }
 
       row = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 1 LIMIT 1', participant);
 
       if (!row)
         await db.run('INSERT INTO participants (name, remote, last_active, last_post) VALUES (?, ?, ?, ?)',
-          participant, 1, Math.floor(Date.now() / 1000), 0);
+          participant, 1, clockNow, 0);
     }
+
+    firstParticipantPoll = false;
 
     const rows = await db.all<DbParticipant>('SELECT * FROM participants where remote = 1');
 
