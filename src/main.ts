@@ -88,3 +88,22 @@ export function notify(type: NotificationType, message: string): void {
     }
   }
 }
+
+export async function awaitMessage(messageName: string, maxWait = 0): Promise<string> {
+  return new Promise<string>(resolve => {
+    const listener = (evt: MessageEvent) => {
+      if (evt.data[0] === messageName) {
+        window.removeEventListener('message', listener);
+        resolve(evt.data[1]);
+      }
+    };
+
+    window.addEventListener('message', listener);
+
+    if (maxWait > 0)
+      setTimeout(() => {
+        window.removeEventListener('message', listener);
+        resolve(`Timed out waiting for message ${messageName}`);
+      }, maxWait);
+  });
+}

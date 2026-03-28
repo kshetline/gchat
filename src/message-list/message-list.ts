@@ -1,8 +1,9 @@
 import { Component, ElementRef, input, OnInit, signal } from '@angular/core';
 import { Message } from '../../server/src/shared-types';
-import { colorFromStyle, getLuminance, getTextBackground, kaomoji } from '../main';
+import { colorFromStyle, getLuminance, getTextBackground, kaomoji, notify } from '../main';
 import { htmlUnescape } from '@tubular/util';
 import { MessageEntry } from '../message-entry/message-entry';
+import { HttpClient } from '@angular/common/http';
 
 const matchEmoji = /(\uD83C[\uD000-\uDFFF]|\uD83D[\uD000-\uDFFF]|\uD83E[\uD000-\uDFFF])/g;
 const QUOTE_MARKER = '\u00A0◀︎ ';
@@ -29,8 +30,9 @@ export class MessageList implements OnInit {
   messageEntry = input.required<MessageEntry>();
   messages = input.required<Message[]>();
   name = input.required<string>();
+  tripCode = input.required<string>();
 
-  constructor(private elemRef: ElementRef) {
+  constructor(private elemRef: ElementRef, private httpClient: HttpClient) {
     document.addEventListener('mouseup', () => setTimeout(() => this.lastSelectedText = window.getSelection().toString()));
   }
 
@@ -116,8 +118,17 @@ export class MessageList implements OnInit {
     this.messageEntry().insertQuote(message.name, quote.trim());
   }
 
-  protected editMessage(_message: Message): void {
-    alert('Edit not yet implemented');
+  protected editMessage(message: Message): void {
+    this.httpClient.get('/api/can-edit',
+      { params: { name: this.name(), tripCode: this.tripCode(), id: message.msgId } }).subscribe({
+      next: (): void => {},
+      error: (error): void => {
+        if (error.status === 400 && error.error?.error)
+          notify('error', error.error.error);
+//        else
+//          this.connectionTrouble.set(true);
+       }
+    });
   }
 
   protected deleteMessage(_message: Message): void {

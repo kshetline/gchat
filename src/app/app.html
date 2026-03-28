@@ -74,7 +74,8 @@
         (uploadFile)="upload($event)" (changeColor)="setColor($event)" (newMessage)="sendComment($event)"></chat-message-entry>
   }
   <chat-message-list [isAdmin]="isAdmin()" [darkMode]="darkMode()" [inChat]="inChat()" [localTime]="localTime()"
-      [isAtBottom]="newOnBottom()" [messages]="messages()" [messageEntry]="messageEntrySignal()" [name]="name()"></chat-message-list>
+      [isAtBottom]="newOnBottom()" [messages]="messages()" [messageEntry]="messageEntrySignal()"
+      [name]="name()" [tripCode]="tripCode()"></chat-message-list>
   @if (inChat() && newOnBottom()) {
     <chat-message-entry class="at-bottom" [darkMode]="darkMode()" [maxFileSizeInMb]="maxFileSizeInMb()"
         (uploadFile)="upload($event)" (changeColor)="setColor($event)" (newMessage)="sendComment($event)"></chat-message-entry>

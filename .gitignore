@@ -46,3 +46,4 @@ __screenshots__/
 Thumbs.db
 
 /server/chat.sqlite
+/tm.js

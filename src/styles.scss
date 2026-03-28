@@ -24,6 +24,15 @@ body {
   overflow: clip;
 }
 
+@font-face {
+  font-family: 'MS PGothic';
+  /* Load from local system if available */
+  //noinspection CssUnknownTarget
+  src: local('MS PGothic'), local('MS PGothic Regular'), url('assets/MS-PGothic.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
 a {
   color: var(--main-link-color);
 

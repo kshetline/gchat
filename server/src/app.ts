@@ -60,6 +60,31 @@ app.use(session({
   cookie: { secure: toBoolean(process.env.SESSION_SECURE) }
 }));
 
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Global error:', err); // For immediate server visibility
+
+  const errorDetails = {
+    message: err.message,
+    stack: err.stack,
+    route: req.originalUrl,
+    method: req.method,
+    time: new Date().toISOString(),
+  };
+
+  console.log('Global error:', JSON.stringify(errorDetails, null, 2));
+
+  // Check if headers have already been sent to avoid "Can't set headers after they are sent" errors
+  if (res.headersSent)
+    return next(err); // Pass to default Express error handler if response already started
+
+  // Determine the appropriate status code and message for the client
+  const statusCode = err.statusCode || 500; // Custom errors might have a statusCode property
+  const message = err.message || 'Internal Server Error';
+
+  // Send a generic, user-friendly error response to the client
+  res.status(statusCode).json({ success: false, message });
+});
+
 app.use(async (req, _res, next) => {
   let session = sessions.get(req.sessionID);
   const ip = getIp(req);
@@ -176,7 +201,7 @@ app.post('/api/enter', async (req, res) => {
     return;
   }
 
-  if (!proxyStarted) {
+  if (!toBoolean(q.framed) && !proxyStarted) {
     await enterLegacyChat(proxyName, null, 0);
     proxyStarted = true;
   }
@@ -227,12 +252,31 @@ app.post('/api/send', async (req, res) => {
   if (participant)
     await db.run('UPDATE participants SET last_post = ?1, last_active = ?1 WHERE id = ?2', now, participant.id);
 
-  if (!proxyStarted) {
-    await enterLegacyChat(proxyName, null, 0);
-    proxyStarted = true;
+  if (!toBoolean(q.framed)) {
+    if (!proxyStarted) {
+      await enterLegacyChat(proxyName, null, 0);
+      proxyStarted = true;
+    }
+
+    await legacySendMessage(q.name, null, q.comment, q.color, q.trip);
   }
 
-  await legacySendMessage(q.name, null, q.comment, q.color, q.trip);
+  res.send('null');
+});
+
+app.get('/api/can-edit', async (req, res) => {
+  const q = req.query as any;
+  const id = toInt(q.id);
+  const db = await getDb();
+  const message = await db.get<DbMessage>('SELECT * FROM messages WHERE id = ? LIMIT 1', id);
+
+  if (!message || message.remote || message.name !== q.name ||
+      (message.session_id !== req.sessionID && message.trip !== q.tripCode)) {
+    res.status(400).json({
+      error: 'You are not authorized to edit this message.'
+    });
+  }
+
   res.send('null');
 });
 
@@ -248,4 +292,8 @@ app.post('/api/upload', async (req, res) => {
       error: error instanceof Error ? error.message : 'Upload failed'
     });
   }
+});
+
+app.get('/api/error', (_req, res) => {
+  res.status(500).json({ error: 'Internal server error' });
 });

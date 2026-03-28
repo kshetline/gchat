@@ -18,14 +18,14 @@
            [style.color]="getColor(message)" [style.background-color]="getBackground(message)"></div>
       @if (inChat()) {
         <div class="tools">
-          @if (isMe(message)) {
+          @if (isMe(message) && !message.remote) {
             <i class="fa-solid fa-pencil" (click)="editMessage(message)"></i>
           }
           @else {
             <i class="fa-solid fa-quote-left" (click)="quoteMessage(message)"></i>
           }
 
-          @if (isMe(message) || isAdmin()) {
+          @if ((isMe(message) || isAdmin()) && !message.remote) {
             <i class="fa-solid fa-trash-can" (click)="deleteMessage(message)"></i>
           }
         </div>

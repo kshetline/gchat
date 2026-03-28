@@ -5,7 +5,7 @@ import { forEach, isAndroid, isEqual } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { FileUploadEvent, MessageEntry } from '../message-entry/message-entry';
-import { NotificationHandler, notify, registerNotificationHandler, shouldIgnoreClick, startClickSuppress } from '../main';
+import { awaitMessage, NotificationHandler, notify, registerNotificationHandler, shouldIgnoreClick, startClickSuppress } from '../main';
 import { applyTheme, getThemeMenuStyle, getThemes, resetDefaultThemeBackground } from '../themes';
 import { MessageList } from '../message-list/message-list';
 import { ColorSelector } from '../color-selector/color-selector';
@@ -41,6 +41,7 @@ export class App implements OnInit {
   protected connectionTrouble = signal(false);
   protected darkMode = signal(false);
   protected email = signal('');
+  protected framed = /\bframed=true\b/.test(location.toString());
   protected inChat = signal(false);
   protected localTime = signal(true);
   protected maxFileSizeInMb = signal(15000);
@@ -237,10 +238,20 @@ export class App implements OnInit {
     });
   }
 
-  protected enterChat(): void {
+  protected async enterChat(): Promise<void> {
     this.prefs.name = this.name();
     this.prefs.email = this.email();
     this.prefService.set(this.prefs);
+
+    if (this.framed) {
+      setTimeout(() => parent.postMessage(['enterChatRoom', this.name(), this.email(), this.color()], '*'));
+      const error = await awaitMessage('enterChatRoom', 5000);
+
+      if (error) {
+        notify('error', error);
+        return;
+      }
+    }
 
     if (this.prefs.name.includes('#')) {
       [this.prefs.name, this.prefs.tripCode] = this.prefs.name.split('#');
@@ -278,13 +289,24 @@ export class App implements OnInit {
     });
   }
 
-  protected sendComment(comment: string): void {
+  protected async sendComment(comment: string): Promise<void> {
     if (!comment?.trim())
       return;
 
     this.messageEntry.sendEnabled(false);
 
-    const params = { ...this.prefs, comment };
+    if (this.framed) {
+      setTimeout(() => parent.postMessage(['sendChatMessage', comment, this.color(), this.tripCode()], '*'));
+      const error = await awaitMessage('sendChatMessage', 5000);
+
+      if (error) {
+        notify('error', error);
+        this.messageEntry.sendEnabled(true);
+        return;
+      }
+    }
+
+   const params = { ...this.prefs, comment };
 
     this.httpClient.post('/api/send', {}, { params }).subscribe({
       next: (): void => {
