@@ -8,15 +8,17 @@
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=%%ICON_DOMAIN%%
 // @grant        none
 // ==/UserScript==
+// @ts-check
 
 (function () {
   'use strict';
 
   console.log('Comchat-Mods loaded');
 
-  const frames = document.querySelector('frameset');
-  const formFrame = document.querySelector('frame[name="form"]');
-  const logFrame = document.querySelector('frame[name="log"]');
+  // A little type-checking deception below
+  const frames = document.querySelector('frame' + 'set');
+  const formFrame = /** @type {HTMLIFrameElement} */ (document.querySelector('frame[name="form"]'));
+  const logFrame = /** @type {HTMLIFrameElement} */ (document.querySelector('frame[name="log"]'));
   let formDoc;
   let form;
   let formSrc;
@@ -28,7 +30,7 @@
   frames.setAttribute('frameborder', '0');
   frames.setAttribute('border', '0');
   frames.setAttribute('framespacing', '0');
-  logFrame.src = '%%ENHANCED_CHAT_URL%%?';
+  logFrame.src = '%%ENHANCED_CHAT_URL%%';
 
   const iframe = document.createElement('iframe');
 
@@ -42,7 +44,7 @@
 
     const html = body.innerHTML;
 
-    if (!html.includes('<form')) // No form? Probably an error page
+    if (!html.includes('<form')) // No form? Probably an error page.
       return (/<h1>([3-5]\d\d\b.+)<\/h2>/.exec(html) || [])[1] || 'Unknown error';
 
     return null;
@@ -69,7 +71,7 @@
     const emailField = formDoc.querySelector('input[name="email"]');
 
     if (!nameField || !emailField) { // Already in chat?
-      logFrame.contentWindow.postMessage([action, formError], '*');
+      logFrame.contentWindow.postMessage(['enterChatRoom', null], '*');
       return;
     }
 
