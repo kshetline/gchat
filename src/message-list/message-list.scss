@@ -67,23 +67,24 @@
 
 .bubble-wrap {
   align-items: center;
-  border-radius: 10px;
+  border-radius: 0.7em;
   display: flex;
-  margin-bottom: 10px;
-  margin-right: 10px;
+  margin-bottom: 0.7em;
+  margin-right: 0.7em;
   width: fit-content;
 
   .bubble {
-    border-radius: 10px;
-    padding: 10px;
+    border-radius: 0.7em;
+    padding: 0.7em;
   }
 
   .tools {
+    background-color: transparent;
     display: flex;
-    flex-basis: 0;
-    flex-grow: 0;
     gap: 0.25em;
+    opacity: 0;
     overflow: hidden;
+    pointer-events: none;
 
     i {
       cursor: pointer;
@@ -103,7 +104,6 @@
     flex-direction: row-reverse;
 
     .bubble {
-      flex-grow: 1;
       text-align: end;
     }
   }
@@ -112,7 +112,9 @@
     background-color: var(--main-bubble-tool-background);
 
     .tools {
+      opacity: 1;
       overflow: visible;
+      pointer-events: all;
     }
   }
 }

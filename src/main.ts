@@ -25,6 +25,7 @@ export function colorByIndex(index: number, darkMode = false): string {
 export function colorFromStyle(styleOrColor: string): string {
   return (/color:\s*([^;]+)\b/.exec(styleOrColor) || [])[1] || styleOrColor;
 }
+
 export function getLuminance(color: string): number {
   const rgb = parseColor(color);
 
@@ -38,11 +39,11 @@ export function getTextBackground(styleOrColor: string, darkMode = false): strin
   if (color) {
     const luminance = getLuminance(color);
 
-    if (darkMode ? luminance > 85 : luminance > 140)
+    if (darkMode ? luminance > 110 : luminance > 140)
       lightBackground = false;
   }
 
-  return lightBackground ? (darkMode ? '#AAA' : '#FFF') : '#333';
+  return lightBackground ? (darkMode ? '#CCC' : '#FFF') : '#333';
 }
 
 let clickSuppress: any;

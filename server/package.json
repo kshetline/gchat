@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node --import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"ts-node/esm\", pathToFileURL(\"./\"));' src/app.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "webpack"
   },
   "keywords": [],
   "author": "",
@@ -36,8 +36,13 @@
     "@types/sqlite3": "^3.1.11",
     "express": "^5.2.1",
     "fortissimo-html": "^1.0.0-alpha.3",
+    "terser-webpack-plugin": "^5.4.0",
+    "ts-loader": "^9.5.4",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "webpack": "^5.105.4",
+    "webpack-cli": "^7.0.2",
+    "webpack-node-externals": "^3.0.0"
   },
   "overrides": {
     "promised-sqlite3": {
