@@ -52,7 +52,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
         pendingDuplicates.splice(i, 1);
     }
 
-    for (let i = messages.messages.length - 1; i >= 0; --i) {
+    for (let i = messages.messages?.length - 1; i >= 0; --i) {
       const message = messages.messages[i];
       const dupIndex = pendingDuplicates.findIndex(d => d.name === message.name && d.comment === message.bbCode &&
         Math.abs(d.time - message.time) < 60);
@@ -158,7 +158,12 @@ function extractMessage(messageRow: DomNode): Message {
 }
 
 async function legacyBrowserSetup(): Promise<void> {
-  browser = browser || (await puppeteer.launch());
+  browser = browser || (await (process.env.CHROME_PATH ?
+    puppeteer.launch({
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
+      executablePath: process.env.CHROME_PATH
+    }) :
+    puppeteer.launch()));
 
   if (!messagePage) {
     messagePage = await browser.newPage();

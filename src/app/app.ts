@@ -87,6 +87,7 @@ export class App implements OnInit {
         const config = JSON.parse(configStr) as Config;
 
         document.title = this.baseTitle = config.title;
+        parent.postMessage(['updateTitle', config.title], '*');
         this.title.set(config.title);
         root.style.setProperty('--primary-background', config.backgroundColor || '#DDD');
         this.navigation.set(config.navigation);
@@ -104,6 +105,7 @@ export class App implements OnInit {
         this.setTheme(this.prefs.theme);
         this.connectionTrouble.set(false);
         document.title = config.title;
+        parent.postMessage(['updateTitle', config.title], '*');
         this.title.set(config.title);
         this.navigation.set(config.navigation);
         this.maxFileSizeInMb.set(config.fileSizeLimitInMb || 15000);
@@ -172,6 +174,7 @@ export class App implements OnInit {
     if (this.chatActive) {
       this.unseenMessages = 0;
       document.title = this.baseTitle;
+      parent.postMessage(['updateTitle', this.baseTitle], '*');
     }
   }
 
@@ -214,6 +217,7 @@ export class App implements OnInit {
               if (this.messages().length > 0 && !this.chatActive) {
                 this.unseenMessages += newMessageCount;
                 document.title = `(${this.unseenMessages}) ${this.baseTitle}`;
+                parent.postMessage(['updateTitle', document.title], '*');
 
                 if (this.prefs.notifySound)
                   this.chime.play().finally();

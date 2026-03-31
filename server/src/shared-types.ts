@@ -13,6 +13,7 @@ export interface Message {
   email?: string;
   hash: string;
   html: string;
+  isMe?: boolean;
   name: string;
   msgId: number;
   remote: boolean;

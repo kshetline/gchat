@@ -150,6 +150,9 @@
       case 'sendChatMessage':
         sendChatMessage(evt.data[1], evt.data[2], evt.data[3]);
         break;
+      case 'updateTitle':
+        document.title = evt.data[1];
+        break;
     }
   });
 })();

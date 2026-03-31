@@ -11,9 +11,11 @@ import ip_ from 'ip';
 import axios from 'axios';
 import { convertBBCodeToHtml, getIp } from './chat-util.js';
 import tripcode from 'tripcode';
+import path from 'path';
 
 const app = express();
-const port = toInt(process.env.HTTP_PORT) || 3000;
+const port = toInt(process.env.PORT) || 3000;
+const __dirname = process.cwd();
 const sessions = new Map<string, SessionInfo>();
 const proxyName = process.env.CHAT_PROXY;
 const config: Config = {
@@ -104,18 +106,22 @@ app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
 });
 
+app.use(express.static(path.join(__dirname, 'public')));
+
 app.get('/api/config', (_req, res) => {
   res.json(config);
 });
 
 app.get('/api/messages', async (req, res) => {
   const session = sessions.get(req.sessionID);
+  const q = req.query as any;
   const db = await getDb();
   const rows = (await db.all<DbMessage>('SELECT * FROM messages ORDER BY messages.synced_time')).slice(-1000);
   let messages = rows.filter(row => !row.deleted).map(row => ({
     email: row.email,
     hash: row.hash,
     html: convertBBCodeToHtml(row.message),
+    isMe: row.name === session.name && (row.session_id === req.sessionID || row.trip === q.trip || row.ip === session.ip),
     msgId: row.id,
     name: row.name,
     remote: !!row.remote,
@@ -303,4 +309,8 @@ app.post('/api/upload', async (req, res) => {
 
 app.get('/api/error', (_req, res) => {
   res.status(500).json({ error: 'Internal server error' });
+});
+
+app.get('/', (_req, res) => {
+  res.send('Static home file not found');
 });

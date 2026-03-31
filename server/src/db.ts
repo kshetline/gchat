@@ -7,7 +7,7 @@ export async function getDb(): Promise<AsyncDatabase> {
   if (db)
     return db;
 
-  db = await AsyncDatabase.open(process.env.CHAT_DB_PATH || 'db.sqlite');
+  db = await AsyncDatabase.open(process.env.CHAT_DB_PATH || 'chat.sqlite');
 
   await db.exec(
     `CREATE TABLE IF NOT EXISTS "messages" (

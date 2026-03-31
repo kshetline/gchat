@@ -1,6 +1,6 @@
 <div class="message-content">
   @for (message of messages(); track message.hash) {
-    <div class="name" [class.me]="isMe(message)">
+    <div class="name" [class.me]="message.isMe">
         <span [style.color]="getColor(message)" [style.background-color]="getBackground(message)">{{
             message.name }}@if (message.email) { &nbsp;<a class="email-link" [href]="message.email">📫</a> }</span>
       @if (message.trip) {
@@ -10,7 +10,7 @@
         <span class="time">{{ formatTime(message.time) }}</span>
       }
     </div>
-    <div class="bubble-wrap" [class.me]="isMe(message)"
+    <div class="bubble-wrap" [class.me]="message.isMe"
          (mouseenter)="focusMessage(message, true)" (mouseleave)="focusMessage(message, false)"
          (click)="focusMessage(message, true)" [class.show-tools]="isFocused(message)">
       <div class="bubble" [innerHTML]="adjustMarkup(message.html)"
@@ -18,14 +18,14 @@
            [style.color]="getColor(message)" [style.background-color]="getBackground(message)"></div>
       @if (inChat()) {
         <div class="tools">
-          @if (isMe(message) && !message.remote) {
+          @if (message.isMe && !message.remote) {
             <i class="fa-solid fa-pencil" (click)="editMessage(message)"></i>
           }
           @else {
             <i class="fa-solid fa-quote-left" (click)="quoteMessage(message)"></i>
           }
 
-          @if ((isMe(message) || isAdmin()) && !message.remote) {
+          @if ((message.isMe || isAdmin()) && !message.remote) {
             <i class="fa-solid fa-trash-can" (click)="deleteMessage(message)"></i>
           }
         </div>

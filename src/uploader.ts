@@ -22,6 +22,7 @@ export class Uploader {
         quill.insertText(range.index, response.url);
         quill.setSelection(range.index + response.url.length);
         quill.enable(true);
+        quill.focus();
       },
       error: (error: any) => {
         quill.enable(true);
