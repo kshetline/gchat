@@ -1,3 +1,10 @@
+<div class="edit-mode" [style.display]="editMode() ? 'flex' : 'none'">
+  <div>
+    Editing message from {{ editTime() }}
+    <button (click)="cancelEdit()">Cancel</button>
+    <button (click)="saveEdit()">Update</button>
+  </div>
+</div>
 <div id="my-toolbar">
   <span class="ql-formats">
     <button class="ql-bold"></button>

@@ -7,7 +7,7 @@ import { PreferencesService } from '../preferences.service';
 import { FileUploadEvent, MessageEntry } from '../message-entry/message-entry';
 import { awaitMessage, NotificationHandler, notify, registerNotificationHandler, shouldIgnoreClick, startClickSuppress } from '../main';
 import { applyTheme, getThemeMenuStyle, getThemes, resetDefaultThemeBackground } from '../themes';
-import { MessageList } from '../message-list/message-list';
+import { EditEvent, MessageList } from '../message-list/message-list';
 import { ColorSelector } from '../color-selector/color-selector';
 import { Uploader } from '../uploader';
 
@@ -125,6 +125,10 @@ export class App implements OnInit {
         this.showThemes.set(false);
         event.preventDefault();
       }
+      else if (event.key === 'Escape') {
+        this.messageEntry.cancelEdit();
+        event.preventDefault();
+      }
       else if (event.key === 'Enter' && this.name().trim() && !this.inChat()) {
         this.enterChat().finally();
         event.preventDefault();
@@ -192,7 +196,7 @@ export class App implements OnInit {
     this.activity = false;
 
     this.httpClient.get<Messages>('/api/messages',
-      { params: { name: this.name(), active: wasActive, force: this.messages().length < 1 } }).subscribe({
+      { params: { name: this.name(), trip: this.tripCode(), active: wasActive, force: this.messages().length < 1 } }).subscribe({
       next: (messages: Messages): void => {
         if (!messages.errorMessage) {
           this.connectionTrouble.set(false);
@@ -339,6 +343,10 @@ export class App implements OnInit {
         this.messageEntry.sendEnabled(true);
       }
     });
+  }
+
+  protected editMessage(evt: EditEvent): void {
+    this.messageEntry.editMessage(evt);
   }
 
   protected async upload(evt: FileUploadEvent): Promise<void> {

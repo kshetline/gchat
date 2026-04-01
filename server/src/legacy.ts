@@ -118,9 +118,11 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
     for (const message of messages.messages || [])
       latestPosts.set(message.name, message.time);
 
-    for (const participant of Array.from(latestPosts.keys()))
-      await db.run('UPDATE participants SET last_active = ?1, last_post = ?1 WHERE name = ?2 AND remote = 1',
-        latestPosts.get(participant), participant);
+    for (const participant of Array.from(latestPosts.keys())) {
+      if (latestPosts.get(participant))
+        await db.run('UPDATE participants SET last_active = ?1, last_post = ?1 WHERE name = ?2 AND remote = 1',
+          latestPosts.get(participant), participant);
+    }
   }
   catch (err) {
     console.error('Error polling legacy chat:', err);

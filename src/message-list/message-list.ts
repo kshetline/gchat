@@ -1,4 +1,4 @@
-import { Component, ElementRef, input, OnInit, signal } from '@angular/core';
+import { Component, ElementRef, input, OnInit, output, signal } from '@angular/core';
 import { Message } from '../../server/src/shared-types';
 import { colorFromStyle, getLuminance, getTextBackground, kaomoji, notify } from '../main';
 import { htmlUnescape } from '@tubular/util';
@@ -7,6 +7,12 @@ import { HttpClient } from '@angular/common/http';
 
 const matchEmoji = /(((\uD83C[\uD000-\uDFFF]|\uD83D[\uD000-\uDFFF]|\uD83E[\uD000-\uDFFF])[\uFE00-\uFE0F]*?\u200D?)+)/g;
 const QUOTE_MARKER = '\u00A0◀︎ ';
+
+export interface EditEvent {
+  bbCode: string;
+  msgId: number;
+  time: string;
+}
 
 @Component({
   selector: 'chat-message-list',
@@ -31,6 +37,9 @@ export class MessageList implements OnInit {
   messages = input.required<Message[]>();
   name = input.required<string>();
   tripCode = input.required<string>();
+
+  connectionTrouble = output<string>();
+  edit = output<EditEvent>();
 
   constructor(private elemRef: ElementRef, private httpClient: HttpClient) {
     document.addEventListener('mouseup', () => setTimeout(() => this.lastSelectedText = window.getSelection().toString()));
@@ -115,14 +124,16 @@ export class MessageList implements OnInit {
   }
 
   protected editMessage(message: Message): void {
-    this.httpClient.get('/api/can-edit',
+    this.httpClient.get<any>('/api/can-edit',
       { params: { name: this.name(), tripCode: this.tripCode(), id: message.msgId } }).subscribe({
-      next: (): void => {},
+      next: (response): void => {
+        this.edit.emit({ bbCode: response.bbCode, msgId: message.msgId, time: this.formatTime(message.time) });
+      },
       error: (error): void => {
         if (error.status === 400 && error.error?.error)
           notify('error', error.error.error);
-//        else
-//          this.connectionTrouble.set(true);
+       else
+         this.connectionTrouble.emit(error.message || error.toString());
        }
     });
   }

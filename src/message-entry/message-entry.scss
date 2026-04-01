@@ -129,6 +129,25 @@ emoji-mart {
   z-index: 1;
 }
 
+.edit-mode {
+  align-items: stretch;
+  display: none;
+  height: 2.5em;
+  justify-content: center;
+  position: absolute;
+  top: -2em;
+  width: 100%;
+
+  > div {
+    align-items: center;
+    background-color: #D05;
+    color: white;
+    display: flex;
+    gap: 0.5em;
+    padding: 0.25em 0.5em;
+  }
+}
+
 @media (max-width: 800px) {
   #my-toolbar {
     justify-content: center;

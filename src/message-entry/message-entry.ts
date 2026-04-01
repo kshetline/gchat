@@ -8,6 +8,7 @@ import { PickerComponent } from '@ctrl/ngx-emoji-mart';
 import { Emoji, EmojiData } from '@ctrl/ngx-emoji-mart/ngx-emoji';
 import { ColorSelector } from '../color-selector/color-selector';
 import { allowedExtensions, MB, sizeMap } from '../../server/src/shared-types';
+import { EditEvent } from '../message-list/message-list';
 
 export interface FileUploadEvent {
   file: File;
@@ -89,6 +90,101 @@ function quillOpsToBBCode(ops: any[]): string {
 const formats = ['bold', 'code', 'font', 'italic', 'underline', 'strike', 'size'];
 const formatSet = new Set(formats);
 
+// Reverse of sizeMap: { s1: '0.625em', s2: '0.8125em', ... }
+const bbSizeMap = Object.fromEntries(Object.entries(sizeMap).map(([k, v]) => [v, k]));
+
+type QuillAttributes = Record<string, any>;
+type QuillOp = { insert: string | { image: string }; attributes?: QuillAttributes };
+
+export function bbCodeToQuillOps(bbCode: string): QuillOp[] {
+  const ops: QuillOp[] = [];
+  let pos = 0;
+
+  function peekTag(): { closing: boolean; tag: string; href?: string; len: number } | null {
+    const match = /^\[(\/?)(b|i|u|s|code|s[1-5]|url(?:=([^\]]*?))?|img)]/.exec(bbCode.slice(pos));
+
+    if (!match)
+      return null;
+
+    const rawTag = match[2];
+    const tag = rawTag.startsWith('url') ? 'url' : rawTag;
+
+    return { closing: match[1] === '/', tag, href: match[3], len: match[0].length };
+  }
+
+  function parse(activeAttrs: QuillAttributes): void {
+    while (pos < bbCode.length) {
+      const tag = peekTag();
+
+      if (!tag) {
+        let text = '';
+        while (pos < bbCode.length && bbCode[pos] !== '[') text += bbCode[pos++];
+
+        if (text) {
+          const op: QuillOp = { insert: text };
+
+          if (Object.keys(activeAttrs).length)
+            op.attributes = { ...activeAttrs };
+
+          ops.push(op);
+        }
+
+        continue;
+      }
+
+      if (tag.closing)
+        break;
+
+      pos += tag.len;
+
+      if (tag.tag === 'url') {
+        const href = tag.href;
+        if (!href) {
+          let content = '';
+
+          while (pos < bbCode.length) {
+            const t = peekTag();
+            if (t?.closing && t.tag === 'url') {
+              pos += t.len;
+              break;
+            }
+
+            content += bbCode[pos++];
+          }
+
+          ops.push({ insert: content, attributes: { ...activeAttrs, link: content } });
+        }
+        else {
+          parse({ ...activeAttrs, link: href });
+          const t = peekTag();
+          if (t?.closing && t.tag === 'url')
+            pos += t.len;
+        }
+      }
+      else {
+        const newAttrs: QuillAttributes = { ...activeAttrs };
+        switch (tag.tag) {
+          case 'b':    newAttrs['bold'] = true; break;
+          case 'i':    newAttrs['italic'] = true; break;
+          case 'u':    newAttrs['underline'] = true; break;
+          case 's':    newAttrs['strike'] = true; break;
+          case 'code': newAttrs['code'] = true; break;
+          default:
+            if (/s[1-5]/.test(tag.tag))
+              newAttrs['size'] = bbSizeMap[tag.tag]; break; // s1–s5 → em values
+        }
+
+        parse(newAttrs);
+        const t = peekTag();
+        if (t?.closing && t.tag === tag.tag) pos += t.len;
+      }
+    }
+  }
+
+  parse({});
+  return ops;
+}
+
 @Component({
   selector: 'chat-message-entry',
   imports: [FormsModule, PickerComponent, QuillModule, ColorSelector],
@@ -99,8 +195,11 @@ export class MessageEntry {
   protected kaomoji = kaomoji;
 
   private _color = 0;
+  private editId = 0;
   private quill: Quill;
 
+  protected editMode = signal(false);
+  protected editTime = signal('');
   protected enabled = signal(true);
   protected filePromptPosition = signal({ top: '0', left: '0' });
   protected lastSelectedFiles: File[];
@@ -134,6 +233,10 @@ export class MessageEntry {
         tab: {
           key: 'Tab',
           'handler': () => true // eslint-disable-line @stylistic/quote-props
+        },
+        escape: {
+          key: 'Escape',
+          'handler': () => this.cancelEdit() // eslint-disable-line @stylistic/quote-props
         }
       }
     },
@@ -273,6 +376,9 @@ export class MessageEntry {
   }
 
   sendMessage(): void {
+    if (this.editMode())
+      return;
+
     const message = quillOpsToBBCode(this.quill.getContents().ops);
 
     this.newMessage.emit(message);
@@ -409,6 +515,32 @@ export class MessageEntry {
     this.quill.insertText(index, QUOTE_MARKER, { italic: false });
     index += QUOTE_MARKER.length;
     this.quill.setSelection(index);
+  }
+
+  setFromBBCode(bbCode: string): void {
+    const ops = bbCodeToQuillOps(bbCode);
+    this.quill.setContents(ops);
+  }
+
+  editMessage(evt: EditEvent): void {
+    this.editId = evt.msgId;
+    this.editMode.set(true);
+    this.editTime.set(evt.time);
+    this.quill.setContents(bbCodeToQuillOps(evt.bbCode));
+  }
+
+  cancelEdit(): void {
+    if (!this.editMode())
+      return;
+
+    this.editMode.set(false);
+    this.editTime.set('');
+    this.quill.setText('');
+  }
+
+  protected saveEdit(): void {
+    this.editMode.set(false);
+    this.editTime.set('');
   }
 
   protected insertKaomoji(text: string): void {

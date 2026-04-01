@@ -115,13 +115,21 @@ app.get('/api/config', (_req, res) => {
 app.get('/api/messages', async (req, res) => {
   const session = sessions.get(req.sessionID);
   const q = req.query as any;
+  const name = q.name as string;
+  const now = Math.floor(Date.now() / 1000);
+
+  if (session) {
+    session.lastAlive = now;
+    session.name = name;
+  }
+
   const db = await getDb();
   const rows = (await db.all<DbMessage>('SELECT * FROM messages ORDER BY messages.synced_time')).slice(-1000);
   let messages = rows.filter(row => !row.deleted).map(row => ({
     email: row.email,
     hash: row.hash,
     html: convertBBCodeToHtml(row.message),
-    isMe: row.name === session.name && (row.session_id === req.sessionID || row.trip === q.trip || row.ip === session.ip),
+    isMe: row.name === name && (row.session_id === req.sessionID || row.trip === q.trip || row.ip === session.ip),
     msgId: row.id,
     name: row.name,
     remote: !!row.remote,
@@ -130,10 +138,8 @@ app.get('/api/messages', async (req, res) => {
     trip: row.remote ? row.trip : tripcode(row.trip)
   } as Message));
 
-  const name = req.query.name as string;
   const active = toBoolean(req.query.active);
   const force = toBoolean(req.query.force);
-  const now = Math.floor(Date.now() / 1000);
   const hourAgo = now - 3600;
   let participant = await getNamedParticipantRecord(name);
 
@@ -168,18 +174,13 @@ app.get('/api/messages', async (req, res) => {
     lastContentUpdate = processMillis();
   }
 
-  if (session) {
-    session.lastAlive = now;
-    session.name = name;
-  }
-
   if (force || (session && session.lastContentUpdate !== lastContentUpdate))
     session.lastContentUpdate = lastContentUpdate;
   else
     messages = [null];
 
   await sessionsCheck();
-  res.json({ messages, participants });
+  res.json({ messages, participants, sc: sessions.size });
 });
 
 app.post('/api/enter', async (req, res) => {
@@ -290,7 +291,7 @@ app.get('/api/can-edit', async (req, res) => {
     });
   }
 
-  res.send('null');
+  res.send({ bbCode: message.message });
 });
 
 app.post('/api/upload', async (req, res) => {
