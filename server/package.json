@@ -15,6 +15,7 @@
     "@tubular/util": "^4.19.0",
     "axios": "^1.13.6",
     "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
     "express-session": "^1.19.0",
     "http-status-codes": "^2.3.0",
     "ip": "^2.0.1",
@@ -26,6 +27,7 @@
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/express-session": "^1.18.2",
     "@types/follow-redirects": "^1.14.4",

@@ -1,6 +1,6 @@
-import cookieParser from 'cookie-parser';
 import express from 'express';
-import session from 'express-session';
+import cors from 'cors';
+import { randomUUID } from 'crypto';
 import { colors, Config, DbMessage, DbParticipant, Message, ParticipantInfo } from './shared-types.js';
 import { checksum53, isEqual, processMillis, toBoolean, toInt } from '@tubular/util';
 import { uploadSingle } from './uploader.js';
@@ -56,12 +56,19 @@ async function sessionsCheck(): Promise<void> {
   }
 }
 
-app.use(session({
-  secret: process.env.SESSION_KEY,
-  resave: true,
-  saveUninitialized: true,
-  cookie: { secure: toBoolean(process.env.SESSION_SECURE) }
+app.set('trust proxy', 1);
+
+app.use(cors({
+  origin: process.env.CHAT_DOMAIN ? `https://${process.env.CHAT_DOMAIN}` : '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Authorization', 'Content-Type'],
+  credentials: true,
 }));
+
+function getToken(req: express.Request): string {
+  const auth = req.headers.authorization;
+  return auth?.startsWith('Bearer ') ? auth.slice(7) : null;
+}
 
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Global error:', err); // For immediate server visibility
@@ -89,18 +96,15 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 app.use(async (req, _res, next) => {
-  let session = sessions.get(req.sessionID);
-  const ip = getIp(req);
+  const token = getToken(req);
 
-  if (!session) {
-    session = ({ ip: ip_.isPrivate(ip) ? await getServerIp() : ip, inChat: false } as SessionInfo);
-    sessions.set(req.sessionID, session);
+  if (token && !sessions.has(token)) {
+    const ip = getIp(req);
+    sessions.set(token, { ip: ip_.isPrivate(ip) ? await getServerIp() : ip, inChat: false } as SessionInfo);
   }
 
   next();
 });
-
-app.use(cookieParser());
 
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
@@ -108,12 +112,20 @@ app.listen(port, () => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.get('/api/token', async (req, res) => {
+  const token = randomUUID();
+  const ip = getIp(req);
+
+  sessions.set(token, { ip: ip_.isPrivate(ip) ? await getServerIp() : ip, inChat: false } as SessionInfo);
+  res.json({ token });
+});
+
 app.get('/api/config', (_req, res) => {
   res.json(config);
 });
 
 app.get('/api/messages', async (req, res) => {
-  const session = sessions.get(req.sessionID);
+  const session = sessions.get(getToken(req));
   const q = req.query as any;
   const name = q.name as string;
   const now = Math.floor(Date.now() / 1000);
@@ -129,7 +141,7 @@ app.get('/api/messages', async (req, res) => {
     email: row.email,
     hash: row.hash,
     html: convertBBCodeToHtml(row.message),
-    isMe: row.name === name && (row.session_id === req.sessionID || row.trip === q.trip || row.ip === session.ip),
+    isMe: row.name === name && (row.session_id === getToken(req) || row.trip === q.trip || row.ip === session.ip),
     msgId: row.id,
     name: row.name,
     remote: !!row.remote,
@@ -185,20 +197,21 @@ app.get('/api/messages', async (req, res) => {
 
 app.post('/api/enter', async (req, res) => {
   const q = req.query as any;
-  const session = sessions.get(req.sessionID);
+  const token = getToken(req);
+  const session = sessions.get(token);
   const db = await getDb();
   const now = Math.floor(Date.now() / 1000);
   const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', q.name);
 
   if (!participant) {
     await db.run('INSERT INTO participants (name, trip, email, ip, session_id, remote, last_active, last_post) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      q.name, q.tripCode, q.email, session.ip, req.sessionID, 0, now, 0);
+      q.name, q.tripCode, q.email, session.ip, token, 0, now, 0);
     session.inChat = true;
   }
   else if (q.tripCode === participant.trip || !participant.ip || session.ip === participant.ip ||
-           !participant.session_id || req.sessionID === participant.session_id) {
+           !participant.session_id || token === participant.session_id) {
     await db.run('UPDATE participants SET trip = ?, email = ?, ip = ?, session_id = ?, remote = ?, last_active = ? WHERE id = ?',
-      q.tripCode, q.email, session.ip, req.sessionID, 0, now, participant.id);
+      q.tripCode, q.email, session.ip, token, 0, now, participant.id);
     session.inChat = true;
     await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', q.name);
   }
@@ -220,7 +233,8 @@ app.post('/api/enter', async (req, res) => {
 
 app.post('/api/leave', async (req, res) => {
   const q = req.query as any;
-  const session = sessions.get(req.sessionID);
+  const token = getToken(req);
+  const session = sessions.get(token);
 
   if (!session?.inChat) {
     res.send('null');
@@ -230,7 +244,7 @@ app.post('/api/leave', async (req, res) => {
   const db = await getDb();
   const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', q.name);
 
-  if (participant && (q.tripCode === participant.trip || session.ip === participant.ip || q.sessionID === participant.session_id)) {
+  if (participant && (q.tripCode === participant.trip || session.ip === participant.ip || token === participant.session_id)) {
     await db.run('DELETE FROM participants WHERE id = ?', participant.id);
     session.inChat = false;
   }
@@ -244,7 +258,8 @@ app.post('/api/leave', async (req, res) => {
 });
 
 app.post('/api/send', async (req, res) => {
-  const session = sessions.get(req.sessionID);
+  const token = getToken(req);
+  const session = sessions.get(token);
   const db = await getDb();
   const now = Math.floor(Date.now() / 1000);
   const q = req.query as any;
@@ -254,7 +269,7 @@ app.post('/api/send', async (req, res) => {
   const framed = toBoolean(q.framed);
 
   const result = await db.run('INSERT INTO messages (time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    now, now, q.name, q.tripCode, q.email, 0, session.ip, req.sessionID, style, comment, hash);
+    now, now, q.name, q.tripCode, q.email, 0, session.ip, token, style, comment, hash);
 
   if (framed)
     addPendingDuplicate(result.lastID, now, q.name, comment);
@@ -285,7 +300,7 @@ app.get('/api/can-edit', async (req, res) => {
   const message = await db.get<DbMessage>('SELECT * FROM messages WHERE id = ? LIMIT 1', id);
 
   if (!message || message.remote || message.name !== q.name ||
-      (message.session_id !== req.sessionID && message.trip !== q.tripCode)) {
+      (message.session_id !== getToken(req) && message.trip !== q.tripCode)) {
     res.status(400).json({
       error: 'You are not authorized to edit this message.'
     });

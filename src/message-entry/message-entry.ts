@@ -517,11 +517,6 @@ export class MessageEntry {
     this.quill.setSelection(index);
   }
 
-  setFromBBCode(bbCode: string): void {
-    const ops = bbCodeToQuillOps(bbCode);
-    this.quill.setContents(ops);
-  }
-
   editMessage(evt: EditEvent): void {
     this.editId = evt.msgId;
     this.editMode.set(true);

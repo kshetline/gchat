@@ -1,5 +1,6 @@
 import { ChangeDetectorRef, Component, effect, OnInit, signal, ViewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { Config, Message, Messages, ParticipantInfo, Preferences } from '../../server/src/shared-types';
 import { forEach, isAndroid, isEqual } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
@@ -156,7 +157,14 @@ export class App implements OnInit {
 
   ngOnInit(): void {
     registerNotificationHandler(this.notify);
-    this.getMessages();
+    this.initToken().then(() => this.getMessages());
+  }
+
+  private async initToken(): Promise<void> {
+    if (!localStorage.getItem('chat-token')) {
+      const { token } = await firstValueFrom(this.httpClient.get<{ token: string }>('/api/token'));
+      localStorage.setItem('chat-token', token);
+    }
   }
 
   notify: NotificationHandler = (type, message): void => {
