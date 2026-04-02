@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comchat-Mods
-// @namespace    http://tampermonkey.net/
-// @version      2026-03-28
+// @namespace    https://chatproxy.chat/
+// @version      2026-04-02
 // @description  Enhance Comchat functionality
 // @author       Anonymous
 // @match        %%HOST%%

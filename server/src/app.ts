@@ -159,7 +159,8 @@ app.get('/api/messages', async (req, res) => {
     await db.run('UPDATE participants SET last_active = ?, remote = 0 WHERE id = ?', now, participant.id);
 
   const participantNames = (await db.all<DbParticipant>('SELECT * FROM participants'))
-    .filter(row => row.last_active > hourAgo || row.last_post > hourAgo).map(row => row.name);
+    .filter(row => row.name !== proxyName && (row.last_active > hourAgo || row.last_post > hourAgo))
+    .map(row => row.name);
   const participants = [...new Set(participantNames)].sort().map(p => ({ name: p } as ParticipantInfo));
 
   for (let i = participants.length - 1; i >= 0; --i) {

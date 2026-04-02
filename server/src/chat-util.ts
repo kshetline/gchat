@@ -7,11 +7,13 @@ export function getIp(req: express.Request): string {
 }
 
 export function convertBBCodeToHtml(text: string): string {
-  text = text.replace(/\[(\/?)(b|code|i|img|s|s1|s2|s3|s4|s5|u|url=.*?|url)]/g, '<$1$2>')
+  text = text.replace(/</g, '\uFFFDlt;').replace(/>/g, '\uFFFDgt;')
+    .replace(/\[(\/?)(b|code|i|img|s|s1|s2|s3|s4|s5|u|url=.*?|url)]/g, '<$1$2>')
     .replace(/<s(\d)>/g, '<span class="fontSize$1">').replace(/<\/s\d>/g, '</span>')
     .replace(/<url=(.*?)>(.*?)<\/url>/g,  (_$0, $1, $2) => `<a href="${$1}" target="_blank">${$2}</a>`)
     .replace(/<img>(.*?)<\/img>/g, '<img src="$1" alt="">')
-    .replace(/(^|>)(.*?)(<|$)/g, (_$0, $1, $2, $3) => `${$1}${htmlEscape($2)}${$3}`);
+    .replace(/(^|>)(.*?)(<|$)/g, (_$0, $1, $2, $3) => `${$1}${htmlEscape($2)}${$3}`)
+    .replace(/\uFFFD/g, '&');
 
   return text;
 }
