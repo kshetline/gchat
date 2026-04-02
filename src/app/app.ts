@@ -31,6 +31,7 @@ export class App implements OnInit {
   // noinspection TypeScriptFieldCanBeMadeReadonly
   private baseTitle = 'Chat';
   private chatActive = true;
+  private confirmCallback: (approved: boolean) => void;
   private lastMessageId: string;
   private _messageEntry: MessageEntry;
   private messageTimer: any;
@@ -55,6 +56,7 @@ export class App implements OnInit {
   protected notificationType = signal('');
   protected notifySound = signal(true);
   protected participants = signal([] as ParticipantInfo[]);
+  protected showConfirmation = signal(false);
   protected showNotification = signal(false);
   protected showThemes = signal(false);
   protected title = signal(this.baseTitle);
@@ -126,8 +128,18 @@ export class App implements OnInit {
         this.showThemes.set(false);
         event.preventDefault();
       }
+      else if (event.key === 'Escape' && this.showConfirmation()) {
+        this.showConfirmation.set(false);
+        this.confirmCallback && this.confirmCallback(false);
+        event.preventDefault();
+      }
       else if (event.key === 'Escape') {
         this.messageEntry.cancelEdit();
+        event.preventDefault();
+      }
+      else if (event.key === 'Enter' && this.showConfirmation()) {
+        this.showConfirmation.set(false);
+        this.confirmCallback && this.confirmCallback(true);
         event.preventDefault();
       }
       else if (event.key === 'Enter' && this.name().trim() && !this.inChat()) {
@@ -175,6 +187,16 @@ export class App implements OnInit {
 
   protected hideNotification() {
     this.showNotification.set(false);
+  }
+
+  protected confirm() {
+    this.showConfirmation.set(false);
+    this.confirmCallback && this.confirmCallback(true);
+  }
+
+  protected dontConfirm() {
+    this.showConfirmation.set(false);
+    this.confirmCallback && this.confirmCallback(false);
   }
 
   private checkChatActive(active?: boolean): void {
@@ -362,6 +384,7 @@ export class App implements OnInit {
 
     delete params.callback;
     params.name = this.name();
+    params.trip = this.tripCode();
 
     this.httpClient.put('/api/update', null, { params }).subscribe({
       next: (): void => {
@@ -371,10 +394,29 @@ export class App implements OnInit {
       error: (error): void => {
         notify('error', error.error?.error || 'Failed to update message');
         console.error(error);
-        setTimeout(() => this.getMessages(), 500);
         evt.callback && evt.callback(false);
       }
     });
+  }
+
+  protected deleteMessage(msgId: number): void {
+    this.notificationMessage.set('Are you sure you want to delete this message?');
+    this.showConfirmation.set(true);
+    this.confirmCallback = (approved: boolean): void => {
+      if (approved) {
+        const params = { msgId, name: this.name(), trip: this.tripCode() };
+
+        this.httpClient.delete('/api/delete', { params }).subscribe({
+          next: (): void => {
+            setTimeout(() => this.getMessages(), 500);
+          },
+          error: (error): void => {
+            notify('error', error.error?.error || 'Failed to delete message');
+            console.error(error);
+          }
+        })
+      }
+    }
   }
 
   protected async upload(evt: FileUploadEvent): Promise<void> {

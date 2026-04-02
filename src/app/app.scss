@@ -180,20 +180,35 @@ main {
   z-index: 10;
 
   &.error {
-    background-color: var(--main-notification-error-background);;
+    background-color: var(--main-notification-error-background);
   }
 
   &.info {
-    background-color: var(--main-notification-info-background);;
+    background-color: var(--main-notification-info-background);
   }
 
   &.warning {
-    background-color: var(--main-notification-warning-background);;
+    background-color: var(--main-notification-warning-background);
   }
 
-  button {
+  &.confirm {
+    background-color: var(--main-notification-confirm-background);
+  }
+
+  > button {
     align-self: center;
     min-width: 60px;
+  }
+
+  .confirm-buttons {
+    align-items: center;
+    align-self: center;
+    display: flex;
+    gap: 1em;
+
+    button {
+      min-width: 4em;
+    }
   }
 }
 

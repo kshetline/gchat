@@ -136,7 +136,7 @@ app.get('/api/messages', async (req, res) => {
   }
 
   const db = await getDb();
-  const rows = (await db.all<DbMessage>('SELECT * FROM messages ORDER BY messages.synced_time')).slice(-1000);
+  const rows = (await db.all<DbMessage>('SELECT * FROM messages WHERE deleted = 0 ORDER BY messages.synced_time')).slice(-1000);
   let messages = rows.filter(row => !row.deleted).map(row => ({
     email: row.email,
     hash: row.hash,
@@ -303,7 +303,7 @@ app.post('/api/send', async (req, res) => {
   res.send('null');
 });
 
-async function allowedToEdit(req: express.Request, res: express.Response): Promise<DbMessage> {
+async function allowedToEdit(req: express.Request, res: express.Response, action = 'edit'): Promise<DbMessage> {
   const q = req.query as any;
   const id = toInt(q.msgId);
   const db = await getDb();
@@ -312,7 +312,7 @@ async function allowedToEdit(req: express.Request, res: express.Response): Promi
   if (!message || message.remote || message.name !== q.name ||
     (message.session_id !== getToken(req) && message.trip !== q.tripCode)) {
     res.status(400).json({
-      error: 'You are not authorized to edit this message.'
+      error: `You are not authorized to ${action} this message.`
     });
 
     return null;
@@ -337,6 +337,17 @@ app.put('/api/update', async (req, res) => {
 
     await db.run('UPDATE messages SET edit_count = edit_count + 1, time = ?, message = ?, style = ? WHERE id = ?',
       now, q.bbCode, colorToStyle(q.color), id);
+
+    res.send('null');
+  }
+});
+
+app.delete('/api/delete', async (req, res) => {
+  if (await allowedToEdit(req, res, 'delete')) {
+    const id = toInt(req.query.msgId);
+    const db = await getDb();
+
+    await db.run('UPDATE messages SET deleted = 1 WHERE id = ?', id);
 
     res.send('null');
   }

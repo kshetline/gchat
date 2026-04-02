@@ -40,6 +40,7 @@ export class MessageList implements OnInit {
   tripCode = input.required<string>();
 
   connectionTrouble = output<string>();
+  delete = output<number>();
   edit = output<EditEvent>();
 
   constructor(private elemRef: ElementRef, private httpClient: HttpClient) {
@@ -49,11 +50,19 @@ export class MessageList implements OnInit {
   ngOnInit(): void {
     const messages = this.elemRef?.nativeElement?.querySelector('.message-content');
 
-    if (messages)
-      messages.addEventListener('scroll', () => {
-        this.showScrollToBottom.set(this.isAtBottom() && messages.scrollTop < messages.scrollHeight - messages.clientHeight - 10);
-        this.showScrollToTop.set(!this.isAtBottom() && messages.scrollTop > 10);
-      });
+    if (messages) {
+      messages.addEventListener('scroll', () => this.scrollDetected());
+      setTimeout(() => this.scrollDetected(), 100);
+    }
+  }
+
+  private scrollDetected(): void {
+    const messages = this.elemRef?.nativeElement?.querySelector('.message-content');
+
+    if (messages) {
+      this.showScrollToBottom.set(this.isAtBottom() && messages.scrollTop < messages.scrollHeight - messages.clientHeight - 10);
+      this.showScrollToTop.set(!this.isAtBottom() && messages.scrollTop > 10);
+    }
   }
 
   protected focusMessage(message: Message, state: boolean): void {
@@ -140,8 +149,8 @@ export class MessageList implements OnInit {
     });
   }
 
-  protected deleteMessage(_message: Message): void {
-    alert('Delete not yet implemented');
+  protected deleteMessage(message: Message): void {
+    this.delete.emit(message.msgId);
   }
 
   protected scrollToBottom() {

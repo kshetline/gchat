@@ -78,7 +78,7 @@
       (connectionTrouble)="connectionTrouble.set(true)" (edit)="editMessage($event)"
       [isAdmin]="isAdmin()" [darkMode]="darkMode()" [inChat]="inChat()" [localTime]="localTime()"
       [isAtBottom]="newOnBottom()" [messages]="messages()" [messageEntry]="messageEntrySignal()"
-      [name]="name()" [tripCode]="tripCode()"></chat-message-list>
+      [name]="name()" [tripCode]="tripCode()" (delete)="deleteMessage($event)"></chat-message-list>
   @if (inChat() && newOnBottom()) {
     <chat-message-entry class="at-bottom" [darkMode]="darkMode()" [maxFileSizeInMb]="maxFileSizeInMb()"
         (uploadFile)="upload($event)" (changeColor)="setColor($event)"
@@ -91,4 +91,11 @@
 <div [class]="'notification ' + notificationType()" [style.display]="showNotification() ? 'flex' : 'none'">
   <span class="notification-message">{{ notificationMessage() }}</span>
   <button (click)="hideNotification()">OK</button>
+</div>
+<div class="notification confirm" [style.display]="showConfirmation() ? 'flex' : 'none'">
+  <span class="notification-message">{{ notificationMessage() }}</span>
+  <div class="confirm-buttons">
+    <button (click)="confirm()">OK</button>
+    <button (click)="dontConfirm()">Cancel</button>
+  </div>
 </div>
