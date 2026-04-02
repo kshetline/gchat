@@ -48,6 +48,10 @@
   }
 }
 
+.trip.native::before {
+  content: "●";
+}
+
 .me .trip {
   &::before {
     content: "";
@@ -56,6 +60,10 @@
   &::after {
     content: "⬥";
   }
+}
+
+.me .trip.native::after {
+  content: "●";
 }
 
 .time {
