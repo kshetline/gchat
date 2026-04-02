@@ -337,7 +337,7 @@ app.put('/api/update', async (req, res) => {
     const now = Math.floor(Date.now() / 1000);
 
     await db.run('UPDATE messages SET edit_count = edit_count + 1, time = ?, message = ?, style = ? WHERE id = ?',
-      now, q.bbCode, colorToStyle(q.color), id);
+      now, q.bbCode.replace(URL_MATCHER, '[url=$1]$1[/url]'), colorToStyle(q.color), id);
 
     res.send('null');
   }

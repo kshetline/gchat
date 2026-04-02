@@ -4,6 +4,7 @@
 // @version      2026-04-02
 // @description  Enhance Comchat functionality
 // @author       Anonymous
+// @license      MIT
 // @match        %%HOST%%
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=%%ICON_DOMAIN%%
 // @grant        none
@@ -26,8 +27,9 @@
   let savedLogFrameSrc;
   let originalSound = localStorage.getItem('originalSoundEnabled') || localStorage.getItem('notificationSoundEnabled') || 'true';
 
-  if (!frames || !formFrame || !logFrame)
+  if (!frames || !formFrame || !logFrame) {
     return;
+  }
 
   localStorage.setItem('originalSoundEnabled', originalSound);
   savedRows = frames.getAttribute('rows');
@@ -54,25 +56,30 @@
 
     let currentForm = document.querySelector('frame[name="entry"]');
 
-    if (currentForm)
+    if (currentForm) {
       currentForm.setAttribute('target', 'form');
-    else if ((currentForm = document.querySelector('frame[name="send"]')))
+    }
+    else if ((currentForm = document.querySelector('frame[name="send"]'))) {
       currentForm.setAttribute('target', 'log');
+    }
 
-    if (formDoc)
+    if (formDoc) {
       formDoc.getElementById('notificationSoundCheckbox').checked = (originalSound === 'true');
+    }
 
     localStorage.setItem('notificationSoundEnabled', originalSound);
   }
 
   function extractError(body) {
-    if (!body)
+    if (!body) {
       return 'Page not loaded';
+    }
 
     const html = body.innerHTML;
 
-    if (html && !html.includes('<(form|div)')) // No form or div? Might be error page.
+    if (html && !html.includes('<(form|div)')) { // No form or div? Might be error page.
       return (/<h1>([3-5]\d\d\b.+)<\/h2>/.exec(html) || [])[1];
+    }
 
     return null;
   }
@@ -81,18 +88,22 @@
     const doc = frame.contentDocument;
     const formError = extractError(doc?.body);
 
-    if (formError && formError !== 'Page not loaded')
+    if (formError && formError !== 'Page not loaded') {
       logFrame.contentWindow.postMessage([action, formError], '*');
+    }
     else if (doc.querySelector(selector)) {
       logFrame.contentWindow.postMessage([action, null], '*');
 
-      if (callback)
+      if (callback) {
         callback();
+      }
     }
-    else if (++tries < 50)
+    else if (++tries < 50) {
       setTimeout(() => documentCheck(frame, action, selector, callback, ++tries), 100);
-    else
+    }
+    else {
       logFrame.contentWindow.postMessage([action, 'Timed out'], '*');
+    }
   }
 
   function enterChatRoom(name, email, color) {
@@ -102,21 +113,24 @@
     if (!nameField || !emailField) { // Already in chat?
       const comment = formDoc.querySelector('input[name="comment"]');
 
-      if (comment)
+      if (comment) {
         comment.value = '';
+      }
 
       logFrame.contentWindow.postMessage(['enterChatRoom', null], '*');
       return;
     }
 
-    if (!formSrc)
+    if (!formSrc) {
       formSrc = formFrame.src;
+    }
 
     let tripCode;
     [name, tripCode] = name.split('#');
 
-    if (tripCode)
+    if (tripCode) {
       localStorage.setItem('password', tripCode);
+    }
 
     const colorButton = formDoc.querySelector(`input[type="radio"][value="${color}"]`);
     const submitButton = formDoc.querySelector('input[type="submit"]');
