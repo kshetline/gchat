@@ -9,6 +9,9 @@
     @for (theme of themes; track theme) {
       <div (click)="setTheme(theme.name)" [style]="getThemeMenuStyle(theme.name)">{{ theme.displayName }}</div>
     }
+    @if (framed) {
+      <div class="revert-item" (click)="revert()">Back to original chat</div>
+    }
   </div>
 </div>
 <div class="connection-trouble" [style.display]="connectionTrouble() ? 'block' : 'none'">⚡️Connection trouble</div>

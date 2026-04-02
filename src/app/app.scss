@@ -81,6 +81,12 @@ main {
       padding: 0.5em;
     }
   }
+
+  .revert-item {
+    background-color: var(--primary-background);
+    color: black;
+    font-style: italic;
+  }
 }
 
 .connection-trouble {

@@ -481,4 +481,13 @@ export class App implements OnInit {
     this.prefService.set(this.prefs);
     setTimeout(() => this.messageEntry?.updateColor(false));
   }
+
+  protected revert(): void {
+    this.notificationMessage.set('Revert to original chat room style and features?');
+    this.showConfirmation.set(true);
+    this.confirmCallback = (approved: boolean): void => {
+      if (approved)
+        parent.postMessage(['revert'], '*');
+    }
+  }
 }

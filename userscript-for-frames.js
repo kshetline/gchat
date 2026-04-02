@@ -22,14 +22,20 @@
   let formDoc;
   let form;
   let formSrc;
+  let savedRows;
+  let savedLogFrameSrc;
+  let originalSound = localStorage.getItem('originalSoundEnabled') || localStorage.getItem('notificationSoundEnabled') || 'true';
 
   if (!frames || !formFrame || !logFrame)
     return;
 
+  localStorage.setItem('originalSoundEnabled', originalSound);
+  savedRows = frames.getAttribute('rows');
   frames.setAttribute('rows', '0,*');
   frames.setAttribute('frameborder', '0');
   frames.setAttribute('border', '0');
   frames.setAttribute('framespacing', '0');
+  savedLogFrameSrc = logFrame.src;
   logFrame.src = '%%ENHANCED_CHAT_URL%%';
 
   const hiddenFrame = document.createElement('iframe');
@@ -37,6 +43,27 @@
   hiddenFrame.name = 'hidden_frame';
   hiddenFrame.style.display = 'none';
   document.body.appendChild(hiddenFrame);
+
+  function revert() {
+    hiddenFrame.remove();
+    frames.setAttribute('rows', savedRows);
+    frames.removeAttribute('frameborder');
+    frames.removeAttribute('border');
+    frames.removeAttribute('framespacing');
+    logFrame.src = savedLogFrameSrc;
+
+    let currentForm = document.querySelector('frame[name="entry"]');
+
+    if (currentForm)
+      currentForm.setAttribute('target', 'form');
+    else if ((currentForm = document.querySelector('frame[name="send"]')))
+      currentForm.setAttribute('target', 'log');
+
+    if (formDoc)
+      formDoc.getElementById('notificationSoundCheckbox').checked = (originalSound === 'true');
+
+    localStorage.setItem('notificationSoundEnabled', originalSound);
+  }
 
   function extractError(body) {
     if (!body)
@@ -157,6 +184,9 @@
         break;
       case 'updateTitle':
         document.title = evt.data[1];
+        break;
+      case 'revert':
+        revert();
         break;
     }
   });
