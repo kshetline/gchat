@@ -85,7 +85,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
       return pollLegacyMessages(1000);
 
     for (const participant of (messages.participants || []).map(p => p.name)) {
-      if (participant === proxyName)
+      if (!participant || participant === proxyName)
         continue;
 
       let row = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', participant);
@@ -151,7 +151,7 @@ function extractMessage(messageRow: DomNode): Message {
 
   const name = (nameElem?.children?.at(nameIndex) as DomNode)?.children?.at(0)?.content;
   const timestamp = messageRow.querySelector('.messageDate')?.children?.at(0)?.content?.slice(1, -1)
-    .replace('-', 'T').replace(/\//g, '-').replace(/\b(\d)\b/g, '0$1');
+    .replace('-', 'T').replace(/\//g, '-').replace(/\b(\d(\b|T))/g, '0$1');
   const time = Math.floor(new Date(timestamp + 'Z').getTime() / 1000);
   const trip = (nameElem?.children?.at(nameIndex + 1) as DomNode)?.content?.substring(1);
   const hash = checksum53(`${name};${trip || ''};${timestamp}`);
@@ -187,51 +187,47 @@ async function loadEnterForm(page: puppeteer.Page): Promise<void> {
 }
 
 export async function getLegacyMessages(name: string, count = 200): Promise<Messages> {
-  try {
-    const url = `https://${domain}/comchat.cgi?retime=120&lines=${count}&name=${encodeForUri(name, true)}`;
-    const raw = (await axios.get(url)).data;
-    const dom = parser.parse(raw).domRoot;
-    const body = dom.querySelector('body');
-    const participantDiv = body?.querySelector('#participantList');
-    const participants = Array.from(new Set(participantDiv.children[0].content.trim().replace(/^.*:\s*/g, '').split(/[◆◇]/)
-      .map(p => p.trim()).filter(p => !!p)).values()).sort().map(p => ({ name: p }) as ParticipantInfo);
-    const messageRows = body?.querySelectorAll('.messageRow').reverse();
-    let messages = messageRows.map(row => extractMessage(row)).filter(m => m.name !== proxyName);
-    const proxyMessages = messageRows.map(row => extractMessage(row)).filter(m => m.name === proxyName);
-    const hashes = new Set<string>();
+  const url = `https://${domain}/comchat.cgi?retime=120&lines=${count}&name=${encodeForUri(name, true)}`;
+  const raw = (await axios.get(url)).data;
+  const dom = parser.parse(raw).domRoot;
+  const body = dom.querySelector('body');
+  const participantDiv = body?.querySelector('#participantList');
+  const participants = Array.from(new Set(participantDiv.children[0].content.trim().replace(/^.*:\s*/g, '').split(/[◆◇]/)
+    .map(p => p.trim()).filter(p => !!p)).values()).sort().map(p => ({ name: p }) as ParticipantInfo);
+  const messageRows = body?.querySelectorAll('.messageRow').reverse();
+  let messages = messageRows.map(row => extractMessage(row)).filter(m => m.name !== proxyName);
+  const proxyMessages = messageRows.map(row => extractMessage(row)).filter(m => m.name === proxyName);
+  const hashes = new Set<string>();
 
-    // Filter duplicate messages by hashcode.
-    messages = messages.filter(m => !hashes.has(m.hash) && hashes.add(m.hash));
+  // Filter duplicate messages by hashcode.
+  messages = messages.filter(m => !hashes.has(m.hash) && hashes.add(m.hash));
 
-    const latestPosts = new Map<string, number>();
+  const latestPosts = new Map<string, number>();
 
-    for (const message of messages) {
-      const latest = latestPosts.get(message.name) || message.time;
+  for (const message of messages) {
+    const latest = latestPosts.get(message.name) || message.time;
 
-      latestPosts.set(message.name, message.time > latest ? message.time : latest);
-    }
+    latestPosts.set(message.name, message.time > latest ? message.time : latest);
+  }
 
-    const db = await getDb();
+  const db = await getDb();
 
-    for (const message of proxyMessages) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const [_$0, name, msg] = /^《(.+?)》(.*)$/.exec(message.bbCode) || [];
+  for (const message of proxyMessages) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [_$0, name, msg] = /^《(.+?)》(.*)$/.exec(message.bbCode) || [];
 
-      if (name && msg)
-        await db.run(`UPDATE messages SET synced_time = ? WHERE name = ? AND message = ? AND synced_time = time
-                                      AND ABS(synced_time - ?) < 120 AND ABS(synced_time - ?) > 2`,
-          message.time, name, msg, message.time);
-    }
+    if (name && msg)
+      await db.run(`UPDATE messages SET synced_time = ? WHERE name = ? AND message = ? AND synced_time = time
+                                    AND ABS(synced_time - ?) < 120 AND ABS(synced_time - ?) > 2`,
+        message.time, name, msg, message.time);
+  }
 
-    for (const participant of Array.from(latestPosts.keys()))
+  for (const participant of Array.from(latestPosts.keys()))
+    if (latestPosts.get(participant))
       await db.run('UPDATE participants SET last_post = ?1, last_active = MAX(last_active, ?1) WHERE name = ?2 and remote = 1',
         latestPosts.get(participant), participant);
 
-    return { messages, participants };
-  }
-  catch (err) {
-    return { errorMessage: ((err as any).message) || String(err) };
-  }
+  return { messages, participants };
 }
 
 export async function enterLegacyChat(name: string, email: string, color: number): Promise<void> {

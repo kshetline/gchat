@@ -73,6 +73,11 @@
     const emailField = formDoc.querySelector('input[name="email"]');
 
     if (!nameField || !emailField) { // Already in chat?
+      const comment = formDoc.querySelector('input[name="comment"]');
+
+      if (comment)
+        comment.value = '';
+
       logFrame.contentWindow.postMessage(['enterChatRoom', null], '*');
       return;
     }
@@ -90,7 +95,7 @@
     const submitButton = formDoc.querySelector('input[type="submit"]');
 
     form.setAttribute('target', '_self');
-    nameField.value = name;
+    nameField.value = name || '';
     emailField.value = email || '';
     colorButton?.click();
     submitButton.click();
@@ -124,10 +129,10 @@
       face = $[3];
     }
 
-    formDoc.querySelector('select[name="color"]').value = color;
+    formDoc.querySelector('select[name="color"]').value = color || 0;
     formDoc.querySelector('#face').value = face;
-    formDoc.querySelector('input[name="comment"]').value = comment;
-    formDoc.querySelector('input[name="password"]').value = tripCode;
+    formDoc.querySelector('input[name="comment"]').value = comment || '';
+    formDoc.querySelector('input[name="password"]').value = tripCode || '';
     formDoc.querySelector('form').setAttribute('target', 'hidden_frame');
 
     hiddenFrame.contentDocument.body.innerHTML = '';

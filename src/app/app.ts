@@ -2,10 +2,10 @@ import { ChangeDetectorRef, Component, effect, OnInit, signal, ViewChild } from 
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { Config, Message, Messages, ParticipantInfo, Preferences } from '../../server/src/shared-types';
-import { forEach, isAndroid, isEqual } from '@tubular/util';
+import { clone, forEach, isAndroid, isEqual } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
-import { FileUploadEvent, MessageEntry } from '../message-entry/message-entry';
+import { FileUploadEvent, MessageEntry, MessageUpdateEvent } from '../message-entry/message-entry';
 import { awaitMessage, NotificationHandler, notify, registerNotificationHandler, shouldIgnoreClick, startClickSuppress } from '../main';
 import { applyTheme, getThemeMenuStyle, getThemes, resetDefaultThemeBackground } from '../themes';
 import { EditEvent, MessageList } from '../message-list/message-list';
@@ -355,6 +355,26 @@ export class App implements OnInit {
 
   protected editMessage(evt: EditEvent): void {
     this.messageEntry.editMessage(evt);
+  }
+
+  protected updateMessage(evt: MessageUpdateEvent): void {
+    const params = clone(evt) as any;
+
+    delete params.callback;
+    params.name = this.name();
+
+    this.httpClient.put('/api/update', null, { params }).subscribe({
+      next: (): void => {
+        evt.callback && evt.callback(true);
+        setTimeout(() => this.getMessages(), 500);
+      },
+      error: (error): void => {
+        notify('error', error.error?.error || 'Failed to update message');
+        console.error(error);
+        setTimeout(() => this.getMessages(), 500);
+        evt.callback && evt.callback(false);
+      }
+    });
   }
 
   protected async upload(evt: FileUploadEvent): Promise<void> {

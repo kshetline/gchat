@@ -15,6 +15,13 @@ export interface FileUploadEvent {
   quill: Quill;
 }
 
+export interface MessageUpdateEvent {
+  bbCode: string;
+  callback: (success: boolean) => void;
+  color: number;
+  msgId: number;
+}
+
 const Size = Quill.import('attributors/style/size') as any;
 
 Size.whitelist = Object.keys(sizeMap);
@@ -197,6 +204,7 @@ export class MessageEntry {
   private _color = 0;
   private editId = 0;
   private quill: Quill;
+  private savedColor = 0;
 
   protected editMode = signal(false);
   protected editTime = signal('');
@@ -247,13 +255,14 @@ export class MessageEntry {
   maxFileSizeInMb = input(15000);
   changeColor = output<number>();
   newMessage = output<string>();
+  updateMessage = output<MessageUpdateEvent>();
   uploadFile = output<FileUploadEvent>();
 
   get color(): number { return this._color; }
   set color(value: number) {
     if (this._color !== value) {
       this._color = value;
-      this.updateColor();
+      this.updateColor(!this.editMode());
     }
   }
 
@@ -519,7 +528,9 @@ export class MessageEntry {
 
   editMessage(evt: EditEvent): void {
     this.editId = evt.msgId;
+    this.savedColor = this.color;
     this.editMode.set(true);
+    this.color = evt.color;
     this.editTime.set(evt.time);
     this.quill.setContents(bbCodeToQuillOps(evt.bbCode));
   }
@@ -530,12 +541,20 @@ export class MessageEntry {
 
     this.editMode.set(false);
     this.editTime.set('');
+    this.color = this.savedColor;
     this.quill.setText('');
   }
 
   protected saveEdit(): void {
-    this.editMode.set(false);
-    this.editTime.set('');
+    this.updateMessage.emit({
+      bbCode: quillOpsToBBCode(this.quill.getContents().ops),
+      color: this.color,
+      msgId: this.editId,
+      callback: (success) => {
+        if (success)
+          this.cancelEdit();
+      }
+    })
   }
 
   protected insertKaomoji(text: string): void {

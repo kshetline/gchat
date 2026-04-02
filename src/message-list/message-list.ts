@@ -10,6 +10,7 @@ const QUOTE_MARKER = '\u00A0◀︎ ';
 
 export interface EditEvent {
   bbCode: string;
+  color: number;
   msgId: number;
   time: string;
 }
@@ -125,9 +126,10 @@ export class MessageList implements OnInit {
 
   protected editMessage(message: Message): void {
     this.httpClient.get<any>('/api/can-edit',
-      { params: { name: this.name(), tripCode: this.tripCode(), id: message.msgId } }).subscribe({
+      { params: { name: this.name(), tripCode: this.tripCode(), msgId: message.msgId } }).subscribe({
       next: (response): void => {
-        this.edit.emit({ bbCode: response.bbCode, msgId: message.msgId, time: this.formatTime(message.time) });
+        this.edit.emit({ bbCode: response.bbCode, color: response.color,
+          msgId: message.msgId, time: this.formatTime(message.time) });
       },
       error: (error): void => {
         if (error.status === 400 && error.error?.error)

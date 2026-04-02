@@ -71,7 +71,8 @@
   </div>
   @if (inChat() && !newOnBottom()) {
     <chat-message-entry class="on-top" [darkMode]="darkMode()" [maxFileSizeInMb]="maxFileSizeInMb()"
-        (uploadFile)="upload($event)" (changeColor)="setColor($event)" (newMessage)="sendComment($event)"></chat-message-entry>
+        (uploadFile)="upload($event)" (changeColor)="setColor($event)"
+        (newMessage)="sendComment($event)" (updateMessage)="updateMessage($event)"></chat-message-entry>
   }
   <chat-message-list [class.in-chat]="!inChat()"
       (connectionTrouble)="connectionTrouble.set(true)" (edit)="editMessage($event)"
@@ -80,7 +81,8 @@
       [name]="name()" [tripCode]="tripCode()"></chat-message-list>
   @if (inChat() && newOnBottom()) {
     <chat-message-entry class="at-bottom" [darkMode]="darkMode()" [maxFileSizeInMb]="maxFileSizeInMb()"
-        (uploadFile)="upload($event)" (changeColor)="setColor($event)" (newMessage)="sendComment($event)"></chat-message-entry>
+        (uploadFile)="upload($event)" (changeColor)="setColor($event)"
+        (newMessage)="sendComment($event)" (updateMessage)="updateMessage($event)"></chat-message-entry>
   }
   @if (!inChat() && newOnBottom()) {
     <div class="spacer"></div>

@@ -17,7 +17,7 @@ const app = express();
 const port = toInt(process.env.PORT) || 3000;
 const __dirname = process.cwd();
 const sessions = new Map<string, SessionInfo>();
-const proxyName = process.env.CHAT_PROXY;
+const proxyName = process.env.CHAT_PROXY || 'CHAT②';
 const config: Config = {
   backgroundColor: process.env.CHAT_BACKGROUND || '#DDD',
   fileSizeLimitInMb: toInt(process.env.UPLOAD_MAX_SIZE_MB),
@@ -203,7 +203,7 @@ app.post('/api/enter', async (req, res) => {
   const now = Math.floor(Date.now() / 1000);
   const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', q.name);
 
-  if (!participant) {
+  if (!participant && q.name) {
     await db.run('INSERT INTO participants (name, trip, email, ip, session_id, remote, last_active, last_post) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       q.name, q.tripCode, q.email, session.ip, token, 0, now, 0);
     session.inChat = true;
@@ -257,13 +257,23 @@ app.post('/api/leave', async (req, res) => {
   res.send('null');
 });
 
+function colorToStyle(color: number): string {
+  return `color:${colors[color].trim()}`;
+}
+
+function styleToColor(styleOrColor: string): number {
+  const color = (/color:\s*([^;]+)\b/.exec(styleOrColor) || [])[1] || styleOrColor;
+
+  return Math.max(0, colors.findIndex(c => color === c.trim()));
+}
+
 app.post('/api/send', async (req, res) => {
   const token = getToken(req);
   const session = sessions.get(token);
   const db = await getDb();
   const now = Math.floor(Date.now() / 1000);
   const q = req.query as any;
-  const style = `color:${colors[q.color].trim()}`;
+  const style = colorToStyle(q.color);
   const comment = q.comment.replace(URL_MATCHER, '[url=$1]$1[/url]');
   const hash = checksum53(`${q.name};${q.tripCode || ''};${new Date(now * 1000).toISOString().substring(0, 19)}`);
   const framed = toBoolean(q.framed);
@@ -293,20 +303,43 @@ app.post('/api/send', async (req, res) => {
   res.send('null');
 });
 
-app.get('/api/can-edit', async (req, res) => {
+async function allowedToEdit(req: express.Request, res: express.Response): Promise<DbMessage> {
   const q = req.query as any;
-  const id = toInt(q.id);
+  const id = toInt(q.msgId);
   const db = await getDb();
   const message = await db.get<DbMessage>('SELECT * FROM messages WHERE id = ? LIMIT 1', id);
 
   if (!message || message.remote || message.name !== q.name ||
-      (message.session_id !== getToken(req) && message.trip !== q.tripCode)) {
+    (message.session_id !== getToken(req) && message.trip !== q.tripCode)) {
     res.status(400).json({
       error: 'You are not authorized to edit this message.'
     });
+
+    return null;
   }
 
-  res.send({ bbCode: message.message });
+  return message;
+}
+
+app.get('/api/can-edit', async (req, res) => {
+  const message = await allowedToEdit(req, res);
+
+  if (message)
+    res.send({ bbCode: message.message, color: styleToColor(message.style) });
+});
+
+app.put('/api/update', async (req, res) => {
+  if (await allowedToEdit(req, res)) {
+    const q = req.query as any;
+    const id = toInt(q.msgId);
+    const db = await getDb();
+    const now = Math.floor(Date.now() / 1000);
+
+    await db.run('UPDATE messages SET edit_count = edit_count + 1, time = ?, message = ?, style = ? WHERE id = ?',
+      now, q.bbCode, colorToStyle(q.color), id);
+
+    res.send('null');
+  }
 });
 
 app.post('/api/upload', async (req, res) => {
