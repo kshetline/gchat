@@ -85,6 +85,9 @@ export default {
     new webpack.BannerPlugin({ banner: '#!/usr/bin/env node', raw: true }),
     emitPackageJson({
       type: 'module', dependencies,
+      scripts: {
+        debug: 'node --env-file=.env --inspect=0.0.0.0:9229 app.js'
+      },
       overrides: {
         'promised-sqlite3': {
           sqlite3: '$sqlite3'

@@ -9,8 +9,8 @@ import { convertBBCodeToHtml, getTextAndMarkupAsBBCode } from './chat-util.js';
 import tripcode from 'tripcode';
 
 const domain = process.env.CHAT_DOMAIN;
-const proxyName = process.env.CHAT_PROXY;
-const proxyTrip = process.env.CHAT_PROXY_TRIPCODE || 'CHAT②';
+const proxyName = process.env.CHAT_PROXY || 'CHAT②';
+const proxyTrip = process.env.CHAT_PROXY_TRIPCODE;
 const parser = new HtmlParser();
 
 export let browser: puppeteer.Browser;
@@ -173,7 +173,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
                                              (synced_time = ?3 OR time = ?3) LIMIT 1`,
               message.name, message.bbCode, message.time);
 
-          if (!row)
+          if (!row && message.name !== proxyName)
             await db.run('INSERT INTO messages (time, synced_time, name, trip, email, remote, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
               message.time, message.time, message.name, message.trip, message.email, 1, message.style, message.bbCode, message.hash);
         }
