@@ -6,10 +6,11 @@ import { DomNode } from 'fortissimo-html/dist/dom.js';
 import * as puppeteer from 'puppeteer';
 import { getDb } from './db.js';
 import { convertBBCodeToHtml, getTextAndMarkupAsBBCode } from './chat-util.js';
+import tripcode from 'tripcode';
 
 const domain = process.env.CHAT_DOMAIN;
 const proxyName = process.env.CHAT_PROXY;
-const proxyTrip = process.env.CHAT_PROXY_TRIPCODE;
+const proxyTrip = process.env.CHAT_PROXY_TRIPCODE || 'CHAT②';
 const parser = new HtmlParser();
 
 export let browser: puppeteer.Browser;
@@ -30,6 +31,99 @@ export const pendingDuplicates: PendingDuplicate[] = [];
 
 export function addPendingDuplicate(id: number, time: number, name: string, comment: string): void {
   pendingDuplicates.push({ id, time, name, comment });
+}
+
+function extractMessage(messageRow: DomNode): Message {
+  const bbCode = getTextAndMarkupAsBBCode(messageRow.querySelector('.messageComment').children, domain);
+  const html = convertBBCodeToHtml(bbCode);
+  const nameElem = messageRow.querySelector('.messageName');
+  const style = nameElem?.valuesLookup['style'];
+  let nameIndex = 1;
+  let email: string;
+  const firstNode = nameElem?.children?.at(0) as DomNode;
+
+  if (firstNode?.tag === 'a') {
+    email = firstNode.valuesLookup['href'];
+    ++nameIndex;
+  }
+
+  const name = (nameElem?.children?.at(nameIndex) as DomNode)?.children?.at(0)?.content;
+  const rawTime = messageRow.querySelector('.messageDate')?.children?.at(0)?.content?.slice(1, -1);
+  const parts = rawTime?.split(/[- :/]/).map((p, i) => p.padStart(i === 0 ? 4 : 2, '0'));
+  const timestamp = parts?.length !== 6 ? null : `${parts[0]}-${parts[1]}-${parts[2]}T${parts[3]}:${parts[4]}:${parts[5]}`;
+  const time = Math.floor(new Date(timestamp + 'Z').getTime() / 1000);
+  const trip = (nameElem?.children?.at(nameIndex + 1) as DomNode)?.content?.substring(1);
+  const hash = checksum53(`${name};${trip || ''};${timestamp}`);
+
+  return { bbCode, email, hash, msgId: -1, name, style, html, remote: true, time, trip };
+}
+
+export async function getLegacyMessages(name: string, count = 200): Promise<Messages> {
+  const url = `https://${domain}/comchat.cgi?retime=120&lines=${count}&name=${encodeForUri(name, true)}`;
+  const raw = (await axios.get(url)).data;
+  const dom = parser.parse(raw).domRoot;
+  const body = dom.querySelector('body');
+  const participantDiv = body?.querySelector('#participantList');
+  const participants = Array.from(new Set(participantDiv.children[0].content.trim().replace(/^.*:\s*/g, '').split(/[◆◇]/)
+  .map(p => p.trim()).filter(p => !!p)).values()).sort().map(p => ({ name: p }) as ParticipantInfo);
+  const messageRows = body?.querySelectorAll('.messageRow').reverse();
+  let messages = messageRows.map(row => extractMessage(row)).filter(m => m.name !== proxyName);
+  const proxyMessages = messageRows.map(row => extractMessage(row)).filter(m => m.name === proxyName);
+  const hashes = new Set<string>();
+
+  // Filter duplicate messages by hashcode.
+  messages = messages.filter(m => !hashes.has(m.hash) && hashes.add(m.hash));
+
+  const latestPosts = new Map<string, number>();
+
+  for (const message of messages) {
+    const latest = latestPosts.get(message.name) || message.time;
+
+    latestPosts.set(message.name, message.time > latest ? message.time : latest);
+  }
+
+  const db = await getDb();
+
+  for (const message of proxyMessages) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [_$0, name, trip, msg] = /^《(.+?)(◆.+?)?》(.*)$/.exec(message.bbCode) || [];
+
+    if (name && msg) {
+      // Use proxy messages to update the synced_time column in the messages table.
+      let result = await db.run(`UPDATE messages SET synced_time = ? WHERE name = ? AND message = ? AND synced_time = time
+        AND ABS(synced_time - ?) < 120 AND ABS(synced_time - ?) > 2`, message.time, name, msg, message.time);
+
+      // Was the proxy message not found in our database? Check again without the goal of syncing the timestamp.
+      if (result.changes === 0) {
+        result = await db.run(`UPDATE messages SET synced_time = ? WHERE name = ? AND message = ? AND synced_time = time
+            AND ABS(synced_time - ?) <= 2`, message.time, name, msg, message.time);
+
+        // Still not found? Then it probably comes from a different chat proxy. Fix the name and treat it as a new message.
+        if (result.changes === 0) {
+          const timestamp = new Date(message.time * 1000).toISOString().slice(0, 19);
+
+          message.name = name;
+          message.bbCode = msg;
+          message.trip = trip?.slice(1) || '';
+          message.hash = checksum53(`${name};${trip || ''};${timestamp}`);
+
+          const index = messages.findIndex(m => m.time >= message.time);
+
+          if (index >= 0)
+            messages.splice(index, 0, message);
+          else
+            messages.push(message);
+        }
+      }
+    }
+  }
+
+  for (const participant of Array.from(latestPosts.keys()))
+    if (latestPosts.get(participant))
+      await db.run('UPDATE participants SET last_post = ?1, last_active = MAX(last_active, ?1) WHERE name = ?2 and remote = 1',
+        latestPosts.get(participant), participant);
+
+  return { messages, participants };
 }
 
 async function pollLegacyMessages(overrideCount?: number): Promise<void> {
@@ -72,7 +166,12 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
         earliest = Math.min(message.time, earliest);
 
         if (message.time > latestInDb - 300 || retrieveCount >= 1000) {
-          const row = await db.get<DbMessage>('SELECT hash FROM messages WHERE hash = ? LIMIT 1', message.hash);
+          let row = await db.get<DbMessage>('SELECT hash FROM messages WHERE hash = ? LIMIT 1', message.hash);
+
+          if (!row)
+            row = await db.get<DbMessage>(`SELECT hash FROM messages WHERE name = ? AND message = ? AND
+                                             (synced_time = ?3 OR time = ?3) LIMIT 1`,
+              message.name, message.bbCode, message.time);
 
           if (!row)
             await db.run('INSERT INTO messages (time, synced_time, name, trip, email, remote, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -135,30 +234,6 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
 pollLegacyMessages().finally();
 legacyBrowserSetup().finally();
 
-function extractMessage(messageRow: DomNode): Message {
-  const bbCode = getTextAndMarkupAsBBCode(messageRow.querySelector('.messageComment').children, domain);
-  const html = convertBBCodeToHtml(bbCode);
-  const nameElem = messageRow.querySelector('.messageName');
-  const style = nameElem?.valuesLookup['style'];
-  let nameIndex = 1;
-  let email: string;
-  const firstNode = nameElem?.children?.at(0) as DomNode;
-
-  if (firstNode?.tag === 'a') {
-    email = firstNode.valuesLookup['href'];
-    ++nameIndex;
-  }
-
-  const name = (nameElem?.children?.at(nameIndex) as DomNode)?.children?.at(0)?.content;
-  const timestamp = messageRow.querySelector('.messageDate')?.children?.at(0)?.content?.slice(1, -1)
-    .replace('-', 'T').replace(/\//g, '-').replace(/\b(\d(\b|T))/g, '0$1');
-  const time = Math.floor(new Date(timestamp + 'Z').getTime() / 1000);
-  const trip = (nameElem?.children?.at(nameIndex + 1) as DomNode)?.content?.substring(1);
-  const hash = checksum53(`${name};${trip || ''};${timestamp}`);
-
-  return { bbCode, email, hash, msgId: -1, name, style, html, remote: true, time, trip };
-}
-
 async function legacyBrowserSetup(): Promise<void> {
   browser = browser || (await (process.env.CHROME_PATH ?
     puppeteer.launch({
@@ -184,50 +259,6 @@ async function loadEnterForm(page: puppeteer.Page): Promise<void> {
   await page.goto(`http://${domain}/comchat.cgi?mode=form&nam=&eml=&col=&retime=40&line=20`);
   await page.waitForSelector('form');
   await page.$eval('form', form => form.setAttribute('target', '_self'));
-}
-
-export async function getLegacyMessages(name: string, count = 200): Promise<Messages> {
-  const url = `https://${domain}/comchat.cgi?retime=120&lines=${count}&name=${encodeForUri(name, true)}`;
-  const raw = (await axios.get(url)).data;
-  const dom = parser.parse(raw).domRoot;
-  const body = dom.querySelector('body');
-  const participantDiv = body?.querySelector('#participantList');
-  const participants = Array.from(new Set(participantDiv.children[0].content.trim().replace(/^.*:\s*/g, '').split(/[◆◇]/)
-    .map(p => p.trim()).filter(p => !!p)).values()).sort().map(p => ({ name: p }) as ParticipantInfo);
-  const messageRows = body?.querySelectorAll('.messageRow').reverse();
-  let messages = messageRows.map(row => extractMessage(row)).filter(m => m.name !== proxyName);
-  const proxyMessages = messageRows.map(row => extractMessage(row)).filter(m => m.name === proxyName);
-  const hashes = new Set<string>();
-
-  // Filter duplicate messages by hashcode.
-  messages = messages.filter(m => !hashes.has(m.hash) && hashes.add(m.hash));
-
-  const latestPosts = new Map<string, number>();
-
-  for (const message of messages) {
-    const latest = latestPosts.get(message.name) || message.time;
-
-    latestPosts.set(message.name, message.time > latest ? message.time : latest);
-  }
-
-  const db = await getDb();
-
-  for (const message of proxyMessages) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [_$0, name, msg] = /^《(.+?)》(.*)$/.exec(message.bbCode) || [];
-
-    if (name && msg)
-      await db.run(`UPDATE messages SET synced_time = ? WHERE name = ? AND message = ? AND synced_time = time
-                                    AND ABS(synced_time - ?) < 120 AND ABS(synced_time - ?) > 2`,
-        message.time, name, msg, message.time);
-  }
-
-  for (const participant of Array.from(latestPosts.keys()))
-    if (latestPosts.get(participant))
-      await db.run('UPDATE participants SET last_post = ?1, last_active = MAX(last_active, ?1) WHERE name = ?2 and remote = 1',
-        latestPosts.get(participant), participant);
-
-  return { messages, participants };
 }
 
 export async function enterLegacyChat(name: string, email: string, color: number): Promise<void> {
@@ -263,12 +294,12 @@ export async function leaveLegacyChat(): Promise<void> {
   inChat = false;
 }
 
-export async function legacySendMessage(name: string, _email: string, comment: string, color: number, _tripCode: string): Promise<void> {
+export async function legacySendMessage(name: string, _email: string, comment: string, color: number, tripCode: string): Promise<void> {
   if (!inChat)
     await enterLegacyChat(proxyName, null, 0);
 
   messagePage = messagePage || await browser.newPage();
-  comment = `《${name}》${comment}`;
+  comment = `《${name}${tripCode ? '◆' + tripcode(tripCode) : ''}》${comment}`;
 
   let face = '';
   const $ = /^(.*)(\u2000(.+)\u2000)\s*$/.exec(comment);

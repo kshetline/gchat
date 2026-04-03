@@ -127,6 +127,7 @@ app.get('/api/config', (_req, res) => {
 app.get('/api/messages', async (req, res) => {
   const session = sessions.get(getToken(req));
   const q = req.query as any;
+  const tripCode = tripcode(q.trip);
   const name = q.name as string;
   const now = Math.floor(Date.now() / 1000);
 
@@ -141,7 +142,8 @@ app.get('/api/messages', async (req, res) => {
     email: row.email,
     hash: row.hash,
     html: convertBBCodeToHtml(row.message),
-    isMe: row.name === name && (row.session_id === getToken(req) || row.trip === q.trip || row.ip === session.ip),
+    isMe: row.name === name && (row.session_id === getToken(req) || row.ip === session.ip ||
+      (row.trip && (row.trip === q.trip || row.trip === tripCode))),
     msgId: row.id,
     name: row.name,
     remote: !!row.remote,
@@ -298,7 +300,7 @@ app.post('/api/send', async (req, res) => {
       proxyStarted = true;
     }
 
-    await legacySendMessage(q.name, null, q.comment, q.color, q.trip);
+    await legacySendMessage(q.name, null, q.comment, q.color, q.tripCode);
   }
 
   res.send('null');
@@ -306,12 +308,13 @@ app.post('/api/send', async (req, res) => {
 
 async function allowedToEdit(req: express.Request, res: express.Response, action = 'edit'): Promise<DbMessage> {
   const q = req.query as any;
+  const tripCode = tripcode(q.trip);
   const id = toInt(q.msgId);
   const db = await getDb();
   const message = await db.get<DbMessage>('SELECT * FROM messages WHERE id = ? LIMIT 1', id);
 
   if (!message || message.remote || message.name !== q.name ||
-    (message.session_id !== getToken(req) && message.trip !== q.tripCode)) {
+      (message.session_id !== getToken(req) && message.trip !== q.tripCode && message.trip !== tripCode)) {
     res.status(400).json({
       error: `You are not authorized to ${action} this message.`
     });
