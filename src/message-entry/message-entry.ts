@@ -42,6 +42,8 @@ if (!localStorage.getItem('emoji-mart.frequently'))
 
 const QUOTE_NAME_DELIM = ': ';
 const QUOTE_MARKER = '\u00A0◀︎ ';
+const INPUT_LENGTH_LIMIT = 1000;
+const INPUT_LENGTH_WARN = 950;
 
 function quillOpsToBBCode(ops: any[]): string {
   let result = '';
@@ -211,6 +213,7 @@ export class MessageEntry {
   protected enabled = signal(true);
   protected filePromptPosition = signal({ top: '0', left: '0' });
   protected lastSelectedFiles: File[];
+  protected lengthWarning = signal(-1);
   protected showEmoji = signal(false);
   protected showFilePrompt = signal(false);
   protected showKaomoji = signal(false);
@@ -305,10 +308,10 @@ export class MessageEntry {
 
   protected editorCreated(quill: Quill): void {
     this.quill = quill;
-    this.quill.setText('');
+    quill.setText('');
     this.updateColor(false);
 
-    this.quill.root.addEventListener('paste', (e: ClipboardEvent) => {
+    quill.root.addEventListener('paste', (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
 
       if (!items)
@@ -329,9 +332,19 @@ export class MessageEntry {
       }
     });
 
-    this.quill.root.addEventListener('drop', (e: DragEvent) => {
+    quill.root.addEventListener('drop', (e: DragEvent) => {
       e.preventDefault();
       this.processFiles(Array.from(e.dataTransfer?.files));
+    });
+
+    quill.on('text-change', () => {
+      if (quill.getLength() > INPUT_LENGTH_LIMIT)
+        quill.deleteText(INPUT_LENGTH_LIMIT, quill.getLength());
+
+      if (quill.getLength() > INPUT_LENGTH_WARN)
+        this.lengthWarning.set(INPUT_LENGTH_LIMIT - quill.getLength() + 1);
+      else
+        this.lengthWarning.set(-1);
     });
   }
 

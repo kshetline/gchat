@@ -104,7 +104,10 @@ export class MessageList implements OnInit {
   }
 
   protected getBackground(message: Message): string {
-    return getTextBackground(this.getColor(message), this.darkMode());
+    if (document.body.classList.contains('theme-li1999'))
+      return 'transparent';
+    else
+      return getTextBackground(this.getColor(message), this.darkMode());
   }
 
   protected getColor(message: Message): string {

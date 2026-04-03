@@ -73,6 +73,10 @@
   opacity: 0.60;
 }
 
+.trailing-time {
+  display: none;
+}
+
 .bubble-wrap {
   align-items: center;
   border-radius: 0.7em;
@@ -124,6 +128,49 @@
       overflow: visible;
       pointer-events: all;
     }
+  }
+}
+
+:host-context(.theme-li1999) .message-row {
+  align-items: baseline;
+  border-bottom: 1px solid gray;
+  display: flex;
+
+  .bubble-wrap {
+    margin: 0;
+
+    .bubble {
+      padding: 0.7em 0;
+    }
+  }
+
+  .name, .bubble {
+    font-size: 10pt;
+  }
+
+  .name > span {
+    border-radius: 0;
+    padding: 0;
+  }
+
+  .name::before {
+    content: '★';
+  }
+
+  .name::after {
+    content: '\A0>\A0';
+  }
+
+  .trip {
+    opacity: 1;
+  }
+
+  .time {
+    display: none;
+  }
+
+  .trailing-time {
+    display: inline;
   }
 }
 

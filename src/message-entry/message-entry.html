@@ -6,6 +6,9 @@
   </div>
 </div>
 <div id="my-toolbar">
+  @if (lengthWarning() >= 0) {
+    <div class="length-warning">{{ lengthWarning() }} char{{ lengthWarning() === 1 ? '' : 's' }} left</div>
+  }
   <span class="ql-formats">
     <button class="ql-bold"></button>
     <button class="ql-italic"></button>

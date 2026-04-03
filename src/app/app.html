@@ -63,7 +63,7 @@
   </div>
   <div class="participants">
     <span>Participants:</span>
-    @if (participants()) {
+    @if (participants()?.length > 0) {
       @for (participant of participants(); track participant.name) {
         <span class="participant" [class.native]="!participant.remote" [class.idle]="!!participant.idle">{{ participant.name }}</span>
       }

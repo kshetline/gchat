@@ -27,7 +27,7 @@ const lightDefaults = {
   _quill_background: '#333',
   _quill_color: '#444',
   _quill_code_background: '#EEE',
-  _quill_picker_background: '#333'
+  _quill_picker_background: '#FFF'
 };
 
 const darkDefaults = {
@@ -84,8 +84,12 @@ const themes: Record<string, any> = {
     displayName: 'Midnight',
     darkMode: true,
     _background: '#111',
-  }
-};
+  },
+  li1999: {
+    displayName: 'Like It’s 1999',
+    darkMode: false,
+    _background: '*',
+  }};
 
 export function getThemes(): Theme[] {
   return Object.keys(themes).map(key => ({
@@ -120,6 +124,9 @@ export function applyTheme(themeName: string): void {
 
   if (theme.darkMode)
     document.body.classList.add(`theme-dark`);
+
+  if (themeName === 'li1999')
+    document.body.classList.add(`theme-li1999`);
 }
 
 export function getThemeMenuStyle(themeName: string): ThemeMenuStyle {
