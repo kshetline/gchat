@@ -86,7 +86,7 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
 
   for (const message of proxyMessages) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [_$0, name, trip, msg] = /^《(.+?)(◆.+?)?》(.*)$/.exec(message.bbCode) || [];
+    const [_$0, name, trip, msg] = /^《(.+?)([◆◇].+?)?》(.*)$/.exec(message.bbCode) || [];
 
     if (name && msg) {
       // Use proxy messages to update the synced_time column in the messages table.

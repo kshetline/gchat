@@ -308,21 +308,19 @@ app.post('/api/send', async (req, res) => {
 
 async function allowedToEdit(req: express.Request, res: express.Response, action = 'edit'): Promise<DbMessage> {
   const q = req.query as any;
-  const tripCode = tripcode(q.trip);
+  const tripCode = q.tripCode && tripcode(q.tripCode);
   const id = toInt(q.msgId);
   const db = await getDb();
   const message = await db.get<DbMessage>('SELECT * FROM messages WHERE id = ? LIMIT 1', id);
 
-  if (!message || message.remote || message.name !== q.name ||
-      (message.session_id !== getToken(req) && message.trip !== q.tripCode && message.trip !== tripCode)) {
-    res.status(400).json({
-      error: `You are not authorized to ${action} this message.`
-    });
+  if (message && message.name === q.name &&
+      ((message.trip && (message.trip === q.tripCode || message.trip === tripCode)) ||
+        message.session_id !== getToken(req)))
+    return message;
 
-    return null;
-  }
+  res.status(400).json({ error: `You are not authorized to ${action} this message.` });
 
-  return message;
+  return null;
 }
 
 app.get('/api/can-edit', async (req, res) => {
