@@ -226,7 +226,7 @@ export class App implements OnInit {
     this.activity = false;
 
     this.httpClient.get<Messages>('/api/messages',
-      { params: { name: this.name(), trip: this.tripCode(), active: wasActive, force: this.messages().length < 1 } }).subscribe({
+      { params: { name: this.name(), tripCode: this.tripCode(), active: wasActive, force: this.messages().length < 1 } }).subscribe({
       next: (messages: Messages): void => {
         if (!messages.errorMessage) {
           this.connectionTrouble.set(false);
@@ -384,7 +384,7 @@ export class App implements OnInit {
 
     delete params.callback;
     params.name = this.name();
-    params.trip = this.tripCode();
+    params.tripCode = this.tripCode();
 
     this.httpClient.put('/api/update', null, { params }).subscribe({
       next: (): void => {
@@ -404,7 +404,7 @@ export class App implements OnInit {
     this.showConfirmation.set(true);
     this.confirmCallback = (approved: boolean): void => {
       if (approved) {
-        const params = { msgId, name: this.name(), trip: this.tripCode() };
+        const params = { msgId, name: this.name(), tripCode: this.tripCode() };
 
         this.httpClient.delete('/api/delete', { params }).subscribe({
           next: (): void => {

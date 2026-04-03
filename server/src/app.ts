@@ -127,7 +127,7 @@ app.get('/api/config', (_req, res) => {
 app.get('/api/messages', async (req, res) => {
   const session = sessions.get(getToken(req));
   const q = req.query as any;
-  const tripCode = tripcode(q.trip);
+  const tripCode = tripcode(q.tripCode);
   const name = q.name as string;
   const now = Math.floor(Date.now() / 1000);
 
