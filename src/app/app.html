@@ -71,6 +71,7 @@
     @else {
       <span class="empty-chat">None</span>
     }
+    <div class="fake-frame-border"></div>
   </div>
   @if (inChat() && !newOnBottom()) {
     <chat-message-entry class="on-top" [darkMode]="darkMode()" [maxFileSizeInMb]="maxFileSizeInMb()"

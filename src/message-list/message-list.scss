@@ -137,10 +137,22 @@
   display: flex;
 
   .bubble-wrap {
+    border-radius: 0.2em;
     margin: 0;
 
     .bubble {
       padding: 0.7em 0;
+    }
+
+    &.show-tools {
+      background-color: transparent;
+
+      .tools {
+        background-color: var(--main-bubble-tool-background);
+        opacity: 1;
+        overflow: visible;
+        pointer-events: all;
+      }
     }
   }
 
@@ -148,17 +160,55 @@
     font-size: 10pt;
   }
 
+  .name.me {
+    align-self: center;
+    flex-direction: row;
+    margin-left: 10px;
+    margin-right: 0;
+  }
+
   .name > span {
     border-radius: 0;
     padding: 0;
-  }
 
-  .name::before {
-    content: '★';
+    &:first-child::before {
+      content: '★';
+    }
   }
 
   .name::after {
     content: '\A0>\A0';
+  }
+
+  .me {
+    flex-direction: row;
+  }
+
+  .me .trip {
+    &::before {
+      content: "⬥";
+    }
+
+    &::after {
+      content: "";
+    }
+  }
+
+  .me .trip.native::before {
+    content: "●";
+  }
+
+  .me .trip.native::after {
+    content: "";
+  }
+
+  &.me {
+    align-self: flex-start;
+    flex-direction: row;
+
+    .bubble {
+      text-align: start;
+    }
   }
 
   .trip {

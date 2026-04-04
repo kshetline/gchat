@@ -158,6 +158,34 @@ emoji-mart {
   top: 0.75em;
 }
 
+:host-context(.theme-li1999) #my-toolbar {
+  button {
+    &.ql-bold::before {
+      content: "[b]";
+    }
+
+    &.ql-italic::before {
+      content: "[i]";
+    }
+
+    &.ql-strike::before {
+      content: "[s]";
+    }
+
+    &.ql-underline::before {
+      content: "[u]";
+    }
+
+    &.ql-code::before {
+      content: "[code]";
+    }
+
+    ::ng-deep svg {
+      display: none;
+    }
+  }
+}
+
 @media (max-width: 800px) {
   #my-toolbar {
     justify-content: center;

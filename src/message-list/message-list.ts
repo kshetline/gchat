@@ -124,7 +124,7 @@ export class MessageList implements OnInit {
   }
 
   protected isLight(message: Message): boolean {
-    return getLuminance(this.getBackground(message)) > 127;
+    return document.body.classList.contains('theme-li1999') || getLuminance(this.getBackground(message)) > 127;
   }
 
   protected quoteMessage(message: Message): void {

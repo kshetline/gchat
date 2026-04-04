@@ -17,7 +17,7 @@
         <div class="bubble" [class.local-light]="isLight(message)" [class.local-dark]="!isLight(message)"
              [style.color]="getColor(message)" [style.background-color]="getBackground(message)">
           <span [innerHTML]="adjustMarkup(message.html)"></span>
-          <span class="trailing-time">({{ formatTime(message.time) }})</span>
+          <span class="trailing-time"> ({{ formatTime(message.time) }})</span>
         </div>
         @if (inChat()) {
           <div class="tools">

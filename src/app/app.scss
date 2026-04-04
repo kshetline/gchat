@@ -42,6 +42,7 @@ main {
   gap: 0.5em;
   margin: 0.5em 0;
   padding: 0.5em 0;
+  position: relative;
 
   .participant {
     background-color: var(--main-participant-background);
@@ -60,6 +61,24 @@ main {
   .empty-chat {
     font-style: italic;
     padding: 4px 0;
+  }
+
+  .fake-frame-border {
+    bottom: 0;
+    height: 0;
+    position: absolute;
+    width: 100%;
+  }
+}
+
+:host-context(.theme-li1999) .participants {
+  border-bottom: 1px solid black;
+  padding-bottom: 0.8em;
+
+  .fake-frame-border {
+    background: #CCC;
+    border-top: 1px solid #AAA;
+    height: 4px;
   }
 }
 
