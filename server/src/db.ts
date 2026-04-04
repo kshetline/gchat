@@ -47,10 +47,6 @@ export async function getDb(): Promise<AsyncDatabase> {
 
 export async function getNamedParticipantRecord(name: string): Promise<DbParticipant> {
   const db = await getDb();
-  let participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', name);
 
-  if (!participant)
-    participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? LIMIT 1', name);
-
-  return participant;
+  return await db.get<DbParticipant>(`SELECT * FROM participants where name = ? ORDER BY last_active DESC LIMIT 1`, name);
 }

@@ -131,10 +131,15 @@
   }
 }
 
+.message-row {
+  display: flex;
+  flex-direction: column;
+}
+
 :host-context(.theme-li1999) .message-row {
   align-items: baseline;
   border-bottom: 1px solid gray;
-  display: flex;
+  flex-direction: row;
 
   .bubble-wrap {
     border-radius: 0.2em;
@@ -142,6 +147,7 @@
 
     .bubble {
       padding: 0.7em 0;
+      text-align: left;
     }
 
     &.show-tools {

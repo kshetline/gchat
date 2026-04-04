@@ -1,7 +1,7 @@
 import { Component, ElementRef, input, OnInit, output, signal } from '@angular/core';
 import { Message } from '../../server/src/shared-types';
 import { colorFromStyle, getLuminance, getTextBackground, kaomoji, notify } from '../main';
-import { htmlUnescape } from '@tubular/util';
+import { debounce, htmlUnescape } from '@tubular/util';
 import { MessageEntry } from '../message-entry/message-entry';
 import { HttpClient } from '@angular/common/http';
 
@@ -43,6 +43,15 @@ export class MessageList implements OnInit {
   delete = output<number>();
   edit = output<EditEvent>();
 
+  private scrollCheck = debounce(100, () => {
+    const messages = this.elemRef?.nativeElement?.querySelector('.message-content');
+
+    if (messages) {
+      this.showScrollToBottom.set(this.isAtBottom() && messages.scrollTop < messages.scrollHeight - messages.clientHeight - 10);
+      this.showScrollToTop.set(!this.isAtBottom() && messages.scrollTop > 10);
+    }
+  });
+
   constructor(private elemRef: ElementRef, private httpClient: HttpClient) {
     document.addEventListener('mouseup', () => setTimeout(() => this.lastSelectedText = window.getSelection().toString()));
   }
@@ -51,17 +60,9 @@ export class MessageList implements OnInit {
     const messages = this.elemRef?.nativeElement?.querySelector('.message-content');
 
     if (messages) {
-      messages.addEventListener('scroll', () => this.scrollDetected());
-      setTimeout(() => this.scrollDetected(), 100);
-    }
-  }
-
-  private scrollDetected(): void {
-    const messages = this.elemRef?.nativeElement?.querySelector('.message-content');
-
-    if (messages) {
-      this.showScrollToBottom.set(this.isAtBottom() && messages.scrollTop < messages.scrollHeight - messages.clientHeight - 10);
-      this.showScrollToTop.set(!this.isAtBottom() && messages.scrollTop > 10);
+      messages.addEventListener('scroll', () => this.scrollCheck());
+      setTimeout(this.scrollCheck, 100);
+      new ResizeObserver(() => this.scrollCheck()).observe(messages);
     }
   }
 
