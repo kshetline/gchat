@@ -50,9 +50,15 @@
           <input id="notify-sound" type="checkbox" [(ngModel)]="notifySound" (ngModelChange)="toggleNotifySound()">
           <label for="notify-sound">Notification sound</label>
         </div>
-        <div class="label-pair">
-          <input id="local-time" type="checkbox" [(ngModel)]="localTime" (ngModelChange)="toggleLocalTime()">
-          <label for="local-time">Local time</label>
+        <div class="checkbox-pair">
+          <div class="label-pair">
+            <input id="local-time" type="checkbox" [(ngModel)]="localTime" (ngModelChange)="toggleLocalTime()">
+            <label for="local-time">Local time</label>
+          </div>
+          <div class="label-pair">
+            <input id="allow-dms" type="checkbox" [(ngModel)]="allowDMs" (change)="toggleAllowDMs()">
+            <label for="allow-dms">Allow DMs</label>
+          </div>
         </div>
         <div class="label-pair">
           <input id="new-on-bottom" type="checkbox" [(ngModel)]="newOnBottom" (change)="toggleMessageOrder()">
@@ -65,7 +71,8 @@
     <span>Participants:</span>
     @if (participants()?.length > 0) {
       @for (participant of participants(); track participant.name) {
-        <span class="participant" [class.native]="!participant.remote" [class.idle]="!!participant.idle">{{ participant.name }}</span>
+        <span class="participant" [class.native]="!participant.remote" [class.idle]="!!participant.idle"
+          >{{ participant.name }}@if (participant.allowsDms) { &nbsp;<i class="fa-regular fa-comment"></i>}</span>
       }
     }
     @else {
@@ -78,18 +85,30 @@
         (uploadFile)="upload($event)" (changeColor)="setColor($event)"
         (newMessage)="sendComment($event)" (updateMessage)="updateMessage($event)"></chat-message-entry>
   }
-  <p-tabs value="0" [class.out-of-chat]="!inChat()">
-    <p-tablist [style.display]="dms() > 0 ? 'flex' : 'none'">
-      <p-tab [value]="'0'">Main chat</p-tab>
+  <p-tabs [value]="selectedChat()" [class.out-of-chat]="!inChat()">
+    <p-tablist [style.display]="dms().length > 0 ? 'flex' : 'none'">
+      <p-tab [value]="0">Main chat</p-tab>
+      @for (dm of dms(); track dm.name; let i = $index) {
+        <p-tab [value]="i + 1">{{ dm.name }}</p-tab>
+      }
     </p-tablist>
     <p-tabpanels>
-      <p-tabpanel [value]="'0'">
+      <p-tabpanel [value]="0">
         <chat-message-list
-            (connectionTrouble)="connectionTrouble.set(true)" (edit)="editMessage($event)"
+            (connectionTrouble)="connectionTrouble.set(true)" [name]="name()" [tripCode]="tripCode()"
             [isAdmin]="isAdmin()" [darkMode]="darkMode()" [inChat]="inChat()" [localTime]="localTime()"
             [isAtBottom]="newOnBottom()" [messages]="messages()" [messageEntry]="messageEntrySignal()"
-            [name]="name()" [tripCode]="tripCode()" (delete)="deleteMessage($event)"></chat-message-list>
+            (edit)="editMessage($event)" (delete)="deleteMessage($event)"></chat-message-list>
       </p-tabpanel>
+      @for (dm of dms(); track dm.name; let i = $index) {
+        <p-tabpanel [value]="i + 1">
+          <chat-message-list [chatIndex]="i + 1"
+              (connectionTrouble)="connectionTrouble.set(true)" [name]="name()" [tripCode]="tripCode()"
+              [isAdmin]="isAdmin()" [darkMode]="darkMode()" [inChat]="true" [localTime]="localTime()"
+              [isAtBottom]="newOnBottom()" [messages]="dm.messages()" [messageEntry]="messageEntrySignal()"
+              (edit)="editMessage($event)" (delete)="deleteMessage($event)"></chat-message-list>
+        </p-tabpanel>
+      }
     </p-tabpanels>
   </p-tabs>
   @if (inChat() && newOnBottom()) {

@@ -40,30 +40,41 @@ export interface DbMessage {
 }
 
 export interface DbParticipant {
+  allow_dm: number;
   email: string;
   id: number;
   ip: string;
   last_active: number;
   last_post: number;
   name: string;
-  remote: boolean;
+  remote: number;
   trip: string;
   session_id: string;
 }
 
 export interface ParticipantInfo {
+  allowsDms?: boolean;
   idle?: number;
   name: string;
   remote?: boolean;
 }
 
+export interface DmSession {
+  id: number;
+  key: string;
+  messages: Message[];
+  name: string;
+}
+
 export interface Messages {
+  dms?: DmSession[];
   errorMessage?: string;
   messages?: Message[];
   participants?: ParticipantInfo[];
 }
 
 export interface Preferences {
+  allowDMs: boolean;
   color: number;
   email: string;
   localTime: boolean;

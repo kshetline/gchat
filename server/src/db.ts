@@ -12,6 +12,7 @@ export async function getDb(): Promise<AsyncDatabase> {
   await db.exec(
     `CREATE TABLE IF NOT EXISTS "messages" (
       "id" INTEGER NOT NULL UNIQUE,
+      "dm" INTEGER NOT NULL DEFAULT 0,
       "time" INTEGER NOT NULL DEFAULT 0,
       "synced_time" INTEGER NOT NULL DEFAULT 0,
       "name" TEXT NOT NULL,
@@ -39,8 +40,20 @@ export async function getDb(): Promise<AsyncDatabase> {
       "remote" INTEGER NOT NULL,
       "last_active" INTEGER NOT NULL DEFAULT 0,
       "last_post" INTEGER NOT NULL DEFAULT 0,
+      "allow_dm"  INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY("id" AUTOINCREMENT)
     )`);
+
+  await db.exec(
+    `CREATE TABLE IF NOT EXISTS "dm_session" (
+      "id" INTEGER NOT NULL UNIQUE,
+      "key" TEXT NOT NULL,
+      "name1" TEXT NOT NULL,
+      "name2" TEXT NOT NULL,
+      "start_time" INTEGER NOT NULL,
+      "last_activity" INTEGER NOT NULL,
+      PRIMARY KEY("id" AUTOINCREMENT)
+  )`);
 
   return db;
 }

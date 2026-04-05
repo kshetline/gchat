@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, effect, OnInit, signal, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, effect, OnInit, signal, ViewChild, WritableSignal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { Config, Message, Messages, ParticipantInfo, Preferences } from '../../server/src/shared-types';
@@ -8,12 +8,18 @@ import { PreferencesService } from '../preferences.service';
 import { FileUploadEvent, MessageEntry, MessageUpdateEvent } from '../message-entry/message-entry';
 import { awaitMessage, NotificationHandler, notify, registerNotificationHandler, shouldIgnoreClick, startClickSuppress } from '../main';
 import { applyTheme, getThemeMenuStyle, getThemes, resetDefaultThemeBackground } from '../themes';
-import { EditEvent, MessageList } from '../message-list/message-list';
+import { DeleteEvent, EditEvent, MessageList } from '../message-list/message-list';
 import { ColorSelector } from '../color-selector/color-selector';
 import { Uploader } from '../uploader';
 import { TabsModule } from 'primeng/tabs';
 
 const REPOLL_RATE = 5000;
+
+interface DmInfo {
+  name: string;
+  messages: WritableSignal<Message[]>;
+  tripCode: string;
+}
 
 @Component({
   selector: 'chat-root',
@@ -40,10 +46,11 @@ export class App implements OnInit {
   private unseenMessages = 0;
   private uploader: Uploader;
 
+  protected allowDMs = signal(false);
   protected color = signal(0);
   protected connectionTrouble = signal(false);
   protected darkMode = signal(false);
-  protected dms = signal(0);
+  protected dms = signal([] as DmInfo[]);
   protected email = signal('');
   protected framed = /\bframed=true\b/.test(location.toString());
   protected inChat = signal(false);
@@ -58,6 +65,7 @@ export class App implements OnInit {
   protected notificationType = signal('');
   protected notifySound = signal(true);
   protected participants = signal([] as ParticipantInfo[]);
+  protected selectedChat = signal(0);
   protected showConfirmation = signal(false);
   protected showNotification = signal(false);
   protected showThemes = signal(false);
@@ -228,7 +236,15 @@ export class App implements OnInit {
     this.activity = false;
 
     this.httpClient.get<Messages>('/api/messages',
-      { params: { name: this.name(), tripCode: this.tripCode(), active: wasActive, force: this.messages().length < 1 } }).subscribe({
+      {
+        params: {
+          active: wasActive,
+          allowDMs: this.allowDMs(),
+          force: this.messages().length < 1,
+          name: this.name(),
+          tripCode: this.tripCode()
+        }
+      }).subscribe({
       next: (messages: Messages): void => {
         if (!messages.errorMessage) {
           this.connectionTrouble.set(false);
@@ -401,12 +417,12 @@ export class App implements OnInit {
     });
   }
 
-  protected deleteMessage(msgId: number): void {
+  protected deleteMessage(evt: DeleteEvent): void {
     this.notificationMessage.set('Are you sure you want to delete this message?');
     this.showConfirmation.set(true);
     this.confirmCallback = (approved: boolean): void => {
       if (approved) {
-        const params = { msgId, name: this.name(), tripCode: this.tripCode() };
+        const params = { chatIndex: evt.chatIndex, msgId: evt.msgId, name: this.name(), tripCode: this.tripCode() };
 
         this.httpClient.delete('/api/delete', { params }).subscribe({
           next: (): void => {
@@ -447,6 +463,12 @@ export class App implements OnInit {
     this.messages.set(this.messages().reverse());
     this.adjustScrolling();
     this.pendingFocus = true;
+  }
+
+  protected toggleAllowDMs(): void {
+    this.prefs.allowDMs = this.allowDMs();
+    this.prefService.set(this.prefs);
+    setTimeout(() => this.getMessages());
   }
 
   protected isAdmin(): boolean {

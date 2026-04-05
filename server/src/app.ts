@@ -137,7 +137,7 @@ app.get('/api/messages', async (req, res) => {
   }
 
   const db = await getDb();
-  const rows = (await db.all<DbMessage>('SELECT * FROM messages WHERE deleted = 0 ORDER BY messages.synced_time')).slice(-1000);
+  const rows = (await db.all<DbMessage>('SELECT * FROM messages WHERE deleted = 0 AND dm = 0 ORDER BY messages.synced_time')).slice(-1000);
   let messages = rows.filter(row => !row.deleted).map(row => ({
     email: row.email,
     hash: row.hash,
@@ -157,8 +157,12 @@ app.get('/api/messages', async (req, res) => {
   const hourAgo = now - 3600;
   let participant = await getNamedParticipantRecord(name);
 
-  if (participant && active && session.inChat)
-    await db.run('UPDATE participants SET last_active = ?, remote = 0 WHERE id = ?', now, participant.id);
+  if (participant) {
+    await db.run('UPDATE participants SET allow_dm = ? WHERE id = ?', +toBoolean(q.allowDMs), participant.id);
+
+    if (active && session.inChat)
+      await db.run('UPDATE participants SET last_active = ?, remote = 0 WHERE id = ?', now, participant.id);
+  }
 
   const participantNames = (await db.all<DbParticipant>('SELECT * FROM participants'))
     .filter(row => row.name !== proxyName && (row.last_active > hourAgo || row.last_post > hourAgo))
@@ -179,6 +183,7 @@ app.get('/api/messages', async (req, res) => {
     }
 
     if (participant) {
+      participantInfo.allowsDms = !!participant.allow_dm;
       participantInfo.idle = now - participant.last_active > (participant.remote ? 1800 : 600) ? 1 : 0;
       participantInfo.remote = !!participant.remote;
     }
@@ -195,7 +200,7 @@ app.get('/api/messages', async (req, res) => {
     messages = [null];
 
   await sessionsCheck();
-  res.json({ messages, participants, sc: sessions.size });
+  res.json({ messages, participants });
 });
 
 app.post('/api/enter', async (req, res) => {

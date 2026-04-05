@@ -93,9 +93,10 @@
   .tools {
     background-color: transparent;
     display: flex;
-    gap: 0.25em;
+    gap: 0.5em;
     opacity: 0;
     overflow: hidden;
+    padding: 0.25em;
     pointer-events: none;
 
     i {

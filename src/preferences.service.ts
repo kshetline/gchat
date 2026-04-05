@@ -3,7 +3,7 @@ import { clone, forEach, throttle } from '@tubular/util';
 import { Preferences } from '../server/src/shared-types';
 
 const defaultPrefs: Preferences = {
-  color: 0, email: '', localTime: true, name: '', newOnBottom: true, notifySound: true, tripCode: ''
+  allowDMs: false, color: 0, email: '', localTime: true, name: '', newOnBottom: true, notifySound: true, tripCode: ''
 };
 
 @Injectable({

@@ -56,6 +56,10 @@ main {
     &.native {
       font-weight: bold;
     }
+
+    i {
+      cursor: pointer;
+    }
   }
 
   .empty-chat {
@@ -174,6 +178,11 @@ main {
     display: flex;
     flex-direction: column;
     gap: 0.5em;
+
+    .checkbox-pair {
+      display: flex;
+      gap: 1em;
+    }
 
     &.in-chat {
       align-items: center;

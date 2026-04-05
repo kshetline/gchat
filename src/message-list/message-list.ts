@@ -8,8 +8,14 @@ import { HttpClient } from '@angular/common/http';
 const matchEmoji = /(((\uD83C[\uD000-\uDFFF]|\uD83D[\uD000-\uDFFF]|\uD83E[\uD000-\uDFFF])[\uFE00-\uFE0F]*?\u200D?)+)/g;
 const QUOTE_MARKER = '\u00A0◀︎ ';
 
+export interface DeleteEvent {
+  chatIndex: number;
+  msgId: number;
+}
+
 export interface EditEvent {
   bbCode: string;
+  chatIndex: number;
   color: number;
   msgId: number;
   time: string;
@@ -29,6 +35,7 @@ export class MessageList implements OnInit {
   protected toolHash = signal('');
   protected toolTimer: any;
 
+  chatIndex = input<number>(0);
   darkMode = input.required<boolean>();
   inChat = input.required<boolean>();
   isAdmin = input.required<boolean>();
@@ -40,7 +47,7 @@ export class MessageList implements OnInit {
   tripCode = input.required<string>();
 
   connectionTrouble = output<string>();
-  delete = output<number>();
+  delete = output<DeleteEvent>();
   edit = output<EditEvent>();
 
   private scrollCheck = debounce(100, () => {
@@ -141,7 +148,7 @@ export class MessageList implements OnInit {
     this.httpClient.get<any>('/api/can-edit',
       { params: { name: this.name(), tripCode: this.tripCode(), msgId: message.msgId } }).subscribe({
       next: (response): void => {
-        this.edit.emit({ bbCode: response.bbCode, color: response.color,
+        this.edit.emit({ bbCode: response.bbCode, color: response.color, chatIndex: this.chatIndex(),
           msgId: message.msgId, time: this.formatTime(message.time) });
       },
       error: (error): void => {
@@ -154,7 +161,7 @@ export class MessageList implements OnInit {
   }
 
   protected deleteMessage(message: Message): void {
-    this.delete.emit(message.msgId);
+    this.delete.emit({ chatIndex: this.chatIndex(), msgId: message.msgId });
   }
 
   protected scrollToBottom() {
