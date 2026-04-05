@@ -242,6 +242,74 @@ main {
   }
 }
 
+p-tabs {
+  overflow: hidden;
+
+  &.out-of-chat {
+    margin-bottom: 1em;
+  }
+
+  p-tablist {
+    background-color: transparent;
+    min-height: 38px;
+
+    p-tab {
+      background-color: #0004;
+      border-color: transparent;
+      color: var(--main-color);
+      margin: 0 0.25em;
+      opacity: 0.6;
+      padding: 0.75em;
+
+      &:hover {
+        color: inherit;
+      }
+
+      &.p-tab-active {
+        background-color: #0003;
+        border-color: var(--main-color);
+        opacity: 1;
+      }
+    }
+  }
+
+  p-tabpanels {
+    background-color: transparent;
+    overflow: hidden;
+    padding: 0.5em 0 0 0;
+
+    p-tabpanel {
+      color: var(--main-color);
+      display: flex;
+      max-height: 100%;
+
+      &[hidden] {
+        display: none;
+      }
+    }
+  }
+}
+
+.p-tablist-active-bar {
+  display: none;
+}
+
+.p-tablist-tab-list {
+  border-width: 0 !important;
+}
+
+:host-context(.theme-dark) {
+  p-tabs {
+    p-tablist {
+      p-tab {
+        &.p-tab-active {
+          background-color: #FFF3;
+        }
+      }
+    }
+  }
+}
+
 @media (max-width: 900px) {
   .form-h1 {
     display: inline-block;
@@ -278,8 +346,4 @@ main {
   .navigation {
     font-size: 0.8em;
   }
-}
-
-chat-message-list.in-chat {
-  margin-bottom: 1em;
 }

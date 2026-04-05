@@ -11,12 +11,13 @@ import { applyTheme, getThemeMenuStyle, getThemes, resetDefaultThemeBackground }
 import { EditEvent, MessageList } from '../message-list/message-list';
 import { ColorSelector } from '../color-selector/color-selector';
 import { Uploader } from '../uploader';
+import { TabsModule } from 'primeng/tabs';
 
 const REPOLL_RATE = 5000;
 
 @Component({
   selector: 'chat-root',
-  imports: [ColorSelector, FormsModule, MessageEntry, MessageList],
+  imports: [ColorSelector, FormsModule, MessageEntry, MessageList, TabsModule],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -42,6 +43,7 @@ export class App implements OnInit {
   protected color = signal(0);
   protected connectionTrouble = signal(false);
   protected darkMode = signal(false);
+  protected dms = signal(0);
   protected email = signal('');
   protected framed = /\bframed=true\b/.test(location.toString());
   protected inChat = signal(false);
