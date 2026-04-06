@@ -9,6 +9,7 @@ import { Emoji, EmojiData } from '@ctrl/ngx-emoji-mart/ngx-emoji';
 import { ColorSelector } from '../color-selector/color-selector';
 import { allowedExtensions, kaomoji, kaomojiRegex, MB, sizeMap } from '../../server/src/shared-types';
 import { EditEvent } from '../message-list/message-list';
+import { toObservable } from '@angular/core/rxjs-interop';
 
 export interface FileUploadEvent {
   file: File;
@@ -210,7 +211,6 @@ export class MessageEntry {
 
   protected editMode = signal(false);
   protected editTime = signal('');
-  protected enabled = signal(true);
   protected filePromptPosition = signal({ top: '0', left: '0' });
   protected lastSelectedFiles: File[];
   protected lengthWarning = signal(-1);
@@ -239,7 +239,7 @@ export class MessageEntry {
       bindings: {
         enter: {
           key: 'Enter',
-          'handler': () => this.sendMessage() // eslint-disable-line @stylistic/quote-props
+          'handler': () => !this.disabled() && this.sendMessage() // eslint-disable-line @stylistic/quote-props
         },
         tab: {
           key: 'Tab',
@@ -256,6 +256,7 @@ export class MessageEntry {
 
   darkMode = input(false);
   dmMode = input(false);
+  disabled = input(false);
   maxFileSizeInMb = input(15000);
   changeColor = output<number>();
   newMessage = output<string>();
@@ -305,10 +306,13 @@ export class MessageEntry {
           this.quill?.format('font', undefined);
       }
     });
+
+    toObservable(this.disabled).subscribe(state => this.quill?.enable(!state));
   }
 
   protected editorCreated(quill: Quill): void {
     this.quill = quill;
+    quill.enable(!this.disabled());
     quill.setText('');
     this.updateColor(false);
 
@@ -407,12 +411,7 @@ export class MessageEntry {
     this.newMessage.emit(message);
   }
 
-  setEnabled(enabled: boolean): void {
-    this.enabled.set(enabled);
-  }
-
   reset(): void {
-    this.setEnabled(true);
     this.quill.setText('');
   }
 

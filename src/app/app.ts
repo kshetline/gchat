@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, effect, OnInit, signal, ViewChild, WritableSignal } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, signal, ViewChild, WritableSignal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { Config, DmSession, Message, Messages, ParticipantInfo, Preferences } from '../../server/src/shared-types';
@@ -12,6 +12,8 @@ import { DeleteEvent, EditEvent, MessageList } from '../message-list/message-lis
 import { ColorSelector } from '../color-selector/color-selector';
 import { Uploader } from '../uploader';
 import { TabsModule } from 'primeng/tabs';
+import { NgTemplateOutlet } from '@angular/common';
+import { toObservable } from '@angular/core/rxjs-interop';
 
 const REPOLL_RATE = 5000;
 
@@ -25,7 +27,7 @@ interface DmInfo {
 
 @Component({
   selector: 'chat-root',
-  imports: [ColorSelector, FormsModule, MessageEntry, MessageList, TabsModule],
+  imports: [ColorSelector, FormsModule, MessageEntry, MessageList, NgTemplateOutlet, TabsModule],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -52,6 +54,7 @@ export class App implements OnInit {
   protected color = signal(0);
   protected connectionTrouble = signal(false);
   protected darkMode = signal(false);
+  protected disableEditor = signal(false);
   protected dms = signal([] as DmInfo[]);
   protected email = signal('');
   protected framed = /\bframed=true\b/.test(location.toString());
@@ -68,6 +71,7 @@ export class App implements OnInit {
   protected notifySound = signal(true);
   protected participants = signal([] as ParticipantInfo[]);
   protected selectedChat = signal(0);
+  protected sending = signal(false);
   protected showConfirmation = signal(false);
   protected showNotification = signal(false);
   protected showThemes = signal(false);
@@ -176,7 +180,9 @@ export class App implements OnInit {
     window.addEventListener('mousemove', () => this.activity = true);
     window.addEventListener('beforeunload', () => this.inChat() && this.leaveChat());
 
-    effect(() => this.prefs.color = this.color());
+    toObservable(this.color).subscribe(color => this.prefs.color = color);
+    toObservable(this.sending).subscribe(() => this.updateDisableEditor());
+    toObservable(this.selectedChat).subscribe(() => this.updateDisableEditor());
   }
 
   ngOnInit(): void {
@@ -366,7 +372,7 @@ export class App implements OnInit {
     if (!comment?.trim())
       return;
 
-    this.messageEntry.setEnabled(false);
+    this.sending.set(true);
 
     if (this.framed) {
       setTimeout(() => parent.postMessage(['sendChatMessage', comment, this.color(), this.tripCode()], '*'));
@@ -374,7 +380,7 @@ export class App implements OnInit {
 
       if (error) {
         notify('error', error);
-        this.messageEntry.setEnabled(true);
+        this.sending.set(false);
         return;
       }
     }
@@ -402,13 +408,14 @@ export class App implements OnInit {
               dmi.closed = true;
               this.dms.set(dms);
               this.tabChanged(this.selectedChat());
+              this.updateDisableEditor();
             }
           }
         }
         else
           this.connectionTrouble.set(true);
 
-        this.messageEntry.setEnabled(true);
+        this.sending.set(false);
       }
     });
   }
@@ -500,20 +507,20 @@ export class App implements OnInit {
 
     if (value as number > 0) {
       const dms = clone(this.dms());
-      const dm = dms.at(this.selectedChat() - 1);
+      const dm = dms.at(value as number - 1);
 
-      if (dm?.id && !dm.viewed) {
+      if (dm?.id && !dm.viewed && !dm.closed) {
         dm.viewed = true;
         this.dms.set(dms);
         this.httpClient.post('/api/start-chat', {}, { params: { id: dm.id } }).subscribe({ next: () => { } });
       }
-
-      this.messageEntry.setEnabled(!dm.closed);
     }
-    else
-      this.messageEntry.setEnabled(true);
 
     setTimeout(() => this.adjustScrolling(), 250);
+  }
+
+  private updateDisableEditor(): void {
+    this.disableEditor.set(this.sending() || (this.selectedChat() > 0 && !!this.dms()[this.selectedChat() - 1]?.closed));
   }
 
   protected adjustScrolling(onlyWhenClose = false): void {
@@ -628,7 +635,9 @@ export class App implements OnInit {
       }
     }
 
-    if (changed)
+    if (changed) {
       this.dms.set(currentDMs);
+      this.updateDisableEditor();
+    }
   }
 }

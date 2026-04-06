@@ -101,7 +101,7 @@ main {
   flex-direction: column;
   position: fixed;
   right: 0.5em;
-  top: 0.5em;
+  top: 1em;
   z-index: 1;
 
   .theme-list {
@@ -111,6 +111,7 @@ main {
     flex-direction: column;
     position: relative;
     right: 0;
+    top: 1em;
 
     > div {
       font-weight: bold;

@@ -26,6 +26,8 @@ const config: Config = {
   title: process.env.CHAT_TITLE,
 };
 const URL_MATCHER = /\b(https?:\/\/[-A-Za-z0-9+&@#/%?=~_()|!:,.;]*[-A-Za-z0-9+&@#/%=~_()|])/g;
+const MONITOR_INTERVAL = 60000; // 1 minute
+const MAX_DM_AGE = 3600; // 1 hour
 
 let proxyStarted = false;
 let lastContentUpdate = 0;
@@ -40,6 +42,18 @@ async function getServerIp(): Promise<string> {
 
   return serverIp;
 }
+
+async function monitor(): Promise<void> {
+  const db = await getDb();
+  const now = Math.floor(Date.now() / 1000);
+
+  await db.run('DELETE FROM messages WHERE dm > 0 AND synced_time < ?', now - MAX_DM_AGE);
+  await db.run('DELETE FROM dm_session WHERE name1_present = 0 AND name2_present = 0 AND last_post < ?', now - MAX_DM_AGE);
+
+  setTimeout(monitor, MONITOR_INTERVAL);
+}
+
+monitor().finally();
 
 async function sessionsCheck(): Promise<void> {
   const now = Math.floor(Date.now() / 1000);
