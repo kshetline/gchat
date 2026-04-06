@@ -1,4 +1,7 @@
 <div class="message-content">
+  @if (messages().length === 0) {
+    <div class="empty-chat">No messages available</div>
+  }
   @for (message of messages(); track message.hash) {
     <div class="message-row">
       <div class="name" [class.me]="message.isMe">

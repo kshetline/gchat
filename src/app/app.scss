@@ -260,6 +260,7 @@ main {
 }
 
 p-tabs {
+  height: 100%;
   overflow: hidden;
 
   &.out-of-chat {
@@ -287,11 +288,17 @@ p-tabs {
         border-color: var(--main-color);
         opacity: 1;
       }
+
+      .closer {
+        cursor: pointer;
+      }
     }
   }
 
   p-tabpanels {
     background-color: transparent;
+    max-height: 100%;
+    min-height: calc(100% - 38px);
     overflow: hidden;
     padding: 0.5em 0 0 0;
 

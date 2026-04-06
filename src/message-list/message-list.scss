@@ -3,6 +3,13 @@
   display: flex;
   overflow: hidden;
   position: relative;
+  width: 100%;
+}
+
+.empty-chat {
+  font-style: italic;
+  font-weight: bold;
+  padding: 1em;
 }
 
 .message-content {
@@ -10,7 +17,7 @@
   flex: 1;
   flex-direction: column;
   overflow-x: hidden;
-  overflow-y: scroll;
+  overflow-y: auto;
 }
 
 .email-link {

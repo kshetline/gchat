@@ -236,7 +236,7 @@ app.post('/api/enter', async (req, res) => {
     proxyStarted = true;
   }
 
-  res.send('null');
+  res.json(null);
 });
 
 app.post('/api/leave', async (req, res) => {
@@ -245,7 +245,7 @@ app.post('/api/leave', async (req, res) => {
   const session = sessions.get(token);
 
   if (!session?.inChat) {
-    res.send('null');
+    res.json(null);
     return;
   }
 
@@ -262,7 +262,7 @@ app.post('/api/leave', async (req, res) => {
     proxyStarted = false;
   }
 
-  res.send('null');
+  res.json(null);
 });
 
 function colorToStyle(color: number): string {
@@ -339,7 +339,7 @@ app.post('/api/send', async (req, res) => {
     await legacySendMessage(q.name, null, q.comment, q.color, q.tripCode);
   }
 
-  res.send('null');
+  res.json(null);
 });
 
 async function allowedToEdit(req: express.Request, res: express.Response, action = 'edit'): Promise<DbMessage> {
@@ -376,7 +376,7 @@ app.put('/api/update', async (req, res) => {
     await db.run('UPDATE messages SET edit_count = edit_count + 1, time = ?, message = ?, style = ? WHERE id = ?',
       now, q.bbCode.replace(URL_MATCHER, '[url=$1]$1[/url]'), colorToStyle(q.color), id);
 
-    res.send('null');
+    res.json(null);
   }
 });
 
@@ -387,7 +387,7 @@ app.delete('/api/delete', async (req, res) => {
 
     await db.run('UPDATE messages SET deleted = 1 WHERE id = ?', id);
 
-    res.send('null');
+    res.json(null);
   }
 });
 
@@ -403,26 +403,44 @@ app.post('/api/start-chat', async (req, res) => {
 
   const participant = await getNamedParticipantRecord(name);
 
-  if (!participant || !participant.allow_dm) {
+  if (!participant || !participant.allow_dm || !sessions.get(participant.session_id)?.inChat) {
     res.status(400).json({ error: `${name} is not available for direct messaging.` });
     return;
   }
 
+  const now = Math.floor(Date.now() / 1000);
   const db = await getDb();
   const dmSession = await db.get<DbDmSession>(`SELECT * FROM dm_session WHERE (name1 = ?1 AND name2 = ?2) OR
                                                  (name1 = ?2 AND name2 = ?1)`, name, self);
-
   if (dmSession) {
+    const whichName = dmSession.name1 === self ? 'name1_present' : 'name2_present';
+
+    await db.run(`UPDATE dm_session SET ${whichName} = 1, last_activity = ? WHERE id = ?`, now, dmSession.id);
     res.json({ id: dmSession.id });
     return;
   }
 
-  const now = Math.floor(Date.now() / 1000);
   const encryptionKey = randomBytes(32).toString('base64');
-  const result = await db.run('INSERT INTO dm_session (name1, name2, key, start_time, last_activity) VALUES (?, ?, ?, ?, ?)',
+  const result = await db.run('INSERT INTO dm_session (name1, name2, name1_present, key, start_time, last_activity) VALUES (?, ?, 1, ?, ?, ?)',
     self, name, encryptionKey, now, now);
 
   res.json({ id: result.lastID });
+});
+
+app.post('/api/leave-chat', async (req, res) => {
+  const q = req.query as any;
+  const self = q.self;
+  const id = toInt(q.id);
+  const db = await getDb();
+  const dmSession = await db.get<DbDmSession>(`SELECT * FROM dm_session WHERE id = ?`, id);
+
+  if (dmSession) {
+    const whichName = dmSession.name1 === self ? 'name1_present' : 'name2_present';
+
+    await db.run(`UPDATE dm_session SET ${whichName} = 0 WHERE id = ?`, id);
+  }
+
+  res.json(null);
 });
 
 app.post('/api/upload', async (req, res) => {

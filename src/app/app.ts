@@ -16,9 +16,9 @@ import { TabsModule } from 'primeng/tabs';
 const REPOLL_RATE = 5000;
 
 interface DmInfo {
+  id: number;
   name: string;
   messages: WritableSignal<Message[]>;
-  tripCode: string;
 }
 
 @Component({
@@ -475,8 +475,12 @@ export class App implements OnInit {
     return false;
   }
 
-  private adjustScrolling(onlyWhenClose = false): void {
-    const messages = document.querySelector('chat-message-list .message-content');
+  protected tabChanged(): void {
+    setTimeout(() => this.adjustScrolling(), 250);
+  }
+
+  protected adjustScrolling(onlyWhenClose = false): void {
+    const messages = document.querySelector('p-tabpanel.p-tabpanel-active chat-message-list .message-content');
     // Need to check closeness before any new messages are added.
     const close = this.newOnBottom() ?
       messages.scrollTop >= messages.scrollHeight - messages.clientHeight - 30 :
@@ -519,13 +523,39 @@ export class App implements OnInit {
     if (name === this.name())
       return;
 
-    for (let i = 0; i < this.dms().length; i++) {
-      const dm = this.dms()[i];
+    const match = this.dms().findIndex(dm => dm.name === name);
 
-      if (dm.name === name) {
-        this.selectedChat.set(i + 1);
-        return;
-      }
+    if (match >= 0) {
+      this.selectedChat.set(match + 1);
+      return;
     }
+
+    this.httpClient.post<{ id: number }>('/api/start-chat', {}, { params: { self: this.name(), name } }).subscribe({
+      next: data => {
+        const match = this.dms().findIndex(dm => dm.id === data.id);
+
+        if (match >= 0) {
+          this.selectedChat.set(match + 1);
+          return;
+        }
+
+        const dms = clone(this.dms());
+
+        dms.push({ id: data.id, name, messages: signal<Message[]>([]) });
+        this.dms.set(dms);
+        this.selectedChat.set(dms.length);
+      },
+      error: (error): void => notify('error', error.error?.error || 'Failed to start chat')
+    })
+  }
+
+  protected closeChat(tabIndex: number): void {
+    const dms = clone(this.dms());
+    const id = dms[tabIndex].id;
+
+    dms.splice(tabIndex, 1);
+    this.dms.set(dms);
+    this.selectedChat.set(0);
+    this.httpClient.post('/api/leave-chat', {}, { params: { self: this.name(), id } }).subscribe();
   }
 }
