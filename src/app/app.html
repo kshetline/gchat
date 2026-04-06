@@ -72,7 +72,12 @@
     @if (participants()?.length > 0) {
       @for (participant of participants(); track participant.name) {
         <span class="participant" [class.native]="!participant.remote" [class.idle]="!!participant.idle"
-          >{{ participant.name }}@if (participant.allowsDms) { &nbsp;<i class="fa-regular fa-comment"></i>}</span>
+              [class.can-chat]="participant.allowsDms && participant.name !== name()" (click)="startChat(participant.name)"
+          >{{ participant.name }}
+          @if (participant.allowsDms) {
+            &nbsp;<i class="fa-regular fa-comment"></i>
+          }
+        </span>
       }
     }
     @else {

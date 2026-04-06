@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
-import { randomUUID } from 'crypto';
-import { colors, Config, DbMessage, DbParticipant, Message, ParticipantInfo } from './shared-types.js';
+import { randomUUID, randomBytes, createCipheriv, createDecipheriv } from 'crypto';
+import { colors, Config, DbDmSession, DbMessage, DbParticipant, Message, ParticipantInfo } from './shared-types.js';
 import { checksum53, isEqual, processMillis, toBoolean, toInt } from '@tubular/util';
 import { uploadSingle } from './uploader.js';
 import { SessionInfo } from './session-info';
@@ -275,6 +275,37 @@ function styleToColor(styleOrColor: string): number {
   return Math.max(0, colors.findIndex(c => color === c.trim()));
 }
 
+export function encryptMessage(text: string, keyBase64: string): string {
+  const key = Buffer.from(keyBase64, 'base64');
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+
+  return `${iv.toString('base64')}:${Buffer.concat([encrypted, authTag]).toString('base64')}`;
+}
+
+export function decryptMessage(encryptedText: string, keyBase64: string): string {
+  try {
+    const key = Buffer.from(keyBase64, 'base64');
+    const [ivBase64, dataBase64] = encryptedText.split(':');
+    const iv = Buffer.from(ivBase64, 'base64');
+    const data = Buffer.from(dataBase64, 'base64');
+    const authTag = data.subarray(data.length - 16);
+    const ciphertext = data.subarray(0, data.length - 16);
+    const decipher = createDecipheriv('aes-256-gcm', key, iv);
+
+    decipher.setAuthTag(authTag);
+
+    return decipher.update(ciphertext) + decipher.final('utf8');
+  }
+  catch (e) {
+    console.error('Error decrypting message:', e);
+  }
+
+  return null;
+}
+
 app.post('/api/send', async (req, res) => {
   const token = getToken(req);
   const session = sessions.get(token);
@@ -358,6 +389,40 @@ app.delete('/api/delete', async (req, res) => {
 
     res.send('null');
   }
+});
+
+app.post('/api/start-chat', async (req, res) => {
+  const q = req.query as any;
+  const self = q.self;
+  const name = q.name;
+
+  if (self === name) {
+    res.status(400).json({ error: 'Cannot start a chat with yourself (not this way, at least).' });
+    return;
+  }
+
+  const participant = await getNamedParticipantRecord(name);
+
+  if (!participant || !participant.allow_dm) {
+    res.status(400).json({ error: `${name} is not available for direct messaging.` });
+    return;
+  }
+
+  const db = await getDb();
+  const dmSession = await db.get<DbDmSession>(`SELECT * FROM dm_session WHERE (name1 = ?1 AND name2 = ?2) OR
+                                                 (name1 = ?2 AND name2 = ?1)`, name, self);
+
+  if (dmSession) {
+    res.json({ id: dmSession.id });
+    return;
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const encryptionKey = randomBytes(32).toString('base64');
+  const result = await db.run('INSERT INTO dm_session (name1, name2, key, start_time, last_activity) VALUES (?, ?, ?, ?, ?)',
+    self, name, encryptionKey, now, now);
+
+  res.json({ id: result.lastID });
 });
 
 app.post('/api/upload', async (req, res) => {

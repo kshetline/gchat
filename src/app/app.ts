@@ -514,4 +514,18 @@ export class App implements OnInit {
         parent.postMessage(['revert'], '*');
     }
   }
+
+  protected startChat(name: string): void {
+    if (name === this.name())
+      return;
+
+    for (let i = 0; i < this.dms().length; i++) {
+      const dm = this.dms()[i];
+
+      if (dm.name === name) {
+        this.selectedChat.set(i + 1);
+        return;
+      }
+    }
+  }
 }

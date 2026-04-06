@@ -7,14 +7,6 @@ import { colors } from '../server/src/shared-types';
 bootstrapApplication(App, appConfig)
   .catch(err => console.error(err));
 
-export const kaomoji = [
-  '(＾_＾)', '(＾_＾；)', '(*＾＾*)', '(；_；)', '(ーー；', 'ｍ（_ _）ｍ', '(・_・)', '(＾＾）/~~',
-  '(＠_＠)', '＼（＾Ｏ＾）／', '(？_？)', '(｀・ω・´) ', 'ヽ(´ー｀)ノ', '(;´Д`)', 'ヽ(´∇`)ノ', '(´∇`)σ',
-  '(;^Д^)', '(;ﾟ∇ﾟ)', '(;ﾟДﾟ)', 'ヽ(`Д´)ノ', '(ρ_;)', '(´￢`)', 'ヽ(ﾟρﾟ)ノ', 'ヽ(´π｀)ノ',
-  '(ﾟДﾟ)', '(´人｀)', 'ъ( ﾟｰ^)', '(⌒∇⌒ゞ)', '(^^;ﾜﾗ', '┐(´∀｀)┌', '(｀∩´)σ'
-];
-export const kaomojiRegex = new RegExp(`(${kaomoji.map(regexEscape).join('|')})`, 'g');
-
 export function colorByIndex(index: number, darkMode = false): string {
   if (index === 0 && darkMode)
     return '#FFFFFF';

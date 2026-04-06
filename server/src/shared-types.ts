@@ -1,5 +1,17 @@
+import { regexEscape } from '@tubular/util';
+
 export const colors = ['#000000', '#000080', '#4444CC', '#44CC44', '#CC9911', '#CC4444', '#CC6600',
                        '#008040 ', '#33AAAA', '#CC44CC', '#800000', '#FF80C0', '#B87333', '#8CA9D9', '#4682B4'];
+
+export const kaomoji = [
+  '(＾_＾)', '(＾_＾；)', '(*＾＾*)', '(；_；)', '(ーー；', 'ｍ（_ _）ｍ', '(・_・)', '(＾＾）/~~',
+  '(＠_＠)', '＼（＾Ｏ＾）／', '(？_？)', '(｀・ω・´) ', 'ヽ(´ー｀)ノ', '(;´Д`)', 'ヽ(´∇`)ノ', '(´∇`)σ',
+  '(;^Д^)', '(;ﾟ∇ﾟ)', '(;ﾟДﾟ)', 'ヽ(`Д´)ノ', '(ρ_;)', '(´￢`)', 'ヽ(ﾟρﾟ)ノ', 'ヽ(´π｀)ノ',
+  '(ﾟДﾟ)', '(´人｀)', 'ъ( ﾟｰ^)', '(⌒∇⌒ゞ)', '(^^;ﾜﾗ', '┐(´∀｀)┌', '(｀∩´)σ'
+];
+
+export const kaomojiRegex = new RegExp(`(${kaomoji.map(regexEscape).join('|')})`, 'g');
+export const kaomojiEndRegex = new RegExp(`\u2000?(${kaomoji.map(regexEscape).join('|')})$`);
 
 export interface Config {
   backgroundColor: string;
@@ -57,6 +69,15 @@ export interface ParticipantInfo {
   idle?: number;
   name: string;
   remote?: boolean;
+}
+
+export interface DbDmSession {
+  id: number;
+  key: string;
+  name1: string;
+  name2: string;
+  start_time: number;
+  last_activity: number;
 }
 
 export interface DmSession {

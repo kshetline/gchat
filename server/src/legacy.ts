@@ -1,4 +1,4 @@
-import { DbMessage, DbParticipant, Message, Messages, ParticipantInfo } from './shared-types.js';
+import { DbMessage, DbParticipant, kaomojiEndRegex, Message, Messages, ParticipantInfo } from './shared-types.js';
 import { checksum53, encodeForUri, processMillis } from '@tubular/util';
 import axios from 'axios';
 import { HtmlParser } from 'fortissimo-html';
@@ -34,7 +34,8 @@ export function addPendingDuplicate(id: number, time: number, name: string, comm
 }
 
 function extractMessage(messageRow: DomNode): Message {
-  const bbCode = getTextAndMarkupAsBBCode(messageRow.querySelector('.messageComment').children, domain);
+  const bbCode = getTextAndMarkupAsBBCode(messageRow.querySelector('.messageComment').children, domain)
+    .replace(kaomojiEndRegex, '\u2000$1\u2000');
   const html = convertBBCodeToHtml(bbCode);
   const nameElem = messageRow.querySelector('.messageName');
   const style = nameElem?.valuesLookup['style'];
@@ -124,6 +125,21 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
         latestPosts.get(participant), participant);
 
   return { messages, participants };
+}
+
+function simplifyError(err: any): any {
+  const message = err.message || err.toString();
+
+  if (message.includes('ERR_NAME_NOT_RESOLVED'))
+    return 'Chat server not found';
+  else if (message.includes('ERR_CONNECTION_REFUSED'))
+    return 'Chat server refused connection';
+  else if (message.includes('ERR_CONNECTION_RESET'))
+    return 'Chat server reset connection';
+  else if (message.includes('ETIMEDOUT'))
+    return 'Chat server timed out';
+
+  return err;
 }
 
 async function pollLegacyMessages(overrideCount?: number): Promise<void> {
@@ -224,7 +240,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
     }
   }
   catch (err) {
-    console.error('Error polling legacy chat:', err);
+    console.error('Error polling legacy chat:', simplifyError(err));
   }
 
   setTimeout(pollLegacyMessages, 10_000);

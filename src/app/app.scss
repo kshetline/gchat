@@ -58,7 +58,15 @@ main {
     }
 
     i {
+      opacity: 0.4;
+    }
+
+    &.can-chat {
       cursor: pointer;
+
+      i {
+        opacity: 1;
+      }
     }
   }
 

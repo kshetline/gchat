@@ -3,11 +3,11 @@ import { FormsModule } from '@angular/forms';
 import Quill from 'quill';
 import { QuillModule  } from 'ngx-quill';
 import { forEach } from '@tubular/util';
-import { colorByIndex, getTextBackground, kaomoji, kaomojiRegex, notify, shouldIgnoreClick, startClickSuppress } from '../main';
+import { colorByIndex, getTextBackground, notify, shouldIgnoreClick, startClickSuppress } from '../main';
 import { PickerComponent } from '@ctrl/ngx-emoji-mart';
 import { Emoji, EmojiData } from '@ctrl/ngx-emoji-mart/ngx-emoji';
 import { ColorSelector } from '../color-selector/color-selector';
-import { allowedExtensions, MB, sizeMap } from '../../server/src/shared-types';
+import { allowedExtensions, kaomoji, kaomojiRegex, MB, sizeMap } from '../../server/src/shared-types';
 import { EditEvent } from '../message-list/message-list';
 
 export interface FileUploadEvent {
