@@ -77,12 +77,12 @@ export interface DbDmSession {
   name1: string;
   name2: string;
   start_time: number;
-  last_activity: number;
+  last_active: number;
+  last_post: number;
 }
 
 export interface DmSession {
   id: number;
-  key: string;
   messages: Message[];
   name: string;
 }

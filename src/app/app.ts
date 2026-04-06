@@ -1,7 +1,7 @@
 import { ChangeDetectorRef, Component, effect, OnInit, signal, ViewChild, WritableSignal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { Config, Message, Messages, ParticipantInfo, Preferences } from '../../server/src/shared-types';
+import { Config, DmSession, Message, Messages, ParticipantInfo, Preferences } from '../../server/src/shared-types';
 import { clone, forEach, isAndroid, isEqual } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
@@ -19,6 +19,7 @@ interface DmInfo {
   id: number;
   name: string;
   messages: WritableSignal<Message[]>;
+  viewed?: boolean;
 }
 
 @Component({
@@ -285,6 +286,7 @@ export class App implements OnInit {
         else
           this.connectionTrouble.set(true);
 
+        this.receiveDirectMessages(messages.dms);
         this.repollMessages();
       },
       error: (_error): void => {
@@ -376,7 +378,8 @@ export class App implements OnInit {
       }
     }
 
-    const params = { ...this.prefs, comment, framed: this.framed };
+    const dm = this.selectedChat() === 0 ? 0 : this.dms()[this.selectedChat() - 1].id;
+    const params = { ...this.prefs, comment, framed: this.framed, dm };
 
     this.httpClient.post('/api/send', {}, { params }).subscribe({
       next: (): void => {
@@ -476,6 +479,17 @@ export class App implements OnInit {
   }
 
   protected tabChanged(): void {
+    if (this.selectedChat() > 0) {
+      const dms = clone(this.dms());
+      const dm = dms.at(this.selectedChat() - 1);
+
+      if (dm?.id && !dm.viewed) {
+        dm.viewed = true;
+        this.dms.set(dms);
+        this.httpClient.post('/api/start-chat', {}, { params: { id: dm.id } }).subscribe();
+      }
+    }
+
     setTimeout(() => this.adjustScrolling(), 250);
   }
 
@@ -557,5 +571,30 @@ export class App implements OnInit {
     this.dms.set(dms);
     this.selectedChat.set(0);
     this.httpClient.post('/api/leave-chat', {}, { params: { self: this.name(), id } }).subscribe();
+  }
+
+  protected receiveDirectMessages(dms: DmSession[]): void {
+    const currentDMs = clone(this.dms());
+    let changed = false;
+
+    for (const dm of dms) {
+      const index = currentDMs.findIndex(d => d.id === dm.id);
+
+      if (index >= 0) {
+        const oldMessages = currentDMs[index].messages();
+
+        if (!isEqual(oldMessages, dm.messages)) {
+          currentDMs[index].messages.set(dm.messages);
+          changed = true;
+        }
+      }
+      else if (this.prefs.allowDMs) {
+        currentDMs.push({ id: dm.id, name: dm.name, messages: signal(dm.messages) });
+        changed = true;
+      }
+    }
+
+    if (changed)
+      this.dms.set(currentDMs);
   }
 }

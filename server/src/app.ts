@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { randomUUID, randomBytes, createCipheriv, createDecipheriv } from 'crypto';
-import { colors, Config, DbDmSession, DbMessage, DbParticipant, Message, ParticipantInfo } from './shared-types.js';
+import { colors, Config, DbDmSession, DbMessage, DbParticipant, DmSession, Message, ParticipantInfo } from './shared-types.js';
 import { checksum53, isEqual, processMillis, toBoolean, toInt } from '@tubular/util';
 import { uploadSingle } from './uploader.js';
 import { SessionInfo } from './session-info';
@@ -54,6 +54,34 @@ async function sessionsCheck(): Promise<void> {
       sessions.delete(sessionId);
     }
   }
+}
+
+async function getDirectMessages(name: string): Promise<DmSession[]> {
+  const db = await getDb();
+  const result: DmSession[] = [];
+  const dmSessions = await db.all<DbDmSession>('SELECT * FROM dm_session WHERE name1 = ? or name2 = ?', name, name);
+
+  for (const dmSession of dmSessions) {
+    const rows = (await db.all<DbMessage>(
+      'SELECT * FROM messages WHERE deleted = 0 AND dm = ? ORDER BY messages.synced_time',
+      dmSession.id)).slice(-1000);
+    const messages = rows.filter(row => !row.deleted).map(row => ({
+      email: row.email,
+      hash: row.hash,
+      html: convertBBCodeToHtml(decryptMessage(row.message, dmSession.key)) || '???',
+      isMe: row.name === name,
+      msgId: row.id,
+      name: row.name,
+      remote: !!row.remote,
+      style: row.style,
+      time: row.synced_time,
+      trip: row.remote ? row.trip : tripcode(row.trip)
+    } as Message));
+
+    result.push({ id: dmSession.id, messages, name: dmSession.name1 === name ? dmSession.name2 : dmSession.name1 });
+  }
+
+  return result;
 }
 
 app.set('trust proxy', 1);
@@ -200,7 +228,7 @@ app.get('/api/messages', async (req, res) => {
     messages = [null];
 
   await sessionsCheck();
-  res.json({ messages, participants });
+  res.json({ messages, participants, dms: await getDirectMessages(name) });
 });
 
 app.post('/api/enter', async (req, res) => {
@@ -275,7 +303,7 @@ function styleToColor(styleOrColor: string): number {
   return Math.max(0, colors.findIndex(c => color === c.trim()));
 }
 
-export function encryptMessage(text: string, keyBase64: string): string {
+function encryptMessage(text: string, keyBase64: string): string {
   const key = Buffer.from(keyBase64, 'base64');
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key, iv);
@@ -313,24 +341,36 @@ app.post('/api/send', async (req, res) => {
   const now = Math.floor(Date.now() / 1000);
   const q = req.query as any;
   const style = colorToStyle(q.color);
-  const comment = q.comment.replace(URL_MATCHER, '[url=$1]$1[/url]');
+  let comment = q.comment.replace(URL_MATCHER, '[url=$1]$1[/url]');
   const hash = checksum53(`${q.name};${q.tripCode || ''};${new Date(now * 1000).toISOString().substring(0, 19)}`);
   const framed = toBoolean(q.framed);
+  const dm = toInt(q.dm);
+  let dmSession: DbDmSession;
 
-  const result = await db.run('INSERT INTO messages (time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    now, now, q.name, q.tripCode, q.email, 0, session.ip, token, style, comment, hash);
+  if (dm && !(dmSession = await db.get<DbDmSession>('SELECT * FROM dm_session WHERE id = ?', dm))) {
+    res.status(400).json({ error: 'Invalid direct message ID.' });
+    return;
+  }
+  else
+    comment = encryptMessage(comment, dmSession.key);
 
-  if (framed)
+  const result = await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    dm, now, now, q.name, q.tripCode, q.email, 0, session.ip, token, style, comment, hash);
+
+  if (!dm && framed)
     addPendingDuplicate(result.lastID, now, q.name, comment);
 
   await db.run('UPDATE participants SET last_post = ?1, last_active = ?1 WHERE name = ?2 and remote = 0', now, q.name);
+
+  if (dmSession)
+    await db.run('UPDATE dm_session SET last_post = ? WHERE id = ?', now, dmSession.id);
 
   const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', q.name);
 
   if (participant)
     await db.run('UPDATE participants SET last_post = ?1, last_active = ?1 WHERE id = ?2', now, participant.id);
 
-  if (!framed) {
+  if (!dm && !framed) {
     if (!proxyStarted) {
       await enterLegacyChat(proxyName, null, 0);
       proxyStarted = true;
@@ -408,21 +448,21 @@ app.post('/api/start-chat', async (req, res) => {
     return;
   }
 
-  const now = Math.floor(Date.now() / 1000);
   const db = await getDb();
   const dmSession = await db.get<DbDmSession>(`SELECT * FROM dm_session WHERE (name1 = ?1 AND name2 = ?2) OR
                                                  (name1 = ?2 AND name2 = ?1)`, name, self);
   if (dmSession) {
     const whichName = dmSession.name1 === self ? 'name1_present' : 'name2_present';
 
-    await db.run(`UPDATE dm_session SET ${whichName} = 1, last_activity = ? WHERE id = ?`, now, dmSession.id);
+    await db.run(`UPDATE dm_session SET ${whichName} = 1 WHERE id = ?`, dmSession.id);
     res.json({ id: dmSession.id });
     return;
   }
 
+  const now = Math.floor(Date.now() / 1000);
   const encryptionKey = randomBytes(32).toString('base64');
-  const result = await db.run('INSERT INTO dm_session (name1, name2, name1_present, key, start_time, last_activity) VALUES (?, ?, 1, ?, ?, ?)',
-    self, name, encryptionKey, now, now);
+  const result = await db.run('INSERT INTO dm_session (name1, name2, name1_present, key, start_time) VALUES (?, ?, 1, ?, ?)',
+    self, name, encryptionKey, now);
 
   res.json({ id: result.lastID });
 });

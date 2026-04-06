@@ -53,7 +53,7 @@ export async function getDb(): Promise<AsyncDatabase> {
       "name2" TEXT NOT NULL,
       "name2_present" INTEGER NOT NULL DEFAULT 0,
       "start_time" INTEGER NOT NULL,
-      "last_activity" INTEGER NOT NULL,
+      "last_post" INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY("id" AUTOINCREMENT)
   )`);
 
