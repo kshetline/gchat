@@ -128,18 +128,18 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
 }
 
 function simplifyError(err: any): any {
-  const message = err.message || err.toString();
+  const message = err.code || err.message || err.toString();
 
-  if (message.includes('ERR_NAME_NOT_RESOLVED'))
+  if (message.includes('ENOTFOUND'))
     return 'Chat server not found';
-  else if (message.includes('ERR_CONNECTION_REFUSED'))
+  else if (message.includes('ECONNREFUSED'))
     return 'Chat server refused connection';
-  else if (message.includes('ERR_CONNECTION_RESET'))
+  else if (message.includes('ECONNRESET'))
     return 'Chat server reset connection';
   else if (message.includes('ETIMEDOUT'))
     return 'Chat server timed out';
 
-  return err;
+  return message;
 }
 
 async function pollLegacyMessages(overrideCount?: number): Promise<void> {

@@ -406,12 +406,12 @@ export class MessageEntry {
     this.newMessage.emit(message);
   }
 
-  sendEnabled(enabled: boolean): void {
+  setEnabled(enabled: boolean): void {
     this.enabled.set(enabled);
   }
 
   reset(): void {
-    this.sendEnabled(true);
+    this.setEnabled(true);
     this.quill.setText('');
   }
 

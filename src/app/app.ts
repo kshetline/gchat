@@ -16,9 +16,10 @@ import { TabsModule } from 'primeng/tabs';
 const REPOLL_RATE = 5000;
 
 interface DmInfo {
+  closed?: boolean;
   id: number;
-  name: string;
   messages: WritableSignal<Message[]>;
+  name: string;
   viewed?: boolean;
 }
 
@@ -365,7 +366,7 @@ export class App implements OnInit {
     if (!comment?.trim())
       return;
 
-    this.messageEntry.sendEnabled(false);
+    this.messageEntry.setEnabled(false);
 
     if (this.framed) {
       setTimeout(() => parent.postMessage(['sendChatMessage', comment, this.color(), this.tripCode()], '*'));
@@ -373,7 +374,7 @@ export class App implements OnInit {
 
       if (error) {
         notify('error', error);
-        this.messageEntry.sendEnabled(true);
+        this.messageEntry.setEnabled(true);
         return;
       }
     }
@@ -389,9 +390,25 @@ export class App implements OnInit {
         this.messageEntry.reset();
         setTimeout(() => this.getMessages(), 500);
       },
-      error: (_error): void => {
-        this.connectionTrouble.set(true);
-        this.messageEntry.sendEnabled(true);
+      error: (error): void => {
+        if (error.error?.error) {
+          notify('error', error.error.error);
+
+          if (error.error.closed) {
+            const dms = clone(this.dms());
+            const dmi = dms.find(d => d.id === dm);
+
+            if (dmi) {
+              dmi.closed = true;
+              this.dms.set(dms);
+              this.tabChanged();
+            }
+          }
+        }
+        else
+          this.connectionTrouble.set(true);
+
+        this.messageEntry.setEnabled(true);
       }
     });
   }
@@ -486,9 +503,13 @@ export class App implements OnInit {
       if (dm?.id && !dm.viewed) {
         dm.viewed = true;
         this.dms.set(dms);
-        this.httpClient.post('/api/start-chat', {}, { params: { id: dm.id } }).subscribe();
+        this.httpClient.post('/api/start-chat', {}, { params: { id: dm.id } }).subscribe({ next: () => { } });
       }
+
+      this.messageEntry.setEnabled(!dm.closed);
     }
+    else
+      this.messageEntry.setEnabled(true);
 
     setTimeout(() => this.adjustScrolling(), 250);
   }
@@ -563,14 +584,18 @@ export class App implements OnInit {
     })
   }
 
-  protected closeChat(tabIndex: number): void {
+  protected closeChat(evt: Event, tabIndex: number): void {
     const dms = clone(this.dms());
     const id = dms[tabIndex].id;
+    const viewed = !!dms[tabIndex].viewed;
 
+    this.selectedChat.set(0);
+    evt.preventDefault();
+    evt.stopPropagation();
     dms.splice(tabIndex, 1);
     this.dms.set(dms);
-    this.selectedChat.set(0);
-    this.httpClient.post('/api/leave-chat', {}, { params: { self: this.name(), id } }).subscribe();
+    this.httpClient.post('/api/leave-chat', {}, { params: { self: this.name(), id, viewed } })
+      .subscribe({ next: () => this.changeRef.detectChanges(), error: () => this.changeRef.detectChanges() });
   }
 
   protected receiveDirectMessages(dms: DmSession[]): void {
@@ -590,6 +615,13 @@ export class App implements OnInit {
       }
       else if (this.prefs.allowDMs) {
         currentDMs.push({ id: dm.id, name: dm.name, messages: signal(dm.messages) });
+        changed = true;
+      }
+    }
+
+    for (const dm of currentDMs) {
+      if (dms.findIndex(d => d.id === dm.id) < 0) {
+        dm.closed = true;
         changed = true;
       }
     }

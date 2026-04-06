@@ -348,7 +348,7 @@ app.post('/api/send', async (req, res) => {
   let dmSession: DbDmSession;
 
   if (dm && !(dmSession = await db.get<DbDmSession>('SELECT * FROM dm_session WHERE id = ?', dm))) {
-    res.status(400).json({ error: 'Invalid direct message ID.' });
+    res.status(400).json({ error: 'This chat session is closed', closed: true });
     return;
   }
   else
@@ -475,9 +475,13 @@ app.post('/api/leave-chat', async (req, res) => {
   const dmSession = await db.get<DbDmSession>(`SELECT * FROM dm_session WHERE id = ?`, id);
 
   if (dmSession) {
-    const whichName = dmSession.name1 === self ? 'name1_present' : 'name2_present';
+    if (!toBoolean(q.viewed))
+      await db.run('DELETE FROM dm_session WHERE id = ?', id);
+    else {
+      const whichName = dmSession.name1 === self ? 'name1_present' : 'name2_present';
 
-    await db.run(`UPDATE dm_session SET ${whichName} = 0 WHERE id = ?`, id);
+      await db.run(`UPDATE dm_session SET ${whichName} = 0 WHERE id = ?`, id);
+    }
   }
 
   res.json(null);

@@ -36,6 +36,7 @@ export class MessageList implements OnInit {
   protected toolTimer: any;
 
   chatIndex = input<number>(0);
+  closed = input<boolean>(false);
   darkMode = input.required<boolean>();
   inChat = input.required<boolean>();
   isAdmin = input.required<boolean>();

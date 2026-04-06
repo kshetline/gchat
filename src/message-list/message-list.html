@@ -2,6 +2,9 @@
   @if (messages().length === 0) {
     <div class="empty-chat">No messages available</div>
   }
+  @if (closed() && !isAtBottom()) {
+    <div class="closed-chat">This chat session is closed</div>
+  }
   @for (message of messages(); track message.hash) {
     <div class="message-row">
       <div class="name" [class.me]="message.isMe">
@@ -38,6 +41,9 @@
         }
       </div>
     </div>
+  }
+  @if (closed() && isAtBottom()) {
+    <div class="closed-chat">This chat session is closed</div>
   }
 </div>
 <div class="scroll-to-top" (click)="scrollToTop()" [class.show]="showScrollToTop()"
