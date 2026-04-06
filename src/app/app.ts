@@ -401,7 +401,7 @@ export class App implements OnInit {
             if (dmi) {
               dmi.closed = true;
               this.dms.set(dms);
-              this.tabChanged();
+              this.tabChanged(this.selectedChat());
             }
           }
         }
@@ -495,8 +495,10 @@ export class App implements OnInit {
     return false;
   }
 
-  protected tabChanged(): void {
-    if (this.selectedChat() > 0) {
+  protected tabChanged(value: number | string): void {
+    this.selectedChat.set(value as number);
+
+    if (value as number > 0) {
       const dms = clone(this.dms());
       const dm = dms.at(this.selectedChat() - 1);
 

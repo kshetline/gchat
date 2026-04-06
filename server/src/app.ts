@@ -331,7 +331,7 @@ export function decryptMessage(encryptedText: string, keyBase64: string): string
     console.error('Error decrypting message:', e);
   }
 
-  return null;
+  return encryptedText;
 }
 
 app.post('/api/send', async (req, res) => {
@@ -347,12 +347,15 @@ app.post('/api/send', async (req, res) => {
   const dm = toInt(q.dm);
   let dmSession: DbDmSession;
 
-  if (dm && !(dmSession = await db.get<DbDmSession>('SELECT * FROM dm_session WHERE id = ?', dm))) {
-    res.status(400).json({ error: 'This chat session is closed', closed: true });
-    return;
+  if (dm) {
+    dmSession = await db.get<DbDmSession>('SELECT * FROM dm_session WHERE id = ?', dm);
+    if (!dmSession) {
+      res.status(400).json({ error: 'This chat session is closed', closed: true });
+      return;
+    }
+    else
+      comment = encryptMessage(comment, dmSession.key);
   }
-  else
-    comment = encryptMessage(comment, dmSession.key);
 
   const result = await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     dm, now, now, q.name, q.tripCode, q.email, 0, session.ip, token, style, comment, hash);
@@ -391,8 +394,16 @@ async function allowedToEdit(req: express.Request, res: express.Response, action
 
   if (message && message.name === q.name &&
       ((message.trip && (message.trip === q.tripCode || message.trip === tripCode)) ||
-        message.session_id !== getToken(req)))
+        message.session_id !== getToken(req))) {
+    if (message.dm) {
+      const dmSession = await db.get<DbDmSession>('SELECT * FROM dm_session WHERE id = ?', message.dm);
+
+      if (dmSession)
+        message.message = decryptMessage(message.message, dmSession.key);
+    }
+
     return message;
+  }
 
   res.status(400).json({ error: `You are not authorized to ${action} this message.` });
 
@@ -412,9 +423,18 @@ app.put('/api/update', async (req, res) => {
     const id = toInt(q.msgId);
     const db = await getDb();
     const now = Math.floor(Date.now() / 1000);
+    let bbCode = (q.bbCode as string).replace(URL_MATCHER, '[url=$1]$1[/url]');
+    const dm = (await db.get<any>('SELECT dm FROM messages WHERE id = ?', id))?.dm as number;
+
+    if (dm) {
+      const dmSession = await db.get<DbDmSession>('SELECT * FROM dm_session WHERE id = ?', dm);
+
+      if (dmSession)
+        bbCode = encryptMessage(bbCode, dmSession.key);
+    }
 
     await db.run('UPDATE messages SET edit_count = edit_count + 1, time = ?, message = ?, style = ? WHERE id = ?',
-      now, q.bbCode.replace(URL_MATCHER, '[url=$1]$1[/url]'), colorToStyle(q.color), id);
+      now, bbCode, colorToStyle(q.color), id);
 
     res.json(null);
   }

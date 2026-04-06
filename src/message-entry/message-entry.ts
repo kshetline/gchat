@@ -255,6 +255,7 @@ export class MessageEntry {
   };
 
   darkMode = input(false);
+  dmMode = input(false);
   maxFileSizeInMb = input(15000);
   changeColor = output<number>();
   newMessage = output<string>();
@@ -517,10 +518,12 @@ export class MessageEntry {
   insertQuote(name: string, quote: string): void {
     let index = 0;
 
-    this.quill.insertText(index, name, { underline: true });
-    index += name.length;
-    this.quill.insertText(index, QUOTE_NAME_DELIM, { underline: false });
-    index += QUOTE_NAME_DELIM.length;
+    if (!this.dmMode()) {
+      this.quill.insertText(index, name, { underline: true });
+      index += name.length;
+      this.quill.insertText(index, QUOTE_NAME_DELIM, { underline: false });
+      index += QUOTE_NAME_DELIM.length;
+    }
 
     const parts = quote.split(kaomojiRegex);
 

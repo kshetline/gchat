@@ -36,6 +36,7 @@ export interface Message {
 
 export interface DbMessage {
   deleted: boolean;
+  dm: number;
   edit_count: number;
   email: string;
   hash: string;
@@ -75,9 +76,10 @@ export interface DbDmSession {
   id: number;
   key: string;
   name1: string;
+  name1_present: number;
   name2: string;
+  name2_present: number;
   start_time: number;
-  last_active: number;
   last_post: number;
 }
 

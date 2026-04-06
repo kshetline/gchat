@@ -87,10 +87,10 @@
   </div>
   @if (inChat() && !newOnBottom()) {
     <chat-message-entry class="on-top" [darkMode]="darkMode()" [maxFileSizeInMb]="maxFileSizeInMb()"
-        (uploadFile)="upload($event)" (changeColor)="setColor($event)"
+        [dmMode]="selectedChat() > 0" (uploadFile)="upload($event)" (changeColor)="setColor($event)"
         (newMessage)="sendComment($event)" (updateMessage)="updateMessage($event)"></chat-message-entry>
   }
-  <p-tabs [value]="selectedChat()" [class.out-of-chat]="!inChat()" (valueChange)="tabChanged()">
+  <p-tabs [value]="selectedChat()" [class.out-of-chat]="!inChat()" (valueChange)="tabChanged($event)">
     <p-tablist [style.display]="dms().length > 0 ? 'flex' : 'none'">
       <p-tab [value]="0">Main chat</p-tab>
       @for (dm of dms(); track dm.name; let i = $index) {
@@ -119,7 +119,7 @@
   </p-tabs>
   @if (inChat() && newOnBottom()) {
     <chat-message-entry class="at-bottom" [darkMode]="darkMode()" [maxFileSizeInMb]="maxFileSizeInMb()"
-        (uploadFile)="upload($event)" (changeColor)="setColor($event)"
+        [dmMode]="selectedChat() > 0" (uploadFile)="upload($event)" (changeColor)="setColor($event)"
         (newMessage)="sendComment($event)" (updateMessage)="updateMessage($event)"></chat-message-entry>
   }
   @if (!inChat() && newOnBottom()) {

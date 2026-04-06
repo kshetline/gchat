@@ -272,21 +272,20 @@ p-tabs {
     min-height: 38px;
 
     p-tab {
-      background-color: #0004;
+      align-self: flex-end;
+      background-color: #0003;
       border-color: transparent;
       color: var(--main-color);
       margin: 0 0.25em;
-      opacity: 0.6;
-      padding: 0.75em;
+      padding: 0.5em 0.75em;
 
       &:hover {
         color: inherit;
       }
 
       &.p-tab-active {
-        background-color: #0003;
         border-color: var(--main-color);
-        opacity: 1;
+        padding: 0.75em;
       }
 
       .closer {
@@ -326,9 +325,7 @@ p-tabs {
   p-tabs {
     p-tablist {
       p-tab {
-        &.p-tab-active {
-          background-color: #FFF3;
-        }
+        background-color: #FFF3;
       }
     }
   }
