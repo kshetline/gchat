@@ -2,14 +2,14 @@ import express from 'express';
 import cors from 'cors';
 import { randomUUID, randomBytes, createCipheriv, createDecipheriv } from 'crypto';
 import { colors, Config, DbDmSession, DbMessage, DbParticipant, DmSession, Message, ParticipantInfo } from './shared-types.js';
-import { checksum53, isEqual, processMillis, toBoolean, toInt } from '@tubular/util';
+import { isEqual, processMillis, toBoolean, toInt } from '@tubular/util';
 import { uploadSingle } from './uploader.js';
 import { SessionInfo } from './session-info';
 import { addPendingDuplicate, enterLegacyChat, leaveLegacyChat, legacySendMessage } from './legacy.js';
 import { getDb, getNamedParticipantRecord } from './db.js';
 import ip_ from 'ip';
 import axios from 'axios';
-import { convertBBCodeToHtml, getIp } from './chat-util.js';
+import { convertBBCodeToHtml, getIp, messageHash } from './chat-util.js';
 import tripcode from 'tripcode';
 import path from 'path';
 
@@ -28,6 +28,8 @@ const config: Config = {
 const URL_MATCHER = /\b(https?:\/\/[-A-Za-z0-9+&@#/%?=~_()|!:,.;]*[-A-Za-z0-9+&@#/%=~_()|])/g;
 const MONITOR_INTERVAL = 60000; // 1 minute
 const MAX_DM_AGE = 3600; // 1 hour
+const MAX_HISTORY = 2000; // chat messages to keep in DB
+const MAX_HISTORY_TOLERANCE = 200; // Overflow before deleting messages
 
 let proxyStarted = false;
 let lastContentUpdate = 0;
@@ -49,6 +51,12 @@ async function monitor(): Promise<void> {
 
   await db.run('DELETE FROM messages WHERE dm > 0 AND synced_time < ?', now - MAX_DM_AGE);
   await db.run('DELETE FROM dm_session WHERE name1_present = 0 AND name2_present = 0 AND last_post < ?', now - MAX_DM_AGE);
+
+  const messageCount = (await db.get<any>('SELECT COUNT(*) as count FROM messages'))?.count || 0;
+
+  if (messageCount > MAX_HISTORY + MAX_HISTORY_TOLERANCE)
+    await db.run('DELETE FROM messages WHERE id IN (SELECT id FROM messages ORDER BY messages.synced_time LIMIT ?)',
+      messageCount - MAX_HISTORY);
 
   setTimeout(monitor, MONITOR_INTERVAL);
 }
@@ -392,7 +400,7 @@ app.post('/api/send', async (req, res) => {
   const q = req.query as any;
   const style = colorToStyle(q.color);
   let comment = q.comment.replace(URL_MATCHER, '[url=$1]$1[/url]');
-  const hash = checksum53(`${q.name};${q.tripCode || ''};${new Date(now * 1000).toISOString().substring(0, 19)}`);
+  const hash = messageHash(q.name, q.tripCode, now);
   const framed = toBoolean(q.framed);
   const dm = toInt(q.dm);
   let dmSession: DbDmSession;

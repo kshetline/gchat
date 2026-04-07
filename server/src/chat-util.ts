@@ -1,9 +1,16 @@
-import { htmlEscape, htmlUnescape } from '@tubular/util';
+import { checksum53, htmlEscape, htmlUnescape, isNumber } from '@tubular/util';
 import { DomElement, DomNode } from 'fortissimo-html/dist/dom.js';
 import express from 'express';
 
 export function getIp(req: express.Request): string {
   return req.ip || req.socket?.remoteAddress || (req as any).connection?.remoteAddress || (req as any).connection?.socket?.remoteAddress;
+}
+
+export function messageHash(name: string, trip: string, timestamp: string | number): string {
+  if (isNumber(timestamp))
+    timestamp = new Date(timestamp * 1000).toISOString().slice(0, 19);
+
+  return checksum53(`${name};${trip || ''};${timestamp}`);
 }
 
 export function convertBBCodeToHtml(text: string): string {

@@ -185,6 +185,7 @@ export class App implements OnInit {
     toObservable(this.color).subscribe(color => this.prefs.color = color);
     toObservable(this.sending).subscribe(() => this.updateDisableEditor());
     toObservable(this.selectedChat).subscribe(() => this.updateDisableEditor());
+    toObservable(this.allowDMs).subscribe(() => this.getMessages());
   }
 
   ngOnInit(): void {

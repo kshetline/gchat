@@ -1,11 +1,11 @@
 import { DbMessage, DbParticipant, kaomojiEndRegex, Message, Messages, ParticipantInfo } from './shared-types.js';
-import { checksum53, encodeForUri, processMillis } from '@tubular/util';
+import { encodeForUri, processMillis } from '@tubular/util';
 import axios from 'axios';
 import { HtmlParser } from 'fortissimo-html';
 import { DomNode } from 'fortissimo-html/dist/dom.js';
 import * as puppeteer from 'puppeteer';
 import { getDb } from './db.js';
-import { convertBBCodeToHtml, getTextAndMarkupAsBBCode } from './chat-util.js';
+import { convertBBCodeToHtml, getTextAndMarkupAsBBCode, messageHash } from './chat-util.js';
 import tripcode from 'tripcode';
 
 const domain = process.env.CHAT_DOMAIN;
@@ -54,7 +54,7 @@ function extractMessage(messageRow: DomNode): Message {
   const timestamp = parts?.length !== 6 ? null : `${parts[0]}-${parts[1]}-${parts[2]}T${parts[3]}:${parts[4]}:${parts[5]}`;
   const time = Math.floor(new Date(timestamp + 'Z').getTime() / 1000);
   const trip = (nameElem?.children?.at(nameIndex + 1) as DomNode)?.content?.substring(1);
-  const hash = checksum53(`${name};${trip || ''};${timestamp}`);
+  const hash = messageHash(name, trip, timestamp);
 
   return { bbCode, email, hash, msgId: -1, name, style, html, remote: true, time, trip };
 }
@@ -101,12 +101,10 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
 
         // Still not found? Then it probably comes from a different chat proxy. Fix the name and treat it as a new message.
         if (result.changes === 0) {
-          const timestamp = new Date(message.time * 1000).toISOString().slice(0, 19);
-
           message.name = name;
           message.bbCode = msg;
           message.trip = trip?.slice(1) || '';
-          message.hash = checksum53(`${name};${trip || ''};${timestamp}`);
+          message.hash = messageHash(name, trip, message.time);
 
           const index = messages.findIndex(m => m.time >= message.time);
 
@@ -148,9 +146,12 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
     (lastLegacyPoll < 0 || now > lastLegacyPoll + 3_600_000 ? 1000 : now > lastLegacyPoll + 600_000 ? 200 : 30);
 
   try {
+    const db = await getDb();
+    const existing = (await db.all<any>('SELECT hash, synced_time FROM messages WHERE deleted = 0'))
+      .reduce((acc, row) => acc.set(row.hash, row.synced_time), new Map<string, number>());
     const messages = await getLegacyMessages(proxyName, retrieveCount);
     let earliest = Number.MAX_SAFE_INTEGER;
-    const db = await getDb();
+    let latest = 0;
     const row = await db.get<DbMessage>('SELECT time FROM messages ORDER BY time DESC LIMIT 1');
     const latestInDb = row?.time;
     const clockNow = Math.floor(Date.now() / 1000);
@@ -175,11 +176,14 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
 
         await db.run('UPDATE messages SET synced_time = ?, hash = ? WHERE id = ?', message.time, message.hash, duplicate.id);
       }
+
+      existing.delete(message.hash);
     }
 
     for (const message of messages.messages || []) {
       if (message.time) {
         earliest = Math.min(message.time, earliest);
+        latest = Math.max(message.time, latest);
 
         if (message.time > latestInDb - 300 || retrieveCount >= 1000) {
           let row = await db.get<DbMessage>('SELECT hash FROM messages WHERE hash = ? LIMIT 1', message.hash);
@@ -193,6 +197,23 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
             await db.run('INSERT INTO messages (time, synced_time, name, trip, email, remote, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
               message.time, message.time, message.name, message.trip, message.email, 1, message.style, message.bbCode, message.hash);
         }
+      }
+    }
+
+    [...existing.entries()].forEach(([hash, time]) => (time < earliest || time > latestInDb) && existing.delete(hash));
+
+    // Check messages in our DB which are not found in the legacy chat anymore, at least with a matching hash.
+    for (const hash of existing.keys()) {
+      const time = existing.get(hash);
+      const row = await db.get<DbMessage>('SELECT * FROM messages WHERE hash = ? LIMIT 1', hash);
+
+      if (row) {
+        // Within 5 seconds of the timestamp in the DB, update the synced_time column.
+        if (Math.abs(time - row.synced_time) < 5)
+          await db.run('UPDATE messages SET synced_time = ? WHERE hash = ?', time, messageHash(row.name, row.trip, time));
+        // Otherwise, presume the message was administratively deleted on the legacy site, and follow suit here.
+        else
+          await db.run('UPDATE messages SET deleted = 1 WHERE hash = ?', hash);
       }
     }
 
