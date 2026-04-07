@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comchat-Mods
 // @namespace    https://chatproxy.chat/
-// @version      2026-04-02
+// @version      2026-04-07
 // @description  Enhance Comchat functionality
 // @author       Anonymous
 // @license      MIT
@@ -145,6 +145,8 @@
       formDoc = formFrame.contentDocument;
       formDoc.getElementById('notificationSoundCheckbox').checked = false;
       localStorage.setItem('notificationSoundEnabled', 'false');
+      formDoc.querySelector('input[name="comment"]').value = '';
+      formDoc.querySelector('#face').value = '';
     });
   }
 

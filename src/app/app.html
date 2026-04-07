@@ -96,10 +96,19 @@
   }
   <p-tabs [value]="selectedChat()" [class.out-of-chat]="!inChat()" (valueChange)="tabChanged($event)">
     <p-tablist [style.display]="dms().length > 0 ? 'flex' : 'none'">
-      <p-tab [value]="0">Main chat</p-tab>
+      <p-tab [value]="0">
+        Main chat
+        @if (unseenMessages() > 0) {
+          <span class="unseen-count"> ({{ unseenMessages() }})</span>
+        }
+      </p-tab>
       @for (dm of dms(); track dm.name; let i = $index) {
         <p-tab [value]="i + 1"><i class="fa-regular fa-comment"></i> {{ dm.name }}
-          <i class="fa-solid fa-circle-xmark closer" (click)="closeChat($event, i)"></i></p-tab>
+          @if (dm.missed() > 0) {
+            <span class="unseen-count"> ({{ dm.missed() }})</span>
+          }
+          <i class="fa-solid fa-circle-xmark closer" (click)="closeChat($event, i)"></i>
+        </p-tab>
       }
     </p-tablist>
     <p-tabpanels>

@@ -2,7 +2,7 @@ import { ChangeDetectorRef, Component, OnInit, signal, ViewChild, WritableSignal
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { Config, DmSession, Message, Messages, ParticipantInfo, Preferences } from '../../server/src/shared-types';
-import { clone, forEach, isAndroid, isEqual } from '@tubular/util';
+import { clone, forEach, isAndroid, isEqual, processMillis } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { FileUploadEvent, MessageEntry, MessageUpdateEvent } from '../message-entry/message-entry';
@@ -21,6 +21,7 @@ interface DmInfo {
   closed?: boolean;
   id: number;
   messages: WritableSignal<Message[]>;
+  missed: WritableSignal<number>;
   name: string;
   viewed?: boolean;
 }
@@ -36,6 +37,7 @@ export class App implements OnInit {
   protected themes = getThemes();
 
   private readonly chime = new Audio('assets/notify.wav');
+  private readonly chimeDM = new Audio('assets/notifyDM.wav');
   private readonly prefs: Preferences;
 
   private activity = false;
@@ -43,11 +45,10 @@ export class App implements OnInit {
   private baseTitle = 'Chat';
   private chatActive = true;
   private confirmCallback: (approved: boolean) => void;
-  private lastMessageId: string;
+  private lastReceiveTime = 0
   private _messageEntry: MessageEntry;
   private messageTimer: any;
   private pendingFocus = false;
-  private unseenMessages = 0;
   private uploader: Uploader;
 
   protected allowDMs = signal(false);
@@ -77,6 +78,7 @@ export class App implements OnInit {
   protected showThemes = signal(false);
   protected title = signal(this.baseTitle);
   protected tripCode = signal('');
+  protected unseenMessages = signal(0);
 
   get messageEntry(): MessageEntry { return this._messageEntry; }
   @ViewChild(MessageEntry) set messageEntry(value: MessageEntry) {
@@ -105,9 +107,9 @@ export class App implements OnInit {
       try {
         const config = JSON.parse(configStr) as Config;
 
-        document.title = this.baseTitle = config.title;
-        parent.postMessage(['updateTitle', config.title], '*');
+        this.baseTitle = config.title;
         this.title.set(config.title);
+        this.updateTitle();
         root.style.setProperty('--primary-background', config.backgroundColor || '#DDD');
         this.navigation.set(config.navigation);
         this.maxFileSizeInMb.set(config.fileSizeLimitInMb || 15000);
@@ -123,9 +125,9 @@ export class App implements OnInit {
         resetDefaultThemeBackground();
         this.setTheme(this.prefs.theme);
         this.connectionTrouble.set(false);
-        document.title = config.title;
-        parent.postMessage(['updateTitle', config.title], '*');
+        this.baseTitle = config.title;
         this.title.set(config.title);
+        this.updateTitle();
         this.navigation.set(config.navigation);
         this.maxFileSizeInMb.set(config.fileSizeLimitInMb || 15000);
         localStorage.setItem('gchat-config', JSON.stringify(config));
@@ -188,6 +190,12 @@ export class App implements OnInit {
   ngOnInit(): void {
     registerNotificationHandler(this.notify);
     this.initToken().then(() => this.getMessages());
+
+    // Make sure message polling is running
+    setInterval(() => {
+      if (processMillis() > this.lastReceiveTime + REPOLL_RATE + 2000)
+        this.getMessages();
+    }, 1000);
   }
 
   private async initToken(): Promise<void> {
@@ -219,14 +227,21 @@ export class App implements OnInit {
 
   private checkChatActive(active?: boolean): void {
     if (active)
-      this.chatActive = active;
+      this.activity = active;
 
     this.chatActive = document.hasFocus() && !document.hidden;
 
     if (this.chatActive) {
-      this.unseenMessages = 0;
-      document.title = this.baseTitle;
-      parent.postMessage(['updateTitle', this.baseTitle], '*');
+      if (this.selectedChat() === 0)
+        this.unseenMessages.set(0);
+      else {
+        const dms = clone(this.dms(), true);
+
+        dms[this.selectedChat() - 1].missed.set(0);
+        this.dms.set(dms);
+      }
+
+      this.updateTitle();
     }
   }
 
@@ -255,29 +270,20 @@ export class App implements OnInit {
       }).subscribe({
       next: (messages: Messages): void => {
         if (!messages.errorMessage) {
+          this.lastReceiveTime = processMillis();
           this.connectionTrouble.set(false);
           this.checkChatActive();
 
           if (!isEqual(messages.messages, [null])) {
-            let newMessageCount = 1;
-            const previousLastMessageIndex = this.lastMessageId ?
-              messages.messages.findIndex(m => m.hash === this.lastMessageId) : -1;
-
-            if (previousLastMessageIndex >= 0)
-              newMessageCount = messages.messages.length - previousLastMessageIndex - 1;
-
-            this.lastMessageId = messages.messages.at(-1).hash;
-
             if (!this.newOnBottom())
               messages.messages.reverse();
 
             const changed = !isEqual(messages.messages, this.messages());
 
-            if (changed || previousLastMessageIndex !== messages.messages.length - 1) {
-              if (this.messages().length > 0 && !this.chatActive) {
-                this.unseenMessages += newMessageCount;
-                document.title = `(${this.unseenMessages}) ${this.baseTitle}`;
-                parent.postMessage(['updateTitle', document.title], '*');
+            if (changed) {
+              if (this.messages().length > 0 && (!this.chatActive || this.selectedChat() !== 0)) {
+                this.unseenMessages.set(this.unseenMessages() + this.countNewMessages(messages.messages, this.messages()));
+                this.updateTitle();
 
                 if (this.prefs.notifySound)
                   this.chime.play().finally();
@@ -301,6 +307,13 @@ export class App implements OnInit {
         this.repollMessages();
       }
     });
+  }
+
+  protected updateTitle(): void {
+    const unseen = this.unseenMessages() + this.dms().reduce((sum, dm) => sum + dm.missed(), 0);
+
+    document.title = `${unseen ? '(' + unseen + ') ' : ''}${this.baseTitle}`;
+    parent.postMessage(['updateTitle', document.title], '*');
   }
 
   protected async enterChat(): Promise<void> {
@@ -332,7 +345,7 @@ export class App implements OnInit {
         this.pendingFocus = true;
         this.inChat.set(true);
         this.changeRef.detectChanges();
-        setTimeout(() => this.adjustScrolling(), 250);
+        this.delayedAdjustScrolling();
       },
       error: (error): void => {
         if (error.status === 400 && error.error?.error)
@@ -362,7 +375,7 @@ export class App implements OnInit {
       next: (): void => {
         this.connectionTrouble.set(false);
         this.inChat.set(false);
-        setTimeout(() => this.adjustScrolling());
+        this.delayedAdjustScrolling();
       },
       error: (_error): void => this.connectionTrouble.set(true)
     });
@@ -402,7 +415,7 @@ export class App implements OnInit {
           notify('error', error.error.error);
 
           if (error.error.closed) {
-            const dms = clone(this.dms());
+            const dms = clone(this.dms(), true);
             const dmi = dms.find(d => d.id === dm);
 
             if (dmi) {
@@ -507,8 +520,13 @@ export class App implements OnInit {
     this.selectedChat.set(value as number);
 
     if (value as number > 0) {
-      const dms = clone(this.dms());
+      const dms = clone(this.dms(), true);
       const dm = dms.at(value as number - 1);
+
+      if (this.chatActive) {
+        dm.missed.set(0);
+        this.updateTitle();
+      }
 
       if (dm?.id && !dm.viewed && !dm.closed) {
         dm.viewed = true;
@@ -517,7 +535,7 @@ export class App implements OnInit {
       }
     }
 
-    setTimeout(() => this.adjustScrolling(), 250);
+    this.delayedAdjustScrolling();
   }
 
   private updateDisableEditor(): void {
@@ -541,6 +559,10 @@ export class App implements OnInit {
       else if (!this.newOnBottom() && (!onlyWhenClose || close))
         messages.scrollTop = 0;
     });
+  }
+
+  protected delayedAdjustScrolling(onlyWhenClose = false): void {
+    setTimeout(() => this.adjustScrolling(onlyWhenClose), 250);
   }
 
   protected setTheme(theme: string): void {
@@ -584,9 +606,9 @@ export class App implements OnInit {
           return;
         }
 
-        const dms = clone(this.dms());
+        const dms = clone(this.dms(), true);
 
-        dms.push({ id: data.id, name, messages: signal<Message[]>([]) });
+        dms.push({ id: data.id, name, messages: signal<Message[]>([]), missed: signal(0) });
         this.dms.set(dms);
         this.selectedChat.set(dms.length);
       },
@@ -595,7 +617,7 @@ export class App implements OnInit {
   }
 
   protected closeChat(evt: Event, tabIndex: number): void {
-    const dms = clone(this.dms());
+    const dms = clone(this.dms(), true);
     const id = dms[tabIndex].id;
     const viewed = !!dms[tabIndex].viewed;
 
@@ -608,23 +630,34 @@ export class App implements OnInit {
       .subscribe({ next: () => this.changeRef.detectChanges(), error: () => this.changeRef.detectChanges() });
   }
 
+  private countNewMessages(oldMessages: Message[], newMessages: Message[]): number {
+    const latest = oldMessages.reduce((acc, msg) => Math.max(acc, msg.time, 0), 0);
+    const newCount = newMessages.reduce((acc, msg) => acc + (!msg.isMe && msg.time > latest ? 1 : 0), 0);
+
+    return Math.max(newCount, 1);
+  }
+
   protected receiveDirectMessages(dms: DmSession[]): void {
-    const currentDMs = clone(this.dms());
+    const currentDMs = clone(this.dms(), true);
     let changed = false;
+    let newDMs = false;
 
     for (const dm of dms) {
       const index = currentDMs.findIndex(d => d.id === dm.id);
 
       if (index >= 0) {
-        const oldMessages = currentDMs[index].messages();
+        const currentDM = currentDMs[index];
+        const oldMessages = currentDM.messages();
 
         if (!isEqual(oldMessages, dm.messages)) {
-          currentDMs[index].messages.set(dm.messages);
+          currentDM.missed.set(currentDM.missed() + this.countNewMessages(oldMessages, dm.messages));
+          currentDM.messages.set(dm.messages);
           changed = true;
+          newDMs = true;
         }
       }
       else if (this.prefs.allowDMs) {
-        currentDMs.push({ id: dm.id, name: dm.name, messages: signal(dm.messages) });
+        currentDMs.push({ id: dm.id, name: dm.name, messages: signal(dm.messages), missed: signal(0) });
         changed = true;
       }
     }
@@ -639,6 +672,11 @@ export class App implements OnInit {
     if (changed) {
       this.dms.set(currentDMs);
       this.updateDisableEditor();
+      this.updateTitle();
+      this.adjustScrolling(true);
     }
+
+    if (newDMs && this.prefs.notifySound)
+      this.chimeDM.play().finally();
   }
 }

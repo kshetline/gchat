@@ -131,7 +131,7 @@ main {
   color: white;
   padding: 0.25em 0.5em;
   position: fixed;
-  right: 2.25em;
+  right: 2.75em;
   top: 0.5em;
   z-index: 2;
 
@@ -287,6 +287,10 @@ p-tabs {
       &.p-tab-active {
         border-color: var(--main-color);
         padding: 0.75em;
+      }
+
+      .unseen-count {
+        font-size: 0.8em;
       }
 
       .closer {
