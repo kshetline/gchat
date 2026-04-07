@@ -393,6 +393,7 @@ export class App implements OnInit {
         this.connectionTrouble.set(false);
         this.inChat.set(true);
         this.changeRef.detectChanges();
+        this.sending.set(false);
         this.messageEntry.reset();
         setTimeout(() => this.getMessages(), 500);
       },

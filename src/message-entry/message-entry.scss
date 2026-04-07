@@ -4,7 +4,6 @@
   flex-wrap: wrap;
   margin: 0.5em 0;
   padding: 0.75em 0;
-  position: relative;
 
   &.on-top {
     border-bottom: 1px solid #CCC;
@@ -12,6 +11,16 @@
     margin-top: 0;
     padding-top: 0.25em
   }
+
+  > div {
+    position: relative;
+    width: 100%;
+  }
+}
+
+.input-disabled {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 #my-toolbar {
