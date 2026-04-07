@@ -193,7 +193,7 @@ app.get('/api/messages', async (req, res) => {
     hash: row.hash,
     html: convertBBCodeToHtml(row.message),
     isMe: row.name === name && (row.session_id === getToken(req) || row.ip === session.ip ||
-      (row.trip && (row.trip === q.trip || row.trip === tripCode))),
+      (row.trip && (row.trip === q.tripCode || row.trip === tripCode))),
     msgId: row.id,
     name: row.name,
     remote: !!row.remote,
