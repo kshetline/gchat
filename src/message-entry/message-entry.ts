@@ -413,6 +413,7 @@ export class MessageEntry {
 
   reset(): void {
     this.quill.setText('');
+    this.focus();
   }
 
   private togglePanel(state: WritableSignal<any>, position: WritableSignal<any>, btn: string, panel: string): void {
