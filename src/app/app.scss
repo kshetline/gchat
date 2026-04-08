@@ -55,10 +55,13 @@ main {
 
     &.native {
       font-weight: bold;
+      -webkit-text-stroke: 1px #AAF;
+      paint-order: stroke fill;
     }
 
     i {
       opacity: 0.4;
+      -webkit-text-stroke-width: 0;
     }
 
     &.can-chat {
@@ -81,6 +84,10 @@ main {
     position: absolute;
     width: 100%;
   }
+}
+
+:host-context(.theme-dark) .participants .participant.native {
+  -webkit-text-stroke: 1px #00F;
 }
 
 :host-context(.theme-li1999) .participants {

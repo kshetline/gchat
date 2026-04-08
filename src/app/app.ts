@@ -45,6 +45,7 @@ export class App implements OnInit {
   private baseTitle = 'Chat';
   private chatActive = true;
   private confirmCallback: (approved: boolean) => void;
+  private dmsJustClosed = new Map<number, number>();
   private lastReceiveTime = 0
   private _messageEntry: MessageEntry;
   private messageTimer: any;
@@ -265,6 +266,7 @@ export class App implements OnInit {
           active: wasActive,
           allowDMs: this.allowDMs(),
           force: this.messages().length < 1,
+          inChat: this.inChat(),
           name: this.name(),
           tripCode: this.tripCode()
         }
@@ -627,6 +629,7 @@ export class App implements OnInit {
     evt.stopPropagation();
     dms.splice(tabIndex, 1);
     this.dms.set(dms);
+    this.dmsJustClosed.set(id, processMillis());
     this.httpClient.post('/api/leave-chat', {}, { params: { self: this.name(), id, viewed } })
       .subscribe({ next: () => this.changeRef.detectChanges(), error: () => this.changeRef.detectChanges() });
   }
@@ -657,11 +660,14 @@ export class App implements OnInit {
           newDMs = true;
         }
       }
-      else if (this.prefs.allowDMs) {
+      else if (this.prefs.allowDMs && !this.dmsJustClosed.get(dm.id)) {
         currentDMs.push({ id: dm.id, name: dm.name, messages: signal(dm.messages), missed: signal(0) });
         changed = true;
       }
     }
+
+    const minuteAgo = processMillis() - 60000;
+    [...this.dmsJustClosed.keys()].forEach(id => this.dmsJustClosed.get(id) < minuteAgo && this.dmsJustClosed.delete(id));
 
     for (const dm of currentDMs) {
       if (dms.findIndex(d => d.id === dm.id) < 0) {

@@ -178,12 +178,15 @@ app.get('/api/messages', async (req, res) => {
   const session = sessions.get(getToken(req));
   const q = req.query as any;
   const tripCode = tripcode(q.tripCode);
-  const name = q.name as string;
+  const name = ((q.name || '') as string).replace(/#.*$/, '');
   const now = Math.floor(Date.now() / 1000);
 
   if (session) {
     session.lastAlive = now;
     session.name = name;
+
+    if (q.inChat != null)
+      session.inChat = toBoolean(q.inChat);
   }
 
   const db = await getDb();
@@ -204,7 +207,7 @@ app.get('/api/messages', async (req, res) => {
 
   const active = toBoolean(req.query.active);
   const force = toBoolean(req.query.force);
-  const hourAgo = now - 3600;
+  const twoHoursAgo = now - 7200;
   let participant = await getNamedParticipantRecord(name);
 
   if (participant) {
@@ -214,9 +217,9 @@ app.get('/api/messages', async (req, res) => {
       await db.run('UPDATE participants SET last_active = ?, remote = 0 WHERE id = ?', now, participant.id);
   }
 
-  const participantNames = (await db.all<DbParticipant>('SELECT * FROM participants'))
-    .filter(row => row.name !== proxyName && (row.last_active > hourAgo || row.last_post > hourAgo))
-    .map(row => row.name);
+  const participantNames = (await db.all<any>(
+    'SELECT name FROM participants WHERE name != ?1 AND (last_active > ?2 OR last_post > ?2)',
+      proxyName, twoHoursAgo)).map(r => r.name);
   const participants = [...new Set(participantNames)].sort().map(p => ({ name: p } as ParticipantInfo));
 
   for (let i = participants.length - 1; i >= 0; --i) {
@@ -224,9 +227,14 @@ app.get('/api/messages', async (req, res) => {
     const participant = await getNamedParticipantRecord(participantInfo.name);
 
     if (!participant.remote) {
-      const session = sessions.get(participant.session_id);
+      let session2 = sessions.get(participant.session_id);
 
-      if (session && !session.inChat) {
+      if (!session2 && participant.name === name) {
+        session2 = session;
+        await db.run('UPDATE participants SET session_id = ? WHERE id = ?', getToken(req), participant.id);
+      }
+
+      if (session2 && !session2.inChat) {
         participants.splice(i, 1);
         continue;
       }
@@ -404,6 +412,8 @@ app.post('/api/send', async (req, res) => {
   const framed = toBoolean(q.framed);
   const dm = toInt(q.dm);
   let dmSession: DbDmSession;
+
+  session.inChat = true;
 
   if (dm) {
     dmSession = await db.get<DbDmSession>('SELECT * FROM dm_session WHERE id = ?', dm);
