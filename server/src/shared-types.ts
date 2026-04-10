@@ -104,6 +104,7 @@ export interface Preferences {
   name: string;
   newOnBottom: boolean;
   notifySound: boolean;
+  suppressUploadWarning: boolean;
   theme?: string;
   tripCode: string;
 }

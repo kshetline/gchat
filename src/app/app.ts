@@ -14,6 +14,8 @@ import { Uploader } from '../uploader';
 import { TabsModule } from 'primeng/tabs';
 import { NgTemplateOutlet } from '@angular/common';
 import { toObservable } from '@angular/core/rxjs-interop';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { ConfirmationService } from 'primeng/api';
 
 const REPOLL_RATE = 5000;
 const CONSIDER_AFK_TIME = 600000; // 10 minutes
@@ -29,7 +31,7 @@ interface DmInfo {
 
 @Component({
   selector: 'chat-root',
-  imports: [ColorSelector, FormsModule, MessageEntry, MessageList, NgTemplateOutlet, TabsModule],
+  imports: [ColorSelector, ConfirmDialogModule, FormsModule, MessageEntry, MessageList, NgTemplateOutlet, TabsModule],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -98,7 +100,12 @@ export class App implements OnInit {
     }
   }
 
-  constructor(private httpClient: HttpClient, private prefService: PreferencesService, private changeRef: ChangeDetectorRef) {
+  constructor(
+    private httpClient: HttpClient,
+    private prefService: PreferencesService,
+    private changeRef: ChangeDetectorRef,
+    private confirmationService: ConfirmationService
+  ) {
     this.uploader = new Uploader(this.httpClient);
     this.prefs = this.prefService.get();
     forEach(this.prefs as Record<string, any>, (key, value) => (this as any)[key] && (this as any)[key]?.set(value));
@@ -485,8 +492,47 @@ export class App implements OnInit {
     }
   }
 
-  protected async upload(evt: FileUploadEvent): Promise<void> {
-    await this.uploader.upload(evt.file, evt.quill, this.name(), this.tripCode());
+  protected upload(evt: FileUploadEvent): void {
+    const doUpload = () => {
+      this.uploader.upload(evt.file, evt.quill, this.name(), this.tripCode()).finally();
+    }
+
+    if (this.selectedChat() > 0) {
+      if (!this.tripCode()?.trim()) {
+        notify('error', 'You cannot upload files in a private chat with setting a tripcode.');
+        return;
+      }
+
+      if (!this.prefs.suppressUploadWarning) {
+        this.confirmationService.confirm({
+          message: 'This upload will be visible on the uploader page. ' +
+            'Your messages here are private, but uploads are not.<br></br>\nAre you sure you want to proceed?' +
+            '<br></br>\nIf you continue, you will not be warned again.',
+          header: 'This upload is not private',
+          icon: 'pi pi-info-circle',
+          rejectLabel: 'Cancel',
+          rejectButtonProps: {
+            label: 'Cancel',
+            severity: 'secondary',
+            outlined: true
+          },
+          acceptButtonProps: {
+            label: 'Continue',
+            severity: 'danger'
+          },
+          accept: () => {
+            this.prefs.suppressUploadWarning = true;
+            this.prefService.set(this.prefs);
+            doUpload();
+          },
+          reject: () => {}
+        })
+
+        return;
+      }
+    }
+
+    doUpload();
   }
 
   protected toggleNotifySound(): void {

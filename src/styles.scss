@@ -132,6 +132,10 @@ a {
   font-family: "MS PGothic", sans-serif !important;
 }
 
+.p-confirmdialog {
+  max-width: min(40em, 90dvw);
+}
+
 @media (max-width: 900px) {
   input, textarea, select {
     font-size: 16px;

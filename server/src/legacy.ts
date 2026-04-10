@@ -255,7 +255,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
     }
   }
   catch (err) {
-    console.error('Error polling legacy chat:', simplifyError(err));
+    console.error('Error polling legacy chat, %s: %s', new Date().toISOString().substring(0, 19), simplifyError(err));
   }
 
   setTimeout(pollLegacyMessages, 10_000);
