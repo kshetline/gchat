@@ -16,6 +16,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { toObservable } from '@angular/core/rxjs-interop';
 
 const REPOLL_RATE = 5000;
+const CONSIDER_AFK_TIME = 600000; // 10 minutes
 
 interface DmInfo {
   closed?: boolean;
@@ -46,6 +47,7 @@ export class App implements OnInit {
   private chatActive = true;
   private confirmCallback: (approved: boolean) => void;
   private dmsJustClosed = new Map<number, number>();
+  private lastActive = 0;
   private lastReceiveTime = 0
   private _messageEntry: MessageEntry;
   private messageTimer: any;
@@ -162,7 +164,7 @@ export class App implements OnInit {
         event.preventDefault();
       }
       else if (event.key === 'Enter' && this.name().trim() && !this.inChat()) {
-        this.enterChat().finally();
+        this.enterMainChat().finally();
         event.preventDefault();
       }
     });
@@ -181,7 +183,7 @@ export class App implements OnInit {
     window.addEventListener('blur', () => this.checkChatActive(true));
     window.addEventListener('focus', () => this.checkChatActive(true));
     window.addEventListener('mousemove', () => this.activity = true);
-    window.addEventListener('beforeunload', () => this.inChat() && this.leaveChat());
+    window.addEventListener('beforeunload', () => this.inChat() && this.leaveMainChat());
 
     toObservable(this.color).subscribe(color => this.prefs.color = color);
     toObservable(this.sending).subscribe(() => this.updateDisableEditor());
@@ -282,14 +284,15 @@ export class App implements OnInit {
               messages.messages.reverse();
 
             const changed = !isEqual(messages.messages, this.messages());
+            const newMessages = this.countNewMessages(messages.messages, this.messages());
 
             if (changed) {
               if (this.messages().length > 0 && (!this.chatActive || this.selectedChat() !== 0)) {
-                this.unseenMessages.set(this.unseenMessages() + this.countNewMessages(messages.messages, this.messages()));
+                this.unseenMessages.set(this.unseenMessages() + newMessages);
                 this.updateTitle();
 
-                if (this.prefs.notifySound)
-                  this.chime.play().finally();
+                if (newMessages && this.prefs.notifySound)
+                  this.playNotificationSound();
               }
 
               this.messages.set(messages.messages);
@@ -319,7 +322,7 @@ export class App implements OnInit {
     parent.postMessage(['updateTitle', document.title], '*');
   }
 
-  protected async enterChat(): Promise<void> {
+  protected async enterMainChat(): Promise<void> {
     this.prefs.name = this.name();
     this.prefs.email = this.email();
     this.prefService.set(this.prefs);
@@ -361,7 +364,7 @@ export class App implements OnInit {
     });
   }
 
-  protected async leaveChat(): Promise<void> {
+  protected async leaveMainChat(): Promise<void> {
     if (this.framed) {
       setTimeout(() => parent.postMessage(['leaveChatRoom'], '*'));
       const error = await awaitMessage('leaveChatRoom', 5000);
@@ -390,7 +393,9 @@ export class App implements OnInit {
 
     this.sending.set(true);
 
-    if (this.framed) {
+    const dm = this.selectedChat() === 0 ? 0 : this.dms()[this.selectedChat() - 1].id;
+
+    if (this.framed && dm === 0) {
       setTimeout(() => parent.postMessage(['sendChatMessage', comment, this.color(), this.tripCode()], '*'));
       const error = await awaitMessage('sendChatMessage', 5000);
 
@@ -401,7 +406,6 @@ export class App implements OnInit {
       }
     }
 
-    const dm = this.selectedChat() === 0 ? 0 : this.dms()[this.selectedChat() - 1].id;
     const params = { ...this.prefs, comment, framed: this.framed, dm };
 
     this.httpClient.post('/api/send', {}, { params }).subscribe({
@@ -589,7 +593,7 @@ export class App implements OnInit {
     }
   }
 
-  protected startChat(name: string): void {
+  protected startDmChat(name: string): void {
     if (name === this.name())
       return;
 
@@ -619,7 +623,7 @@ export class App implements OnInit {
     })
   }
 
-  protected closeChat(evt: Event, tabIndex: number): void {
+  protected closeDmChat(evt: Event, tabIndex: number): void {
     const dms = clone(this.dms(), true);
     const id = dms[tabIndex].id;
     const viewed = !!dms[tabIndex].viewed;
@@ -636,15 +640,14 @@ export class App implements OnInit {
 
   private countNewMessages(oldMessages: Message[], newMessages: Message[]): number {
     const latest = oldMessages.reduce((acc, msg) => Math.max(acc, msg.time, 0), 0);
-    const newCount = newMessages.reduce((acc, msg) => acc + (!msg.isMe && msg.time > latest ? 1 : 0), 0);
 
-    return Math.max(newCount, 1);
+    return newMessages.reduce((acc, msg) => acc + (!msg.isMe && msg.time > latest ? 1 : 0), 0);
   }
 
   protected receiveDirectMessages(dms: DmSession[]): void {
     const currentDMs = clone(this.dms(), true);
     let changed = false;
-    let newDMs = false;
+    let totalNewMessages = 0;
 
     for (const dm of dms) {
       const index = currentDMs.findIndex(d => d.id === dm.id);
@@ -654,10 +657,12 @@ export class App implements OnInit {
         const oldMessages = currentDM.messages();
 
         if (!isEqual(oldMessages, dm.messages)) {
-          currentDM.missed.set(currentDM.missed() + this.countNewMessages(oldMessages, dm.messages));
+          const newMessages = this.countNewMessages(oldMessages, dm.messages);
+
+          totalNewMessages += (index === this.selectedChat() && !this.isIdle() ? 0 : newMessages);
+          currentDM.missed.set(currentDM.missed() + newMessages);
           currentDM.messages.set(dm.messages);
           changed = true;
-          newDMs = true;
         }
       }
       else if (this.prefs.allowDMs && !this.dmsJustClosed.get(dm.id)) {
@@ -683,7 +688,16 @@ export class App implements OnInit {
       this.adjustScrolling(true);
     }
 
-    if (newDMs && this.prefs.notifySound)
-      this.chimeDM.play().finally();
+    if (totalNewMessages > 0)
+      this.playNotificationSound(true);
+  }
+
+  private isIdle(): boolean {
+    return this.lastActive < processMillis() - CONSIDER_AFK_TIME;
+  }
+
+  private playNotificationSound(forDM = false): void {
+    if (this.prefs.notifySound && (this.isIdle() || forDM || (!forDM && this.selectedChat() !== 0)))
+      (forDM ? this.chime : this.chimeDM).play().finally();
   }
 }

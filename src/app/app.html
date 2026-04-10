@@ -25,12 +25,12 @@
   <div class="header">
     <h1 class="form-h1">{{ title() }}</h1>
     @if (!inChat()) {
-      <button class="upper-enter" (click)="enterChat()" [disabled]="!name().trim()">Enter&nbsp;room</button>
+      <button class="upper-enter" (click)="enterMainChat()" [disabled]="!name().trim()">Enter&nbsp;room</button>
     }
     <div class="entry-panel" [class.in-chat]="inChat()">
       @if (inChat()) {
         <span>{{ name() }}</span>
-        <button (click)="leaveChat()">Leave&nbsp;room</button>
+        <button (click)="leaveMainChat()">Leave&nbsp;room</button>
       }
       @else {
         <div class="name-email">
@@ -39,7 +39,7 @@
           <label for="name">Email</label>
           <input id="name" type="text" placeholder="optional" [(ngModel)]="email"/>
         </div>
-        <button class="lower-enter" (click)="enterChat()" [disabled]="!name().trim()">Enter&nbsp;room</button>
+        <button class="lower-enter" (click)="enterMainChat()" [disabled]="!name().trim()">Enter&nbsp;room</button>
         <div class="titled-color-selector">
           <span>- select text color -</span>
           <chat-color-selector [(color)]="color" [darkMode]="darkMode()"></chat-color-selector>
@@ -78,7 +78,7 @@
     @if (participants()?.length > 0) {
       @for (participant of participants(); track participant.name) {
         <span class="participant" [class.native]="!participant.remote" [class.idle]="!!participant.idle"
-              [class.can-chat]="participant.allowsDms && participant.name !== name()" (click)="startChat(participant.name)"
+              [class.can-chat]="participant.allowsDms && participant.name !== name()" (click)="startDmChat(participant.name)"
           >{{ participant.name }}
           @if (participant.allowsDms) {
             &nbsp;<i class="fa-regular fa-comment"></i>
@@ -107,7 +107,7 @@
           @if (dm.missed() > 0) {
             <span class="unseen-count"> ({{ dm.missed() }})</span>
           }
-          <i class="fa-solid fa-circle-xmark closer" (click)="closeChat($event, i)"></i>
+          <i class="fa-solid fa-circle-xmark closer" (click)="closeDmChat($event, i)"></i>
         </p-tab>
       }
     </p-tablist>

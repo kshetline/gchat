@@ -13,6 +13,8 @@ import { convertBBCodeToHtml, getIp, messageHash } from './chat-util.js';
 import tripcode from 'tripcode';
 import path from 'path';
 
+export const MAX_IDLE_PARTICIPANT_AGE = 7200; // 2 hours
+
 const app = express();
 const port = toInt(process.env.PORT) || 3000;
 const __dirname = process.cwd();
@@ -27,8 +29,8 @@ const config: Config = {
 };
 const URL_MATCHER = /\b(https?:\/\/[-A-Za-z0-9+&@#/%?=~_()|!:,.;]*[-A-Za-z0-9+&@#/%=~_()|])/g;
 const MONITOR_INTERVAL = 60000; // 1 minute
-const MAX_DM_AGE = 3600; // 1 hour
-const MAX_HISTORY = 2000; // chat messages to keep in DB
+const MAX_DM_AGE = 7200; // 2 hours
+const MAX_HISTORY = 2000; // number of chat messages to keep in DB
 const MAX_HISTORY_TOLERANCE = 200; // Overflow before deleting messages
 
 let proxyStarted = false;
@@ -50,7 +52,8 @@ async function monitor(): Promise<void> {
   const now = Math.floor(Date.now() / 1000);
 
   await db.run('DELETE FROM messages WHERE dm > 0 AND synced_time < ?', now - MAX_DM_AGE);
-  await db.run('DELETE FROM dm_session WHERE name1_present = 0 AND name2_present = 0 AND last_post < ?', now - MAX_DM_AGE);
+  await db.run('DELETE FROM dm_session WHERE name1_present <= 0 AND name2_present <= 0 AND last_post < ?', now - MAX_DM_AGE);
+  await db.run('DELETE FROM participants WHERE last_active < ?', now - MAX_IDLE_PARTICIPANT_AGE);
 
   const messageCount = (await db.get<any>('SELECT COUNT(*) as count FROM messages'))?.count || 0;
 
@@ -84,6 +87,15 @@ async function getDirectMessages(name: string): Promise<DmSession[]> {
   const dmSessions = await db.all<DbDmSession>('SELECT * FROM dm_session WHERE name1 = ? or name2 = ?', name, name);
 
   for (const dmSession of dmSessions) {
+    const whichName = dmSession.name1 === name ? 'name1_present' : 'name2_present';
+    const present = dmSession[whichName];
+
+    // Have there been any new messages since this person left the chat? If so, don't broadcast the chat session until
+    // there's something new to show.
+
+    if (present < 0 && dmSession.last_post < -present)
+      continue;
+
     const rows = (await db.all<DbMessage>(
       'SELECT * FROM messages WHERE deleted = 0 AND dm = ? ORDER BY messages.synced_time',
       dmSession.id)).slice(-1000);
@@ -100,7 +112,10 @@ async function getDirectMessages(name: string): Promise<DmSession[]> {
       trip: row.remote ? row.trip : tripcode(row.trip)
     } as Message));
 
-    result.push({ id: dmSession.id, messages, name: dmSession.name1 === name ? dmSession.name2 : dmSession.name1 });
+    const sessionName = dmSession.name1 === name ? dmSession.name2 : dmSession.name1;
+
+    if (sessionName?.trim())
+      result.push({ id: dmSession.id, messages, name: sessionName });
   }
 
   return result;
@@ -288,10 +303,12 @@ app.get('/api/messages', async (req, res) => {
     lastContentUpdate = processMillis();
   }
 
-  if (force || (session && session.lastContentUpdate !== lastContentUpdate))
-    session.lastContentUpdate = lastContentUpdate;
-  else
-    messages = [null];
+  if (session) {
+    if (force || session.lastContentUpdate !== lastContentUpdate)
+      session.lastContentUpdate = lastContentUpdate;
+    else
+      messages = [null];
+  }
 
   await sessionsCheck();
   res.json({ messages, participants, dms: await getDirectMessages(name) });
@@ -417,8 +434,13 @@ app.post('/api/send', async (req, res) => {
 
   if (dm) {
     dmSession = await db.get<DbDmSession>('SELECT * FROM dm_session WHERE id = ?', dm);
+
     if (!dmSession) {
-      res.status(400).json({ error: 'This chat session is closed', closed: true });
+      res.status(400).json({ error: 'This chat session is closed.', closed: true });
+      return;
+    }
+    else if (!q.name?.trim()) {
+      res.status(400).json({ error: 'You must use a non-blank chat name to send DMs.', closed: true });
       return;
     }
     else
@@ -528,6 +550,10 @@ app.post('/api/start-chat', async (req, res) => {
     res.status(400).json({ error: 'Cannot start a chat with yourself (not this way, at least).' });
     return;
   }
+  else if (!self?.trim()) {
+    res.status(400).json({ error: 'You must use a non-blank chat name to send DMs.' });
+    return;
+  }
 
   const participant = await getNamedParticipantRecord(name);
 
@@ -568,7 +594,7 @@ app.post('/api/leave-chat', async (req, res) => {
     else {
       const whichName = dmSession.name1 === self ? 'name1_present' : 'name2_present';
 
-      await db.run(`UPDATE dm_session SET ${whichName} = 0 WHERE id = ?`, id);
+      await db.run(`UPDATE dm_session SET ${whichName} = ? WHERE id = ?`, -Math.floor(Date.now() / 1000), id);
     }
   }
 

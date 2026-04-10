@@ -5,13 +5,15 @@ import { HtmlParser } from 'fortissimo-html';
 import { DomNode } from 'fortissimo-html/dist/dom.js';
 import * as puppeteer from 'puppeteer';
 import { getDb } from './db.js';
-import { convertBBCodeToHtml, getTextAndMarkupAsBBCode, messageHash } from './chat-util.js';
+import { convertBBCodeToHtml, getTextAndMarkupAsBBCode, messageHash, simplifyError } from './chat-util.js';
 import tripcode from 'tripcode';
+import { MAX_IDLE_PARTICIPANT_AGE } from './app.js';
 
 const domain = process.env.CHAT_DOMAIN;
 const proxyName = process.env.CHAT_PROXY || 'CHAT②';
 const proxyTrip = process.env.CHAT_PROXY_TRIPCODE;
 const parser = new HtmlParser();
+export const MAX_IDLE_PARTICIPANT_LEEWAY = 600000; // 10 minutes
 
 export let browser: puppeteer.Browser;
 
@@ -117,27 +119,19 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
     }
   }
 
+  const now = Math.floor(Date.now() / 1000);
+  const gettingOld = now - MAX_IDLE_PARTICIPANT_AGE + MAX_IDLE_PARTICIPANT_LEEWAY;
+  const currentNames = participants.map(p => `'${p.name.replace(/'/g, "''")}'`).join(',');
+
+  await db.run(`UPDATE participants SET last_active = ? WHERE remote = 1 AND name IN (${currentNames}) AND last_active < ?`,
+    gettingOld + MAX_IDLE_PARTICIPANT_LEEWAY, gettingOld);
+
   for (const participant of Array.from(latestPosts.keys()))
     if (latestPosts.get(participant))
       await db.run('UPDATE participants SET last_post = ?1, last_active = MAX(last_active, ?1) WHERE name = ?2 and remote = 1',
         latestPosts.get(participant), participant);
 
   return { messages, participants };
-}
-
-function simplifyError(err: any): any {
-  const message = err.code || err.message || err.toString();
-
-  if (message.includes('ENOTFOUND'))
-    return 'Chat server not found';
-  else if (message.includes('ECONNREFUSED'))
-    return 'Chat server refused connection';
-  else if (message.includes('ECONNRESET'))
-    return 'Chat server reset connection';
-  else if (message.includes('ETIMEDOUT'))
-    return 'Chat server timed out';
-
-  return message;
 }
 
 async function pollLegacyMessages(overrideCount?: number): Promise<void> {
@@ -211,7 +205,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
         // Within 5 seconds of the timestamp in the DB, update the synced_time column.
         if (Math.abs(time - row.synced_time) < 5)
           await db.run('UPDATE messages SET synced_time = ? WHERE hash = ?', time, messageHash(row.name, row.trip, time));
-        // Otherwise, presume the message was administratively deleted on the legacy site, and follow suit here.
+        // Otherwise, presume the message was administratively deleted on the legacy site and follow suit here.
         else
           await db.run('UPDATE messages SET deleted = 1 WHERE hash = ?', hash);
       }

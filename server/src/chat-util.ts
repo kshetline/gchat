@@ -69,3 +69,18 @@ export function getTextAndMarkupAsBBCode(elems: DomElement[], domain: string): s
 
   return text;
 }
+
+export function simplifyError(err: any): any {
+  const message = err.code || err.message || err.toString();
+
+  if (message.includes('ENOTFOUND'))
+    return 'Chat server not found';
+  else if (message.includes('ECONNREFUSED'))
+    return 'Chat server refused connection';
+  else if (message.includes('ECONNRESET'))
+    return 'Chat server reset connection';
+  else if (message.includes('ETIMEDOUT'))
+    return 'Chat server timed out';
+
+  return message;
+}
