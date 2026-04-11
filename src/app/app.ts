@@ -291,7 +291,7 @@ export class App implements OnInit {
               messages.messages.reverse();
 
             const changed = !isEqual(messages.messages, this.messages());
-            const newMessages = this.countNewMessages(messages.messages, this.messages());
+            const newMessages = this.countNewMessages(this.messages(), messages.messages);
 
             if (changed) {
               if (this.messages().length > 0 && (!this.chatActive || this.selectedChat() !== 0)) {
@@ -395,7 +395,7 @@ export class App implements OnInit {
   }
 
   protected async sendComment(comment: string): Promise<void> {
-    if (!comment?.trim())
+    if (!comment?.trim() || (this.selectedChat() > 0 && !await this.verifyAllowingDMs()))
       return;
 
     this.sending.set(true);
@@ -506,8 +506,8 @@ export class App implements OnInit {
       if (!this.prefs.suppressUploadWarning) {
         this.confirmationService.confirm({
           message: 'This upload will be visible on the uploader page. ' +
-            'Your messages here are private, but uploads are not.<br></br>\nAre you sure you want to proceed?' +
-            '<br></br>\nIf you continue, you will not be warned again.',
+            'Your messages here are private, but uploads are not.<br><br>\nAre you sure you want to proceed?' +
+            '<br><br>\nIf you continue, you will not be warned again.',
           header: 'This upload is not private',
           icon: 'pi pi-info-circle',
           rejectLabel: 'Cancel',
@@ -639,8 +639,39 @@ export class App implements OnInit {
     }
   }
 
-  protected startDmChat(name: string): void {
-    if (name === this.name())
+  private async verifyAllowingDMs(): Promise<boolean> {
+    if (this.prefs.allowDMs)
+      return true;
+
+    return new Promise<boolean>(resolve => {
+      this.confirmationService.confirm({
+        message: 'You can only send direct messages if you allow them yourself.<br><br>\n' +
+          'Activate DMs?',
+        header: 'Your "Allow DMs" setting is unchecked.',
+        icon: 'pi pi-info-circle',
+        rejectLabel: 'Not now',
+        rejectButtonProps: {
+          label: 'Not now',
+          severity: 'secondary',
+          outlined: true
+        },
+        acceptButtonProps: {
+          label: 'Yes',
+          severity: 'success'
+        },
+        accept: () => {
+          this.allowDMs.set(true);
+          this.prefs.allowDMs = true;
+          this.prefService.set(this.prefs);
+          resolve(true);
+        },
+        reject: () => resolve(false)
+      })
+    });
+  }
+
+  protected async startDmChat(name: string): Promise<void> {
+    if (name === this.name() || !await this.verifyAllowingDMs())
       return;
 
     const match = this.dms().findIndex(dm => dm.name === name);
@@ -743,7 +774,9 @@ export class App implements OnInit {
   }
 
   private playNotificationSound(forDM = false): void {
-    if (this.prefs.notifySound && (this.isIdle() || forDM || (!forDM && this.selectedChat() !== 0)))
+    const idleOrInactive = this.isIdle() || !this.chatActive;
+
+    if (this.prefs.notifySound && (idleOrInactive || forDM || (!forDM && this.selectedChat() !== 0)))
       (forDM ? this.chime : this.chimeDM).play().finally();
   }
 }
