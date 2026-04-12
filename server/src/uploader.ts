@@ -5,10 +5,13 @@ import crypto from 'crypto';
 import fs from 'fs/promises';
 import os from 'os';
 import { HtmlParser  } from 'fortissimo-html';
-import { toInt } from '@tubular/util';
+import { toBoolean, toInt } from '@tubular/util';
 import { allowedExtensions, allowedTypes, MB } from './shared-types.js';
 import * as puppeteer from 'puppeteer';
 import { browser } from './legacy.js';
+import { getExternalUploadLink } from './external-uploader.js';
+
+type MFile = Express.Multer.File;
 
 const domain = process.env.CHAT_DOMAIN;
 const parser = new HtmlParser();
@@ -33,19 +36,21 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({
-  storage: storage,
-  limits: { fileSize: toInt(process.env.UPLOAD_MAX_SIZE_MB) * MB },
-  fileFilter: (_req, file, cb) => {
-    const extname = allowedExtensions.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
+function getUploader(external = false): multer.Multer {
+  return multer({
+    storage: storage,
+    limits: { fileSize: toInt(external ? process.env.EXTERNAL_UPLOAD_MAX_SIZE_MB : process.env.UPLOAD_MAX_SIZE_MB) * MB },
+    fileFilter: (_req, file, cb) => {
+      const extname = allowedExtensions.test(path.extname(file.originalname).toLowerCase());
+      const mimetype = allowedTypes.test(file.mimetype);
 
-    if (mimetype && extname)
-      cb(null, true);
-    else
-      cb(new Error('Only image files are allowed'));
-  }
-});
+      if (mimetype && extname)
+        cb(null, true);
+      else
+        cb(new Error('Not an allowed file type.'));
+    }
+  });
+}
 
 function extractLinkFromPageContent(content: string, comment: string): string  {
   const dom = parser.parse(content).domRoot;
@@ -67,8 +72,9 @@ function extractLinkFromPageContent(content: string, comment: string): string  {
 }
 
 export async function uploadSingle(req: express.Request, res: express.Response): Promise<string> {
-  const file = await new Promise<Express.Multer.File> ((resolve, reject) => {
-    upload.single('image')(req, res, err => {
+  const external = toBoolean(req.query.external);
+  const file = await new Promise<MFile> ((resolve, reject) => {
+    getUploader(external).single('image')(req, res, err => {
       if (err)
         reject(err as Error);
       else if (!req.file)
@@ -77,6 +83,9 @@ export async function uploadSingle(req: express.Request, res: express.Response):
         resolve(req.file);
     });
   });
+
+  if (external)
+    return await getExternalUploadLink(file);
 
   const pwd = req.body.password;
 

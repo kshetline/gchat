@@ -1,9 +1,47 @@
 import * as puppeteer from 'puppeteer';
 import * as net from 'net';
 import { SocksClient } from 'socks';
+import { readFile } from 'node:fs/promises';
+import fs from 'fs/promises';
+
+type MFile = Express.Multer.File;
 
 let browser: puppeteer.Browser;
 let page: puppeteer.Page;
+let inInit = false;
+
+export async function initExternalUploader(force = false): Promise<void> {
+  if (inInit) return;
+  if (browser && !force) return;
+
+  try {
+    inInit = true;
+
+    if (page) await page.close();
+    if (browser) await browser.close();
+
+    const port = await startLocalSocksProxy();
+
+    const options: puppeteer.LaunchOptions = {
+      args: [`--proxy-server=socks5://127.0.0.1:${port}`],
+    };
+
+    if (process.env.CHROME_PATH) {
+      options.executablePath = process.env.CHROME_PATH;
+      options.args.push('--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage');
+    }
+
+    browser = browser || (await puppeteer.launch(options));
+    page = page || (await browser.newPage());
+    await page.goto(process.env.EXTERNAL_UPLOADER);
+  }
+  catch (error) {
+    console.error('Failed to initialize external uploader:', error);
+  }
+  finally {
+    inInit = false;
+  }
+}
 
 let localProxyServer: net.Server;
 let localProxyPort: number;
@@ -78,20 +116,63 @@ async function startLocalSocksProxy(): Promise<number> {
   });
 }
 
-export async function uploadBrowserSetup(): Promise<void> {
-  const port = await startLocalSocksProxy();
+export async function getExternalUploadLink(file: MFile): Promise<string> {
+  await initExternalUploader();
+  const fileData = (await readFile(file.path)).toString('base64');
 
-  const options: puppeteer.LaunchOptions = {
-    args: [`--proxy-server=socks5://127.0.0.1:${port}`],
-  };
+  await page.reload();
+  await page.evaluate(
+    ({ fileData, filename, mimetype, selector }) => {
+      // Create a JS File object in the browser
+      const byteCharacters = atob(fileData);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const file = new File([byteArray], filename, { type: mimetype });
 
-  if (process.env.CHROME_PATH) {
-    options.executablePath = process.env.CHROME_PATH;
-    options.args.push('--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage');
+      // Create a mock DataTransfer object
+      // @ts-ignore
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+      // @ts-ignore
+      const input = document.querySelector(selector);
+      // @ts-ignore
+      input.dispatchEvent(new DragEvent('drop', { dataTransfer, bubbles: true }));
+    },
+    {
+      fileData,
+      filename: file.originalname,
+      mimetype: file.mimetype,
+      selector: '#dropzoneUpload',
+    }
+  );
+
+  await page.waitForSelector('div.dz-preview.dz-complete :is(.responseText, .dz-error-message)', { timeout: 15000 });
+
+  let link: string;
+  let error: string;
+
+  try {
+    link = await page.$eval('div.dz-preview.dz-success .responseText', el => el.innerText);
+  }
+  catch {}
+
+  if (!link) {
+    try {
+      error = await page.$eval('div.dz-preview.dz-complete .dz-error-message', el => el.innerText);
+    }
+    catch {}
   }
 
-  browser = browser || (await puppeteer.launch(options));
-  page = page || (await browser.newPage());
-  await page.goto(process.env.GET_IP_SERVICE);
-  console.log((await page.content()).replace(/^.*?(\d+\.\d+\.\d+\.\d+).*$/s, '$1'));
+  try {
+    await fs.unlink(file.path);
+  }
+  catch {}
+
+  if (link)
+    return link;
+
+  throw new Error('External uploader: ' + (error || 'failed to upload file'));
 }

@@ -1,4 +1,4 @@
-import { Component, ElementRef, input, output, signal, WritableSignal } from '@angular/core';
+import { Component, ElementRef, input, OnInit, output, signal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import Quill from 'quill';
 import { QuillModule  } from 'ngx-quill';
@@ -7,7 +7,7 @@ import { colorByIndex, getTextBackground, notify, shouldIgnoreClick, startClickS
 import { PickerComponent } from '@ctrl/ngx-emoji-mart';
 import { Emoji, EmojiData } from '@ctrl/ngx-emoji-mart/ngx-emoji';
 import { ColorSelector } from '../color-selector/color-selector';
-import { allowedExtensions, kaomoji, kaomojiRegex, MB, sizeMap } from '../../server/src/shared-types';
+import { allowedExtensions, Config, kaomoji, kaomojiRegex, MB, sizeMap } from '../../server/src/shared-types';
 import { EditEvent } from '../message-list/message-list';
 import { toObservable } from '@angular/core/rxjs-interop';
 
@@ -201,7 +201,7 @@ export function bbCodeToQuillOps(bbCode: string): QuillOp[] {
   templateUrl: './message-entry.html',
   styleUrl: './message-entry.scss',
 })
-export class MessageEntry {
+export class MessageEntry implements OnInit{
   protected kaomoji = kaomoji;
 
   private _color = 0;
@@ -211,9 +211,14 @@ export class MessageEntry {
 
   protected editMode = signal(false);
   protected editTime = signal('');
+  protected externalUploader = signal(false);
+  protected externalUploaderName = signal('External Uploader');
+  protected externalUploaderShortName = signal('Ext. Uploader');
   protected filePromptPosition = signal({ top: '0', left: '0' });
   protected lastSelectedFiles: File[];
   protected lengthWarning = signal(-1);
+  protected maxExtFileSizeInMb = signal(200);
+  protected maxFileSizeInMb = signal(15000);
   protected showEmoji = signal(false);
   protected showFilePrompt = signal(false);
   protected showKaomoji = signal(false);
@@ -257,7 +262,6 @@ export class MessageEntry {
   darkMode = input(false);
   dmMode = input(false);
   disabled = input(false);
-  maxFileSizeInMb = input(15000);
   changeColor = output<number>();
   newMessage = output<string>();
   updateMessage = output<MessageUpdateEvent>();
@@ -310,6 +314,22 @@ export class MessageEntry {
     toObservable(this.disabled).subscribe(state => this.quill?.enable(!state));
   }
 
+  ngOnInit(): void {
+    const configStr = localStorage.getItem('gchat-config');
+
+    if (configStr) {
+      try {
+        const config = JSON.parse(configStr) as Config;
+
+        this.externalUploaderName.set(config.externalUploaderName || 'External Uploader');
+        this.externalUploaderShortName.set(config.externalUploaderShortName || 'Ext. Uploader');
+        this.maxExtFileSizeInMb.set(config.fileSizeLimitExtInMb || 200);
+        this.maxFileSizeInMb.set(config.fileSizeLimitInMb || 15000);
+      }
+      catch {}
+    }
+  }
+
   protected editorCreated(quill: Quill): void {
     this.quill = quill;
     quill.enable(!this.disabled());
@@ -326,9 +346,10 @@ export class MessageEntry {
         if (/\bimage\b/.test(items[i].type)) {
           e.preventDefault();
           const blob = items[i].getAsFile();
+          const maxSize = this.externalUploader ? this.maxExtFileSizeInMb() : this.maxFileSizeInMb();
 
-          if (blob?.size > this.maxFileSizeInMb() * MB)
-            notify('error', `Image too big. Maximum size is ${this.maxFileSizeInMb()} MB.`);
+          if (blob?.size > maxSize * MB)
+            notify('error', `Image too big. Maximum size is ${maxSize} MB.`);
           else if (blob) {
             this.insertImage(blob);
             break;
@@ -493,6 +514,9 @@ export class MessageEntry {
       this.lastSelectedFiles = undefined;
 
     this.togglePanel(this.showFilePrompt, this.filePromptPosition, '#upload-button', '#upload-panel');
+  }
+
+  protected toggleExternalUploader(): void {
   }
 
   protected onFileSelected(evt: Event): void {

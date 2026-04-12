@@ -9,9 +9,10 @@ import { addPendingDuplicate, enterLegacyChat, leaveLegacyChat, legacySendMessag
 import { getDb, getNamedParticipantRecord } from './db.js';
 import ip_ from 'ip';
 import axios from 'axios';
-import { convertBBCodeToHtml, getIp, messageHash } from './chat-util.js';
+import { convertBBCodeToHtml, getIp, messageHash, unescapeUnicode } from './chat-util.js';
 import tripcode from 'tripcode';
 import path from 'path';
+import { initExternalUploader } from './external-uploader.js';
 
 export const MAX_IDLE_PARTICIPANT_AGE = 7200; // 2 hours
 
@@ -22,7 +23,10 @@ const sessions = new Map<string, SessionInfo>();
 const proxyName = process.env.CHAT_PROXY || 'CHAT②';
 const config: Config = {
   backgroundColor: process.env.CHAT_BACKGROUND || '#DDD',
-  fileSizeLimitInMb: toInt(process.env.UPLOAD_MAX_SIZE_MB),
+  externalUploaderName: unescapeUnicode(process.env.EXTERNAL_UPLOADER_NAME || 'External Uploader'),
+  externalUploaderShortName: unescapeUnicode(process.env.EXTERNAL_UPLOADER_SHORT_NAME || 'ExtUploader'),
+  fileSizeLimitInMb: toInt(process.env.UPLOAD_MAX_SIZE_MB) || 15000,
+  fileSizeLimitExtInMb: toInt(process.env.EXT_UPLOADER_MAX_SIZE_MB) || 200,
   navigation: process.env.NAV_LINKS.split(';').map(link => link.split('::'))
     .map(link => ({ name: link[0], url: link[1], target: link[2] || '_blank' })),
   title: process.env.CHAT_TITLE,
@@ -65,6 +69,7 @@ async function monitor(): Promise<void> {
 }
 
 monitor().finally();
+initExternalUploader().finally();
 
 async function sessionsCheck(): Promise<void> {
   const now = Math.floor(Date.now() / 1000);

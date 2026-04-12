@@ -15,7 +15,10 @@ export const kaomojiEndRegex = new RegExp(`\u2000?(${kaomoji.map(regexEscape).jo
 
 export interface Config {
   backgroundColor: string;
+  externalUploaderName: string;
+  externalUploaderShortName: string;
   fileSizeLimitInMb: number;
+  fileSizeLimitExtInMb: number;
   navigation: { name: string; url: string; target?: string }[];
   title: string;
 }
@@ -109,35 +112,21 @@ export interface Preferences {
   tripCode: string;
 }
 
-const types = `dat|htm|torrent|deb|lzh|ogm|doc|class|js|swift|cc|tga|ape|woff2|cab|
-               whl|mpe|rmvb|srt|pdf|xz|exe|m4a|crx|vob|tif|gz|roq|m4v|gif|rb|3g2|m4a|
-               rvb|sid|ai|wma|pea|bmp|py|mp4|m4p|ods|jpeg|command|azw4|otf|ebook|rtf|
-               ttf|mobi|ra|flv|ogv|mpg|xls|jpg|mkv|nsv|mp3|kmz|java|lua|m2v|deb|rst|
-               csv|pls|pak|egg|tlz|c|cbz|xcodeproj|iso|xm|azw|webm|3ds|azw6|azw3|cue|
-               kml|woff|zipx|3gp|po|mpa|mng|wps|wpd|a|s7z|ics|tex|go|ps|org|yml|msg|
-               xml|cpio|epub|docx|lha|flac|odp|wmv|vcxproj|mar|eot|less|asf|apk|css|
-               mp2|odt|patch|wav|msi|rs|gsm|ogg|cbr|azw1|m|dds|h|dmg|mid|psd|dwg|aac|
-               s3m|cs|cpp|au|aiff|diff|avi|bat|html|pages|bin|txt|rpm|m3u|max|vcf|svg
-               |ppt|clj|png|svi|tiff|tgz|mxf|7z|drc|yuv|mov|tbz2|bz2|gpx|shar|xcf|dxf|
-               jar|qt|tar|xpi|zip|thm|cxx|3dm|rar|md|scss|mpv|webp|war|pl|xlsx|mpeg|
-               aaf|avchd|mod|rm|it|wasm|el|eps|nes|smc|sfc|md|smd|gen|gg|z64|v64|n64|
-               gb|gbc|gba|srl|gcm|gcz|nds|dsi|wbfs|wad|cia|3ds|ngp|ngc|pce|vb|ws|wsc|
-               dsv|sav|ps2|mcr|mpk|eep|st0|dta|srm|afa|zpaq|arc|paq|lpaq|swf|pdn|lol|
-               php|sh|img|ico|asc|m2ts|nzb|appimage|json|dat|htm|torrent|deb|lzh|ogm|
-               doc|class|js|swift|cc|tga|ape|woff2|cab|whl|mpe|rmvb|srt|pdf|xz|exe|m4a
-               |crx|vob|tif|gz|roq|m4v|gif|rb|3g2|m4a|rvb|sid|ai|wma|pea|bmp|py|mp4|
-               m4p|ods|jpeg|command|azw4|otf|ebook|rtf|ttf|mobi|ra|flv|ogv|mpg|xls|jpg|
-               mkv|nsv|mp3|kmz|java|lua|m2v|deb|rst|csv|pls|pak|egg|tlz|c|cbz|xcodeproj
-               |iso|xm|azw|webm|3ds|azw6|azw3|cue|kml|woff|zipx|3gp|po|mpa|mng|wps|wpd|
-               a|s7z|ics|tex|go|ps|org|yml|msg|xml|cpio|epub|docx|lha|flac|odp|wmv|
-               vcxproj|mar|eot|less|asf|apk|css|mp2|odt|patch|wav|msi|rs|gsm|ogg|cbr|
-               azw1|m|dds|h|dmg|mid|psd|dwg|aac|s3m|cs|cpp|au|aiff|diff|avi|bat|html|
-               pages|bin|txt|rpm|m3u|max|vcf|svg|ppt|clj|png|svi|tiff|tgz|mxf|7z|drc|
-               yuv|mov|tbz2|bz2|gpx|shar|xcf|dxf|jar|qt|tar|xpi|zip|thm|cxx|3dm|rar|md|
-               scss|mpv|webp|war|pl|xlsx|mpeg|aaf|avchd|mod|rm|it|wasm|el|eps|nes|smc|
-               sfc|md|smd|gen|gg|z64|v64|n64|gb|gbc|gba|srl|gcm|gcz|nds|dsi|wbfs|wad|
-               cia|3ds|ngp|ngc|pce|vb|ws|wsc|dsv|sav|ps2|mcr|mpk|eep|st0|dta|srm|afa|
-               zpaq|arc|paq|lpaq|swf|pdn|lol|php|sh|img|ico|asc|m2ts|nzb|appimage|json`.replace(/\s*/g, '');
+// Original list, but without .doc*, .exe, .jar (.scr and .cpl already excluded)
+// noinspection SpellCheckingInspection
+const types = `3dm|3ds|3g2|3gp|7z|a|aac|aaf|afa|ai|aiff|ape|apk|appimage|arc|asc|asf|au|avchd|
+               avi|azw|azw1|azw3|azw4|azw6|bat|bin|bmp|bz2|c|cab|cbr|cbz|cc|cia|class|clj|command|
+               cpio|cpp|crx|cs|css|csv|cue|cxx|dat|dds|deb|diff|dmg|drc|dsi|dsv|dta|dwg|
+               dxf|ebook|eep|egg|el|eot|eps|epub|flac|flv|gb|gba|gbc|gcm|gcz|gen|gg|gif|go|
+               gpx|gsm|gz|h|htm|html|ico|ics|img|iso|it|java|jpeg|jpg|js|json|kml|kmz|less|
+               lha|lol|lpaq|lua|lzh|m|m2ts|m2v|m3u|m4a|m4p|m4v|mar|max|mcr|md|mid|mkv|mng|mobi|mod|
+               mov|mp2|mp3|mp4|mpa|mpe|mpeg|mpg|mpk|mpv|msg|msi|mxf|n64|nds|nes|ngc|ngp|nsv|nzb|
+               odp|ods|odt|ogg|ogm|ogv|org|otf|pages|pak|paq|patch|pce|pdf|pdn|pea|php|pl|pls|png
+               |po|ppt|ps|ps2|psd|py|qt|ra|rar|rb|rm|rmvb|roq|rpm|rs|rst|rtf|rvb|s3m|s7z|sav|scss|
+               sfc|sh|shar|sid|smc|smd|srl|srm|srt|st0|svg|svi|swf|swift|tar|tbz2|tex|tga|tgz|thm|
+               tif|tiff|tlz|torrent|ttf|txt|v64|vb|vcf|vcxproj|vob|wad|war|wasm|wav|wbfs|webm|
+               webp|whl|wma|wmv|woff|woff2|wpd|wps|ws|wsc|xcf|xcodeproj|xls|xlsx|xm|xml|xpi|xz|
+               yml|yuv|z64|zip|zipx|zpaq`.replace(/\s*/g, '');
 export const allowedExtensions = new RegExp('\\.(' + types + ')$', 'i');
 export const allowedTypes = new RegExp('\\b(' + types + ')\\b', 'i');
 export const MB = 1024 * 1024;

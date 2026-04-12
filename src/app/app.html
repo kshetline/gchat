@@ -1,7 +1,7 @@
 <ng-template #messageEntry let-qlass="qlass">
   <chat-message-entry [disabled]="disableEditor()"
-                      [class]="qlass" [darkMode]="darkMode()" [maxFileSizeInMb]="maxFileSizeInMb()"
-                      [dmMode]="selectedChat() > 0" (uploadFile)="upload($event)" (changeColor)="setColor($event)"
+                      [class]="qlass" [darkMode]="darkMode()" [dmMode]="selectedChat() > 0"
+                      (uploadFile)="upload($event)" (changeColor)="setColor($event)"
                       (newMessage)="sendComment($event)" (updateMessage)="updateMessage($event)"></chat-message-entry>
 </ng-template>
 <div class="navigation"><div>

@@ -66,7 +66,6 @@ export class App implements OnInit {
   protected framed = /\bframed=true\b/.test(location.toString());
   protected inChat = signal(false);
   protected localTime = signal(true);
-  protected maxFileSizeInMb = signal(15000);
   protected messageEntrySignal = signal<MessageEntry>(undefined);
   protected messages = signal([] as Message[]);
   protected name = signal('');
@@ -122,7 +121,6 @@ export class App implements OnInit {
         this.updateTitle();
         root.style.setProperty('--primary-background', config.backgroundColor || '#DDD');
         this.navigation.set(config.navigation);
-        this.maxFileSizeInMb.set(config.fileSizeLimitInMb || 15000);
       }
       catch {}
     }
@@ -139,7 +137,6 @@ export class App implements OnInit {
         this.title.set(config.title);
         this.updateTitle();
         this.navigation.set(config.navigation);
-        this.maxFileSizeInMb.set(config.fileSizeLimitInMb || 15000);
         localStorage.setItem('gchat-config', JSON.stringify(config));
       },
       error: (_error): void => this.connectionTrouble.set(true)

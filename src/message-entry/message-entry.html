@@ -49,6 +49,10 @@
           [style.top]="pickerPosition().top" [style.left]="pickerPosition().left" [totalFrequentLines]="2"
           (emojiClick)="emojiClick($event)"></emoji-mart>
       <button id="upload-button" (click)="toggleFileUpload()"><i class="fa-solid fa-upload"></i></button>
+      <div class="label-pair">
+        <input id="ext-upload" type="checkbox" [(ngModel)]="externalUploader" (ngModelChange)="toggleExternalUploader()">
+        <label for="ext-upload">{{ externalUploaderShortName() }}</label>
+      </div>
     </div>
   </div>
   <quill-editor [formats]="formats" [modules]="modules" [sanitize]="true"

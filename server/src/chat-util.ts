@@ -84,3 +84,7 @@ export function simplifyError(err: any): any {
 
   return message;
 }
+
+export function unescapeUnicode(text: string): string {
+  return text.replace(/#U\+([0-9A-F]{4})/gi, (_$0, $1) => String.fromCharCode(parseInt($1, 16)));
+}
