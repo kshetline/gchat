@@ -5,10 +5,11 @@ import { notify } from './main';
 export class Uploader {
   constructor(private httpClient: HttpClient) {}
 
-  async upload(file: File, quill: Quill, name: string, tripCode: string): Promise<void> {
+  async upload(external: boolean, file: File, quill: Quill, name: string, tripCode: string): Promise<void> {
     const formData = new FormData();
     const range = quill.getSelection(true);
     const placeholderUrl = '🔗';
+    const url = '/api/upload' + (external ? '?external=true' : '');
 
     formData.append('image', file);
     formData.append('name', name);
@@ -16,7 +17,7 @@ export class Uploader {
     quill.enable(false);
     quill.insertText(range.index, placeholderUrl);
 
-    this.httpClient.post<{ error?: string; url?: string }>('/api/upload', formData).subscribe({
+    this.httpClient.post<{ error?: string; url?: string }>(url, formData).subscribe({
       next: response => {
         quill.deleteText(range.index, placeholderUrl.length);
         quill.insertText(range.index, response.url);

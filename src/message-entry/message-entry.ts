@@ -10,8 +10,15 @@ import { ColorSelector } from '../color-selector/color-selector';
 import { allowedExtensions, Config, kaomoji, kaomojiRegex, MB, sizeMap } from '../../server/src/shared-types';
 import { EditEvent } from '../message-list/message-list';
 import { toObservable } from '@angular/core/rxjs-interop';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { ConfirmationService } from 'primeng/api';
+import { PreferencesService } from '../preferences.service';
+
+// I don't want to persist this setting in localStorage -- per session in a better time frame.
+let useExternalUploader = false;
 
 export interface FileUploadEvent {
+  external: boolean;
   file: File;
   quill: Quill;
 }
@@ -197,7 +204,7 @@ export function bbCodeToQuillOps(bbCode: string): QuillOp[] {
 
 @Component({
   selector: 'chat-message-entry',
-  imports: [FormsModule, PickerComponent, QuillModule, ColorSelector],
+  imports: [ConfirmDialogModule, ColorSelector, FormsModule, PickerComponent, QuillModule],
   templateUrl: './message-entry.html',
   styleUrl: './message-entry.scss',
 })
@@ -211,7 +218,7 @@ export class MessageEntry implements OnInit{
 
   protected editMode = signal(false);
   protected editTime = signal('');
-  protected externalUploader = signal(false);
+  protected externalUploader = signal(useExternalUploader);
   protected externalUploaderName = signal('External Uploader');
   protected externalUploaderShortName = signal('Ext. Uploader');
   protected filePromptPosition = signal({ top: '0', left: '0' });
@@ -275,7 +282,9 @@ export class MessageEntry implements OnInit{
     }
   }
 
-  constructor(private elementRef: ElementRef<HTMLElement>) {
+  constructor(private elementRef: ElementRef<HTMLElement>,
+              private prefService: PreferencesService,
+              private confirmationService: ConfirmationService) {
     document.addEventListener('keydown', (event: KeyboardEvent) => {
       if (event.key === 'Escape' && this.showEmoji()) {
         this.showEmoji.set(false);
@@ -346,7 +355,7 @@ export class MessageEntry implements OnInit{
         if (/\bimage\b/.test(items[i].type)) {
           e.preventDefault();
           const blob = items[i].getAsFile();
-          const maxSize = this.externalUploader ? this.maxExtFileSizeInMb() : this.maxFileSizeInMb();
+          const maxSize = this.externalUploader() ? this.maxExtFileSizeInMb() : this.maxFileSizeInMb();
 
           if (blob?.size > maxSize * MB)
             notify('error', `Image too big. Maximum size is ${maxSize} MB.`);
@@ -380,9 +389,10 @@ export class MessageEntry implements OnInit{
 
     const uploads: File[] = [];
     let tooBig = false;
+    const maxSize = this.externalUploader() ? this.maxExtFileSizeInMb() : this.maxFileSizeInMb();
 
     for (let i = 0; i < files.length; i++) {
-      if (files[i].size > this.maxFileSizeInMb() * MB)
+      if (files[i].size > maxSize * MB)
         tooBig = true;
       else if (allowedExtensions.test(files[i].name))
         uploads.push(files[i]);
@@ -399,7 +409,7 @@ export class MessageEntry implements OnInit{
   }
 
   private insertImage(file: File): void {
-    this.uploadFile.emit({ file, quill: this.quill });
+    this.uploadFile.emit({ external: this.externalUploader(), file, quill: this.quill });
   }
 
   setColor(color: number): void {
@@ -517,6 +527,37 @@ export class MessageEntry implements OnInit{
   }
 
   protected toggleExternalUploader(): void {
+    const prefs = this.prefService.get();
+
+    if (!this.externalUploader() || prefs.suppressExternalUploadWarning) {
+      useExternalUploader = this.externalUploader();
+      return;
+    }
+
+    this.confirmationService.confirm({
+      key: 'messageEntry',
+      message: `This option sends your uploads to ${this.externalUploaderName()}.<br><br>\n` +
+        'This provides greater privacy for your shared files, but a smaller maximum file ' +
+        `size of ${this.maxExtFileSizeInMb()} MB. You also must abide by the ` +
+        `${this.externalUploaderName()} terms of service.`,
+          header: `Uploading to ${this.externalUploaderName()}`,
+          icon: 'pi pi-info-circle',
+          rejectLabel: 'Cancel',
+          rejectButtonProps: {
+            label: 'Cancel',
+            severity: 'secondary',
+            outlined: true
+          },
+          acceptButtonProps: {
+            label: 'Continue',
+            severity: 'success'
+          },
+          accept: () => {
+            useExternalUploader = prefs.suppressExternalUploadWarning = true;
+            this.prefService.set(prefs);
+          },
+          reject: () => this.externalUploader.set(false)
+        })
   }
 
   protected onFileSelected(evt: Event): void {

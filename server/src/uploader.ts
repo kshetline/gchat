@@ -39,7 +39,7 @@ const storage = multer.diskStorage({
 function getUploader(external = false): multer.Multer {
   return multer({
     storage: storage,
-    limits: { fileSize: toInt(external ? process.env.EXTERNAL_UPLOAD_MAX_SIZE_MB : process.env.UPLOAD_MAX_SIZE_MB) * MB },
+    limits: { fileSize: toInt(external ? process.env.EXT_UPLOAD_MAX_SIZE_MB : process.env.UPLOAD_MAX_SIZE_MB) * MB },
     fileFilter: (_req, file, cb) => {
       const extname = allowedExtensions.test(path.extname(file.originalname).toLowerCase());
       const mimetype = allowedTypes.test(file.mimetype);

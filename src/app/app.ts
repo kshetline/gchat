@@ -491,7 +491,7 @@ export class App implements OnInit {
 
   protected upload(evt: FileUploadEvent): void {
     const doUpload = () => {
-      this.uploader.upload(evt.file, evt.quill, this.name(), this.tripCode()).finally();
+      this.uploader.upload(evt.external, evt.file, evt.quill, this.name(), this.tripCode()).finally();
     }
 
     if (this.selectedChat() > 0) {
@@ -500,8 +500,9 @@ export class App implements OnInit {
         return;
       }
 
-      if (!this.prefs.suppressUploadWarning) {
+      if (!evt.external && !this.prefs.suppressUploadWarning) {
         this.confirmationService.confirm({
+          key: 'app',
           message: 'This upload will be visible on the uploader page. ' +
             'Your messages here are private, but uploads are not.<br><br>\nAre you sure you want to proceed?' +
             '<br><br>\nIf you continue, you will not be warned again.',
@@ -642,6 +643,7 @@ export class App implements OnInit {
 
     return new Promise<boolean>(resolve => {
       this.confirmationService.confirm({
+        key: 'app',
         message: 'You can only send direct messages if you allow them yourself.<br><br>\n' +
           'Activate DMs?',
         header: 'Your "Allow DMs" setting is unchecked.',

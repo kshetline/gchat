@@ -10,6 +10,7 @@ const defaultPrefs: Preferences = {
   name: '',
   newOnBottom: true,
   notifySound: true,
+  suppressExternalUploadWarning: false,
   suppressUploadWarning: false,
   tripCode: ''
 };
