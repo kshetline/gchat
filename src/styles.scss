@@ -20,6 +20,13 @@
   --main-toolbar-item-background: #FFF;
 }
 
+.theme-dark {
+  b, h1, h2, h3, h4, h5, h6, strong, th {
+    color: #FFF;
+    font-weight: 900;
+  }
+}
+
 body {
   background-color: var(--main-background);
   color: var(--main-color);

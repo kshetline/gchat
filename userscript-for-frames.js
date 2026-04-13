@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comchat-Mods
 // @namespace    https://chatproxy.chat/
-// @version      2026-04-07
+// @version      2026-04-12
 // @description  Enhance Comchat functionality
 // @author       Anonymous
 // @license      MIT
@@ -140,6 +140,7 @@
     emailField.value = email || '';
     colorButton?.click();
     submitButton.click();
+    logFrame.contentWindow.focus();
 
     documentCheck(formFrame, 'enterChatRoom', 'input[name="comment"]', () => {
       formDoc = formFrame.contentDocument;
@@ -180,6 +181,7 @@
 
     hiddenFrame.contentDocument.body.innerHTML = '';
     form.submit();
+    logFrame.contentWindow.focus();
 
     documentCheck(hiddenFrame, 'sendChatMessage', 'div[class="messageRow"]');
   }

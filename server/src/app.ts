@@ -286,7 +286,7 @@ app.get('/api/messages', async (req, res) => {
 
   for (const dupSet of dupes) {
     const ids = [...dupSet].join(',');
-    const matches = await db.all<DbMessage>(`SELECT * FROM messages WHERE id IN (${ids})`);
+    const matches = await db.all<DbMessage>(`SELECT * FROM messages WHERE deleted = 0 AND id IN (${ids})`);
     const remotes = matches.filter(m => m.remote);
 
     for (const remote of remotes) {
@@ -294,7 +294,8 @@ app.get('/api/messages', async (req, res) => {
 
       if (index >= 0) {
         messages.splice(index, 1);
-        await db.run('DELETE FROM messages WHERE id = ?', remote.id);
+        // TODO: Fully delete the record rather than just marking it as deleted if further testing is successful.
+        await db.run('UPDATE messages SET deleted = 1 WHERE id = ?', remote.id);
         dupSet.delete(remote.id);
       }
     }

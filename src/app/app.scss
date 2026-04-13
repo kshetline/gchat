@@ -54,9 +54,7 @@ main {
     }
 
     &.native {
-      font-weight: bold;
-      -webkit-text-stroke: 1px #AAF;
-      paint-order: stroke fill;
+      font-weight: 900;
     }
 
     i {
@@ -87,7 +85,8 @@ main {
 }
 
 :host-context(.theme-dark) .participants .participant.native {
-  -webkit-text-stroke: 1px #00F;
+  color: #FFF;
+  font-weight: 900;
 }
 
 :host-context(.theme-li1999) .participants {
@@ -375,7 +374,7 @@ p-tabs {
   }
 }
 
-@media (max-width: 420px) {
+@media (max-width: 475px) {
   .navigation {
     font-size: 0.8em;
   }
