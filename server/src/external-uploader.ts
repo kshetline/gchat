@@ -3,6 +3,8 @@ import * as net from 'net';
 import { SocksClient } from 'socks';
 import { readFile } from 'node:fs/promises';
 import fs from 'fs/promises';
+import { window } from 'rxjs';
+import { sleep, toNumber } from '@tubular/util';
 
 type MFile = Express.Multer.File;
 
@@ -131,22 +133,39 @@ async function startLocalSocksProxy(): Promise<number> {
 
 export async function getExternalUploadLink(file: MFile): Promise<string> {
   await initExternalUploader();
-  const fileData = (await readFile(file.path)).toString('base64');
+
+  const fileBuffer = await readFile(file.path);
+  const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
 
   await page.reload();
   (await page.waitForSelector('[id="72h"]', { timeout: 10000 }))?.click();
-  await page.evaluate(
-    ({ fileData, filename, mimetype, selector }) => {
-      // Create a JS File object in the browser
-      const byteCharacters = atob(fileData);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const file = new File([byteArray], filename, { type: mimetype });
 
-      // Create a mock DataTransfer object
+  // Initialize accumulator in the browser
+  await page.evaluate(() => { (window as any).__fileChunks = []; });
+
+  // Send one chunk at a time to stay well under the CDP JSON size limit
+  for (let i = 0; i < fileBuffer.length; i += CHUNK_SIZE) {
+    const chunk = fileBuffer.subarray(i, i + CHUNK_SIZE).toString('base64');
+    await page.evaluate((chunk: string) => { (window as any).__fileChunks.push(chunk); }, chunk);
+  }
+
+  // Assemble and dispatch — no large data crosses the CDP boundary here
+  await page.evaluate(
+    ({ filename, mimetype, selector }) => {
+      const chunks: string[] = (window as any).__fileChunks;
+      delete (window as any).__fileChunks;
+
+      // Decode each base64 chunk separately to avoid creating a giant string
+      const blobParts: Uint8Array[] = chunks.map(chunk => {
+        const binary = atob(chunk);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++)
+          bytes[i] = binary.charCodeAt(i);
+        return bytes;
+      });
+
+      // @ts-ignore
+      const file = new File(blobParts, filename, { type: mimetype });
       // @ts-ignore
       const dataTransfer = new DataTransfer();
       dataTransfer.items.add(file);
@@ -155,30 +174,59 @@ export async function getExternalUploadLink(file: MFile): Promise<string> {
       // @ts-ignore
       input.dispatchEvent(new DragEvent('drop', { dataTransfer, bubbles: true }));
     },
-    {
-      fileData,
-      filename: file.originalname,
-      mimetype: file.mimetype,
-      selector: '#dropzoneUpload'
-    }
+    { filename: file.originalname, mimetype: file.mimetype, selector: '#dropzoneUpload' }
   );
-
-  await page.waitForSelector('div.dz-preview.dz-complete :is(.responseText, .dz-error-message)', { timeout: 15000 });
 
   let link: string;
   let error: string;
+  let lastProgress = 0;
+  let lackOfProgress = 0;
 
-  try {
-    link = await page.$eval('div.dz-preview.dz-success .responseText', el => el.innerText);
-  }
-  catch {}
-
-  if (!link) {
+  do {
     try {
-      error = await page.$eval('div.dz-preview.dz-complete .dz-error-message', el => el.innerText);
+      await page.waitForSelector('div.dz-preview.dz-complete :is(.responseText, .dz-error-message, .dz-progress)',
+        { timeout: 5000 });
     }
     catch {}
-  }
+
+    let progress = lastProgress;
+
+    try {
+      const style = await page.$$eval('div.dz-progress > span.dz-upload', el => el.map(x => x.getAttribute('style')));
+      const $ = /width:\s*([.0-9]+)%/.exec(style[0]);
+
+      if ($) {
+        progress = toNumber($[1]);
+        console.log('Progress:', progress);
+      }
+    }
+    catch {}
+
+    if (progress === lastProgress)
+      ++lackOfProgress;
+    else {
+      lastProgress = progress;
+      lackOfProgress = 0;
+    }
+
+    try {
+      link = await page.$eval('div.dz-preview.dz-success .responseText span', el => el.innerText);
+    }
+    catch {}
+
+    if (!link) {
+      try {
+        error = await page.$eval('div.dz-preview.dz-complete .dz-error-message', el => el.innerText);
+      }
+      catch {}
+    }
+
+    if (!link && !error)
+      await sleep(5000);
+  } while (!link && !error && lackOfProgress < 5);
+
+  if (!error && !link)
+    error = 'Upload stalled for unknown reason';
 
   try {
     await fs.unlink(file.path);

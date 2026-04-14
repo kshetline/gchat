@@ -127,7 +127,7 @@ const types = `3dm|3ds|3g2|3gp|7z|a|aac|aaf|afa|ai|aiff|ape|apk|appimage|arc|asc
                sfc|sh|shar|sid|smc|smd|srl|srm|srt|st0|svg|svi|swf|swift|tar|tbz2|tex|tga|tgz|thm|
                tif|tiff|tlz|torrent|ttf|txt|v64|vb|vcf|vcxproj|vob|wad|war|wasm|wav|wbfs|webm|
                webp|whl|wma|wmv|woff|woff2|wpd|wps|ws|wsc|xcf|xcodeproj|xls|xlsx|xm|xml|xpi|xz|
-               yml|yuv|z64|zip|zipx|zpaq`.replace(/\s*/g, '');
+               yml|yuv|z64|zip|zipx|zpaq`.replace(/\s*/gs, '');
 export const allowedExtensions = new RegExp('\\.(' + types + ')$', 'i');
 export const allowedTypes = new RegExp('\\b(' + types + ')\\b', 'i');
 export const MB = 1024 * 1024;

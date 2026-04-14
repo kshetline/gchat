@@ -1,4 +1,4 @@
-<div class="panel" [class.input-disabled]="disabled()">
+<div class="panel" [class.input-disabled]="busy() || disabled()">
   <div class="edit-mode" [style.display]="editMode() ? 'flex' : 'none'">
     <div>
       Editing message from {{ editTime() }}

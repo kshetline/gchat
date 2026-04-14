@@ -183,8 +183,8 @@ export class App implements OnInit {
       }
     });
 
-    document.addEventListener('visibilitychange', () => this.checkChatActive(true));
-    window.addEventListener('blur', () => this.checkChatActive(true));
+    document.addEventListener('visibilitychange', () => this.checkChatActive(document.hidden ? undefined : true));
+    window.addEventListener('blur', () => this.checkChatActive());
     window.addEventListener('focus', () => this.checkChatActive(true));
     window.addEventListener('mousemove', () => this.activity = true);
     window.addEventListener('beforeunload', () => this.inChat() && this.leaveMainChat());

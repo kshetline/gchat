@@ -35,7 +35,7 @@
   right: 0;
   top: 0;
 
-  .busy {
+  &.busy {
     display: flex;
   }
 }

@@ -1,5 +1,4 @@
 import { HttpClient } from '@angular/common/http';
-import Quill from 'quill';
 import { notify } from './main';
 import { FileUploadEvent } from './message-entry/message-entry';
 
@@ -19,6 +18,9 @@ export class Uploader {
     quill.enable(false);
     quill.insertText(range.index, placeholderUrl);
 
+    if (evt.started)
+      evt.started();
+
     this.httpClient.post<{ error?: string; url?: string }>(url, formData).subscribe({
       next: response => {
         quill.deleteText(range.index, placeholderUrl.length);
@@ -26,11 +28,17 @@ export class Uploader {
         quill.setSelection(range.index + response.url.length);
         quill.enable(true);
         quill.focus();
+
+        if (evt.finished)
+          evt.finished();
       },
       error: (error: any) => {
         quill.enable(true);
         notify('error', 'Image upload failed: ' + (error?.error?.error || error?.message || error?.toString()));
         quill.deleteText(range.index, placeholderUrl.length);
+
+        if (evt.finished)
+          evt.finished();
       }
     });
   }

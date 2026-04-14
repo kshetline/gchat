@@ -44,7 +44,7 @@ function getUploader(external = false): multer.Multer {
       const extname = allowedExtensions.test(path.extname(file.originalname).toLowerCase());
       const mimetype = allowedTypes.test(file.mimetype);
 
-      if (mimetype && extname)
+      if (mimetype || extname)
         cb(null, true);
       else
         cb(new Error('Not an allowed file type.'));
