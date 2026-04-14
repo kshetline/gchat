@@ -21,25 +21,35 @@ export class Uploader {
     if (evt.started)
       evt.started();
 
-    this.httpClient.post<{ error?: string; url?: string }>(url, formData).subscribe({
-      next: response => {
-        quill.deleteText(range.index, placeholderUrl.length);
-        quill.insertText(range.index, response.url);
-        quill.setSelection(range.index + response.url.length);
-        quill.enable(true);
+    const cleanup = (insertUrl?: string) => {
+      quill.deleteText(range.index, placeholderUrl.length);
+
+      if (insertUrl) {
+        quill.insertText(range.index, insertUrl);
+        quill.setSelection(range.index + insertUrl.length);
         quill.focus();
+      }
 
-        if (evt.finished)
-          evt.finished();
-      },
+      quill.enable(true);
+      evt.interrupt = undefined;
+
+      if (evt.finished)
+        evt.finished();
+    };
+
+    const subscription = this.httpClient.post<{ error?: string; url?: string }>(url, formData).subscribe({
+      next: response => cleanup(response.url),
       error: (error: any) => {
-        quill.enable(true);
+        if (error?.name === 'AbortError' || subscription?.closed)
+          return; // canceled by user
         notify('error', 'Image upload failed: ' + (error?.error?.error || error?.message || error?.toString()));
-        quill.deleteText(range.index, placeholderUrl.length);
-
-        if (evt.finished)
-          evt.finished();
+        cleanup();
       }
     });
+
+    evt.interrupt = () => {
+      subscription.unsubscribe();
+      cleanup();
+    };
   }
 }

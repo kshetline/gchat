@@ -215,12 +215,14 @@ export class MessageEntry implements OnInit{
   protected kaomoji = kaomoji;
 
   private _color = 0;
+  private currentUpload: FileUploadEvent;
   private editId = 0;
   private quill: Quill;
   private savedColor = 0;
 
   protected busy = signal(false);
   protected busyTimer: any;
+  protected canCancelUpload = signal(false);
   protected editMode = signal(false);
   protected editTime = signal('');
   protected externalUploader = signal(useExternalUploader);
@@ -365,7 +367,7 @@ export class MessageEntry implements OnInit{
           if (blob?.size > maxSize * MB)
             notify('error', `Image too big. Maximum size is ${maxSize} MB.`);
           else if (blob) {
-            this.insertImage(blob);
+            this.insertFile(blob);
             break;
           }
         }
@@ -406,15 +408,16 @@ export class MessageEntry implements OnInit{
     if (tooBig)
       notify('error', `File too big. Maximum size is ${maxSize} MB.`);
     else if (uploads.length === 1 && !tooBig)
-      this.insertImage(uploads[0]);
+      this.insertFile(uploads[0]);
     else if (uploads.length > 1)
       notify('error', 'Only one file can be sent at a time.');
     else if (files.length > 0)
       notify('error', 'File type is not supported.');
   }
 
-  private insertImage(file: File): void {
-    this.uploadFile.emit({
+  private insertFile(file: File): void {
+    this.canCancelUpload.set(false);
+    this.currentUpload ={
       external: this.externalUploader(),
       file,
       finished: () => {
@@ -424,6 +427,7 @@ export class MessageEntry implements OnInit{
         }
 
         this.busy.set(false);
+        this.canCancelUpload.set(false);
       },
       quill: this.quill,
       started: () => {
@@ -433,10 +437,43 @@ export class MessageEntry implements OnInit{
             this.busyTimer = undefined;
           }
 
+          if (this.currentUpload.interrupt)
+            this.canCancelUpload.set(true);
+
           this.busy.set(true);
         }, 3000);
       }
-    });
+    };
+
+    this.uploadFile.emit(this.currentUpload);
+  }
+
+  protected cancelUpload(): void {
+    this.confirmationService.confirm({
+      key: 'messageEntry',
+      message: 'Are you sure you want to cancel this upload?',
+      header: 'Cancel Upload',
+      icon: 'pi pi-info-circle',
+      rejectLabel: 'No, keep uploading',
+      rejectButtonProps: {
+        label: 'No, keep uploading',
+        severity: 'secondary',
+        outlined: true
+      },
+      acceptButtonProps: {
+        label: 'Cancel upload',
+        severity: 'danger'
+      },
+      accept: () => {
+        if (this.currentUpload.interrupt) {
+          this.currentUpload.interrupt();
+          this.canCancelUpload.set(false);
+          this.busy.set(false);
+          this.currentUpload = undefined;
+        }
+      },
+      reject: () => {}
+    })
   }
 
   setColor(color: number): void {

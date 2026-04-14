@@ -61,5 +61,8 @@
 </div>
 <div class="downloading" [class.busy]="busy()">
   <i class="fa-solid fa-arrows-rotate fa-spin-pulse fa-2xl"></i>
+  @if (canCancelUpload()) {
+    <i class="fa-regular fa-circle-xmark fa-2xl cancel" (click)="cancelUpload()"></i>
+  }
 </div>
 <p-confirmdialog key="messageEntry"></p-confirmdialog>

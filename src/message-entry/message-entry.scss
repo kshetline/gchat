@@ -29,6 +29,7 @@
   bottom: 0;
   display: none;
   color: dodgerblue;
+  gap: 1em;
   justify-content: center;
   left: 0;
   position: absolute;
@@ -37,6 +38,11 @@
 
   &.busy {
     display: flex;
+  }
+
+  .cancel {
+    color: #D05;
+    cursor: pointer;
   }
 }
 
