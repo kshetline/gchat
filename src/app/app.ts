@@ -491,7 +491,7 @@ export class App implements OnInit {
 
   protected upload(evt: FileUploadEvent): void {
     const doUpload = () => {
-      this.uploader.upload(evt.external, evt.file, evt.quill, this.name(), this.tripCode()).finally();
+      this.uploader.upload(evt, this.name(), this.tripCode()).finally();
     }
 
     if (this.selectedChat() > 0) {

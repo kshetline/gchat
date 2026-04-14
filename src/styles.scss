@@ -20,10 +20,14 @@
   --main-toolbar-item-background: #FFF;
 }
 
+b, h1, h2, h3, h4, h5, h6, strong, th {
+  color: #000;
+  font-weight: 900;
+}
+
 .theme-dark {
   b, h1, h2, h3, h4, h5, h6, strong, th {
     color: #FFF;
-    font-weight: 900;
   }
 }
 

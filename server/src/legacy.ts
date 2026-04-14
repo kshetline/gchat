@@ -194,22 +194,22 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
       }
     }
 
-    // [...existing.entries()].forEach(([hash, time]) => (time < earliest || time > latestInDb) && existing.delete(hash));
-    //
-    // // Check messages in our DB which are not found in the legacy chat anymore, at least with a matching hash.
-    // for (const hash of existing.keys()) {
-    //   const time = existing.get(hash);
-    //   const row = await db.get<DbMessage>('SELECT * FROM messages WHERE hash = ? LIMIT 1', hash);
-    //
-    //   if (row) {
-    //     // Within 5 seconds of the timestamp in the DB, update the synced_time column.
-    //     if (Math.abs(time - row.synced_time) < 5)
-    //       await db.run('UPDATE messages SET synced_time = ? WHERE hash = ?', time, messageHash(row.name, row.trip, time));
-    //     // Otherwise, presume the message was administratively deleted on the legacy site and follow suit here.
-    //     else
-    //       await db.run('UPDATE messages SET deleted = 1 WHERE hash = ?', hash);
-    //   }
-    // }
+    [...existing.entries()].forEach(([hash, time]) => (time < earliest || time > latestInDb) && existing.delete(hash));
+
+    // Check messages in our DB which are not found in the legacy chat anymore, at least with a matching hash.
+    for (const hash of existing.keys()) {
+      const time = existing.get(hash);
+      const row = await db.get<DbMessage>('SELECT * FROM messages WHERE hash = ? LIMIT 1', hash);
+
+      if (row) {
+        // Within 5 seconds of the timestamp in the DB, update the synced_time column.
+        if (Math.abs(time - row.synced_time) < 5)
+          await db.run('UPDATE messages SET synced_time = ? WHERE hash = ?', time, messageHash(row.name, row.trip, time));
+        // Otherwise, presume the message was administratively deleted on the legacy site and follow suit here.
+        else
+          await db.run('UPDATE messages SET deleted = 1 WHERE hash = ?', hash);
+      }
+    }
 
     if (retrieveCount < 1000 && latestInDb && earliest > latestInDb)
       return pollLegacyMessages(1000);

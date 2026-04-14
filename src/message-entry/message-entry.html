@@ -1,4 +1,4 @@
-<div [class.input-disabled]="disabled()">
+<div class="panel" [class.input-disabled]="disabled()">
   <div class="edit-mode" [style.display]="editMode() ? 'flex' : 'none'">
     <div>
       Editing message from {{ editTime() }}
@@ -58,5 +58,8 @@
   <quill-editor [formats]="formats" [modules]="modules" [sanitize]="true"
                 (onEditorCreated)="editorCreated($event)" placeholder="">
   </quill-editor>
+</div>
+<div class="downloading" [class.busy]="busy()">
+  <i class="fa-solid fa-arrows-rotate fa-spin-pulse fa-2xl"></i>
 </div>
 <p-confirmdialog key="messageEntry"></p-confirmdialog>

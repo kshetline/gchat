@@ -11,7 +11,15 @@ let page: puppeteer.Page;
 let inInit = false;
 
 export async function initExternalUploader(force = false): Promise<void> {
-  if (inInit) return;
+  if (inInit) return new Promise<void>(resolve => {
+    const interval = setInterval(() => {
+      if (!inInit) {
+        clearInterval(interval);
+        resolve();
+      }
+    }, 100);
+  });
+
   if (browser && !force) return;
 
   try {
@@ -34,8 +42,13 @@ export async function initExternalUploader(force = false): Promise<void> {
     browser = browser || (await puppeteer.launch(options));
     page = page || (await browser.newPage());
     await page.goto(process.env.EXTERNAL_UPLOADER);
+    console.info('External uploader initialized');
   }
   catch (error) {
+    page?.close();
+    page = undefined;
+    browser?.close();
+    browser = undefined;
     console.error('Failed to initialize external uploader:', error);
   }
   finally {
@@ -121,6 +134,7 @@ export async function getExternalUploadLink(file: MFile): Promise<string> {
   const fileData = (await readFile(file.path)).toString('base64');
 
   await page.reload();
+  (await page.waitForSelector('[id="72h"]', { timeout: 10000 }))?.click();
   await page.evaluate(
     ({ fileData, filename, mimetype, selector }) => {
       // Create a JS File object in the browser
@@ -145,7 +159,7 @@ export async function getExternalUploadLink(file: MFile): Promise<string> {
       fileData,
       filename: file.originalname,
       mimetype: file.mimetype,
-      selector: '#dropzoneUpload',
+      selector: '#dropzoneUpload'
     }
   );
 

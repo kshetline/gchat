@@ -20,7 +20,10 @@ let useExternalUploader = false;
 export interface FileUploadEvent {
   external: boolean;
   file: File;
+  finished?: () => void;
+  interrupt?: () => void;
   quill: Quill;
+  started?: () => void;
 }
 
 export interface MessageUpdateEvent {
@@ -216,6 +219,8 @@ export class MessageEntry implements OnInit{
   private quill: Quill;
   private savedColor = 0;
 
+  protected busy = signal(false);
+  protected busyTimer: any;
   protected editMode = signal(false);
   protected editTime = signal('');
   protected externalUploader = signal(useExternalUploader);
@@ -399,7 +404,7 @@ export class MessageEntry implements OnInit{
     }
 
     if (tooBig)
-      notify('error', `File too big. Maximum size is ${this.maxFileSizeInMb()} MB.`);
+      notify('error', `File too big. Maximum size is ${maxSize} MB.`);
     else if (uploads.length === 1 && !tooBig)
       this.insertImage(uploads[0]);
     else if (uploads.length > 1)
@@ -409,7 +414,29 @@ export class MessageEntry implements OnInit{
   }
 
   private insertImage(file: File): void {
-    this.uploadFile.emit({ external: this.externalUploader(), file, quill: this.quill });
+    this.uploadFile.emit({
+      external: this.externalUploader(),
+      file,
+      finished: () => {
+        if (this.busyTimer) {
+          clearTimeout(this.busyTimer);
+          this.busyTimer = undefined;
+        }
+
+        this.busy.set(false);
+      },
+      quill: this.quill,
+      started: () => {
+        this.busyTimer = setTimeout(() => {
+          if (this.busyTimer) {
+            clearTimeout(this.busyTimer);
+            this.busyTimer = undefined;
+          }
+
+          this.busy.set(true);
+        }, 3000);
+      }
+    });
   }
 
   setColor(color: number): void {
