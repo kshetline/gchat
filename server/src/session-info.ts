@@ -4,4 +4,5 @@ export interface SessionInfo {
   lastAlive?: number;
   lastContentUpdate?: number;
   name?: string;
+  progress?: number;
 }

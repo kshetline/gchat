@@ -5,6 +5,8 @@ import { readFile } from 'node:fs/promises';
 import fs from 'fs/promises';
 import { window } from 'rxjs';
 import { sleep, toNumber } from '@tubular/util';
+import express from 'express';
+import { reportUploadProgress } from './app.js';
 
 type MFile = Express.Multer.File;
 
@@ -131,7 +133,7 @@ async function startLocalSocksProxy(): Promise<number> {
   });
 }
 
-export async function getExternalUploadLink(file: MFile): Promise<string> {
+export async function getExternalUploadLink(req: express.Request, file: MFile): Promise<string> {
   await initExternalUploader();
 
   const fileBuffer = await readFile(file.path);
@@ -197,7 +199,7 @@ export async function getExternalUploadLink(file: MFile): Promise<string> {
 
       if ($) {
         progress = toNumber($[1]);
-        console.log('Progress:', progress);
+        reportUploadProgress(req, progress);
       }
     }
     catch {}
@@ -223,10 +225,12 @@ export async function getExternalUploadLink(file: MFile): Promise<string> {
 
     if (!link && !error)
       await sleep(5000);
-  } while (!link && !error && lackOfProgress < 5);
+  } while (!link && !error && lackOfProgress < 8);
 
   if (!error && !link)
     error = 'Upload stalled for unknown reason';
+
+  reportUploadProgress(req, 0);
 
   try {
     await fs.unlink(file.path);
@@ -236,5 +240,6 @@ export async function getExternalUploadLink(file: MFile): Promise<string> {
   if (link)
     return link;
 
+  initExternalUploader(true).finally();
   throw new Error('External uploader: ' + (error || 'failed to upload file'));
 }

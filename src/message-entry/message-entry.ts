@@ -229,15 +229,16 @@ export class MessageEntry implements OnInit{
   protected externalUploaderName = signal('External Uploader');
   protected externalUploaderShortName = signal('Ext. Uploader');
   protected filePromptPosition = signal({ top: '0', left: '0' });
+  protected kaomojiPosition = signal({ top: '0', left: '0' });
   protected lastSelectedFiles: File[];
   protected lengthWarning = signal(-1);
   protected maxExtFileSizeInMb = signal(200);
   protected maxFileSizeInMb = signal(15000);
+  protected pickerPosition = signal({ top: '0', left: '0' });
+  protected progress = signal(0);
   protected showEmoji = signal(false);
   protected showFilePrompt = signal(false);
   protected showKaomoji = signal(false);
-  protected kaomojiPosition = signal({ top: '0', left: '0' });
-  protected pickerPosition = signal({ top: '0', left: '0' });
 
   protected formats = formats;
   protected modules = {
@@ -495,6 +496,10 @@ export class MessageEntry implements OnInit{
       this.quill.root.style.color = colorByIndex(this.color, this.darkMode());
       this.quill.root.style.backgroundColor = getTextBackground(this.quill.root.style.color);
     }
+  }
+
+  setProgress(progress: number): void {
+    this.progress.set(progress);
   }
 
   sendMessage(): void {

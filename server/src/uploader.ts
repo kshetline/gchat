@@ -85,7 +85,7 @@ export async function uploadSingle(req: express.Request, res: express.Response):
   });
 
   if (external)
-    return await getExternalUploadLink(file);
+    return await getExternalUploadLink(req, file);
 
   const pwd = req.body.password;
 

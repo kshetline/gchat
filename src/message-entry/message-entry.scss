@@ -40,6 +40,16 @@
     display: flex;
   }
 
+  .progress {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: white;
+    -webkit-text-stroke: 3px black;
+    paint-order: stroke fill;
+    text-align: center;
+    width: 3em;
+  }
+
   .cancel {
     color: #D05;
     cursor: pointer;

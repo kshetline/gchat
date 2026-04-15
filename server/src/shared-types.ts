@@ -97,6 +97,7 @@ export interface Messages {
   errorMessage?: string;
   messages?: Message[];
   participants?: ParticipantInfo[];
+  progress?: number;
 }
 
 export interface Preferences {

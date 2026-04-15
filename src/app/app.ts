@@ -17,7 +17,8 @@ import { toObservable } from '@angular/core/rxjs-interop';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
 
-const REPOLL_RATE = 5000;
+const REPOLL_RATE = 5000; // 5 seconds
+const REPOLL_RATE_CHECK_PROGRESS = 2500; // 2.5 seconds
 const CONSIDER_AFK_TIME = 600000; // 10 minutes
 
 interface DmInfo {
@@ -253,8 +254,8 @@ export class App implements OnInit {
     }
   }
 
-  private repollMessages(): void {
-    this.messageTimer = setTimeout(() => this.getMessages(), REPOLL_RATE);
+  private repollMessages(forProgress = false): void {
+    this.messageTimer = setTimeout(() => this.getMessages(), forProgress ? REPOLL_RATE_CHECK_PROGRESS : REPOLL_RATE);
   }
 
   protected getMessages(): void {
@@ -310,7 +311,8 @@ export class App implements OnInit {
           this.connectionTrouble.set(true);
 
         this.receiveDirectMessages(messages.dms);
-        this.repollMessages();
+        this.messageEntry?.setProgress(messages.progress);
+        this.repollMessages(messages.progress > 0);
       },
       error: (_error): void => {
         this.connectionTrouble.set(true);
@@ -408,6 +410,11 @@ export class App implements OnInit {
         this.sending.set(false);
         return;
       }
+    }
+
+    if (this.prefs.tripCode !== this.tripCode()) {
+      this.prefs.tripCode = this.tripCode();
+      this.prefService.set(this.prefs);
     }
 
     const params = { ...this.prefs, comment, framed: this.framed, dm };

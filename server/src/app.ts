@@ -86,6 +86,13 @@ async function sessionsCheck(): Promise<void> {
   }
 }
 
+export function reportUploadProgress(req: express.Request, progress: number): void {
+  const session = sessions.get(getToken(req));
+
+  if (session)
+    session.progress = Math.round(progress);
+}
+
 async function getDirectMessages(name: string): Promise<DmSession[]> {
   const db = await getDb();
   const result: DmSession[] = [];
@@ -141,6 +148,7 @@ function getToken(req: express.Request): string {
 }
 
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  reportUploadProgress(req, 0);
   console.error('Global error:', err); // For immediate server visibility
 
   const errorDetails = {
@@ -317,7 +325,7 @@ app.get('/api/messages', async (req, res) => {
   }
 
   await sessionsCheck();
-  res.json({ messages, participants, dms: await getDirectMessages(name) });
+  res.json({ messages, participants, dms: await getDirectMessages(name), progress: session?.progress });
 });
 
 app.post('/api/enter', async (req, res) => {

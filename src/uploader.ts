@@ -25,8 +25,8 @@ export class Uploader {
       quill.deleteText(range.index, placeholderUrl.length);
 
       if (insertUrl) {
-        quill.insertText(range.index, insertUrl);
-        quill.setSelection(range.index + insertUrl.length);
+        quill.insertText(range.index, insertUrl + ' ');
+        quill.setSelection(range.index + insertUrl.length + 1);
         quill.focus();
       }
 

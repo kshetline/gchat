@@ -61,6 +61,9 @@
 </div>
 <div class="downloading" [class.busy]="busy()">
   <i class="fa-solid fa-arrows-rotate fa-spin-pulse fa-2xl"></i>
+  @if (externalUploader()) {
+    <span class="progress">{{ progress() > 0 ? progress() : '---' }}%</span>
+  }
   @if (canCancelUpload()) {
     <i class="fa-regular fa-circle-xmark fa-2xl cancel" (click)="cancelUpload()"></i>
   }
