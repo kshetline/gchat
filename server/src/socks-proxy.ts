@@ -3,6 +3,26 @@ import { SocksClient } from 'socks';
 
 let localProxyServer: net.Server;
 let localProxyPort: number;
+const activeSockets = new Set<net.Socket>();
+
+export async function stopLocalSocksProxy(): Promise<void> {
+  if (!localProxyServer)
+    return;
+
+  const server = localProxyServer;
+
+  localProxyServer = undefined;
+  localProxyPort = undefined;
+  [...activeSockets].forEach(socket => socket.destroy());
+  activeSockets.clear();
+
+  return new Promise((resolve, reject) => server.close(err => err ? reject(err) : resolve()));
+}
+
+export async function restartLocalSocksProxy(): Promise<number> {
+  await stopLocalSocksProxy();
+  return startLocalSocksProxy();
+}
 
 export async function startLocalSocksProxy(): Promise<number> {
   if (localProxyServer) return localProxyPort;
@@ -44,6 +64,9 @@ export async function startLocalSocksProxy(): Promise<number> {
               command: 'connect',
               destination: { host: targetHost, port: targetPort },
             });
+
+            activeSockets.add(socket);
+            socket.on('close', () => activeSockets.delete(socket));
 
             // Tell Chrome the connection succeeded
             const reply = Buffer.alloc(10);

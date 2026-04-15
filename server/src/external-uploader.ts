@@ -4,15 +4,19 @@ import fs from 'fs/promises';
 import { sleep, toNumber } from '@tubular/util';
 import express from 'express';
 import { reportUploadProgress } from './app.js';
-import { startLocalSocksProxy } from './socks-proxy.js';
+import { restartLocalSocksProxy, startLocalSocksProxy } from './socks-proxy.js';
+
+const PROXY_UPDATE_INTERVAL = 7200000; // 2 hours
 
 type MFile = Express.Multer.File;
 
 let browser: puppeteer.Browser;
 let page: puppeteer.Page;
 let inInit = false;
+let proxyPort: number;
+let lastProxyUpdate = 0;
 
-export async function initExternalUploader(force = false): Promise<void> {
+export async function initExternalUploader(force = false, newProxy = false): Promise<void> {
   if (inInit) return new Promise<void>(resolve => {
     const interval = setInterval(() => {
       if (!inInit) {
@@ -30,10 +34,15 @@ export async function initExternalUploader(force = false): Promise<void> {
     if (page) await page.close();
     if (browser) await browser.close();
 
-    const port = await startLocalSocksProxy();
+    if (!proxyPort)
+      proxyPort = await startLocalSocksProxy();
+    else if (newProxy) {
+      proxyPort = 0;
+      proxyPort = await restartLocalSocksProxy();
+    }
 
     const options: puppeteer.LaunchOptions = {
-      args: [`--proxy-server=socks5://127.0.0.1:${port}`],
+      args: [`--proxy-server=socks5://127.0.0.1:${proxyPort}`],
     };
 
     if (process.env.CHROME_PATH) {
@@ -59,7 +68,12 @@ export async function initExternalUploader(force = false): Promise<void> {
 }
 
 export async function getExternalUploadLink(req: express.Request, file: MFile): Promise<string> {
-  await initExternalUploader();
+  if (Date.now() - lastProxyUpdate > PROXY_UPDATE_INTERVAL) {
+    lastProxyUpdate = Date.now();
+    await initExternalUploader(true, true);
+  }
+  else
+    await initExternalUploader();
 
   const fileBuffer = await readFile(file.path);
   const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
