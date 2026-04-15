@@ -238,6 +238,34 @@
   }
 }
 
+.image-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1em;
+  margin-bottom: 1em;
+  min-height: 180px;
+  overflow-y: hidden;
+  padding-left: 1em;
+  padding-right: 2em;
+  width: 100%;
+
+  img {
+    max-width: 320px;
+    max-height: 180px;
+    height: auto;       /* Maintains aspect ratio automatically */
+    width: auto;        /* Maintains aspect ratio automatically */
+    object-fit: contain; /* Ensures the whole image is visible without clipping */
+  }
+
+  &.me {
+    justify-content: flex-end;
+  }
+}
+
+:host-context(.theme-li1999) .image-preview {
+  display: none;
+}
+
 .scroll-to-bottom, .scroll-to-top {
   align-items: center;
   align-self: flex-end;

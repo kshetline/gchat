@@ -178,4 +178,12 @@ export class MessageList implements OnInit {
     if (messages)
       messages.scrollTop = 0;
   }
+
+  protected getImages(html: string): string[] {
+    return html.split(/\bhref="(http(s?):\/\/.+?\.(avif|gif|jpeg|jpg|png|svg|webp))"/g).filter((_s, i) => (i - 1) % 4 === 0);
+  }
+
+  protected hasImages(html: string): boolean {
+    return this.getImages(html).length > 0;
+  }
 }
