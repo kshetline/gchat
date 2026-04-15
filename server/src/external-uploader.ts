@@ -3,7 +3,6 @@ import * as net from 'net';
 import { SocksClient } from 'socks';
 import { readFile } from 'node:fs/promises';
 import fs from 'fs/promises';
-import { window } from 'rxjs';
 import { sleep, toNumber } from '@tubular/util';
 import express from 'express';
 import { reportUploadProgress } from './app.js';
@@ -143,18 +142,22 @@ export async function getExternalUploadLink(req: express.Request, file: MFile): 
   (await page.waitForSelector('[id="72h"]', { timeout: 10000 }))?.click();
 
   // Initialize accumulator in the browser
+  // @ts-ignore
   await page.evaluate(() => { (window as any).__fileChunks = []; });
 
   // Send one chunk at a time to stay well under the CDP JSON size limit
   for (let i = 0; i < fileBuffer.length; i += CHUNK_SIZE) {
     const chunk = fileBuffer.subarray(i, i + CHUNK_SIZE).toString('base64');
+    // @ts-ignore
     await page.evaluate((chunk: string) => { (window as any).__fileChunks.push(chunk); }, chunk);
   }
 
   // Assemble and dispatch — no large data crosses the CDP boundary here
   await page.evaluate(
     ({ filename, mimetype, selector }) => {
+      // @ts-ignore
       const chunks: string[] = (window as any).__fileChunks;
+      // @ts-ignore
       delete (window as any).__fileChunks;
 
       // Decode each base64 chunk separately to avoid creating a giant string
