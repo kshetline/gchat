@@ -70,6 +70,16 @@ const themes: Record<string, any> = {
     darkMode: false,
     _background: '#FFE6C0'
   },
+  creamsicle: {
+    displayName: 'Creamsicle',
+    darkMode: false,
+    _background: '#F96',
+  },
+  barbie: {
+    displayName: 'Barbie',
+    darkMode: false,
+    _background: '#F7F'
+  },
   abyss: {
     displayName: 'Abyss',
     darkMode: true,
@@ -79,6 +89,16 @@ const themes: Record<string, any> = {
     displayName: 'Cypress',
     darkMode: true,
     _background: '#004040',
+  },
+  asphyxia: {
+    displayName: 'Asphyxia',
+    darkMode: true,
+    _background: '#506',
+  },
+  espresso: {
+    displayName: 'Espresso',
+    darkMode: true,
+    _background: '#331800',
   },
   midnight: {
     displayName: 'Midnight',
