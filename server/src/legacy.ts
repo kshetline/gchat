@@ -138,12 +138,14 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
   const now = processMillis();
   const retrieveCount = overrideCount ??
     (lastLegacyPoll < 0 || now > lastLegacyPoll + 3_600_000 ? 1000 : now > lastLegacyPoll + 600_000 ? 200 : 30);
+  let existing: Map<string, number>;
 
   try {
     const db = await getDb();
-    const existing = (await db.all<any>('SELECT hash, synced_time FROM messages WHERE deleted = 0'))
+    existing = (await db.all<any>('SELECT hash, synced_time FROM messages WHERE deleted = 0'))
       .reduce((acc, row) => acc.set(row.hash, row.synced_time), new Map<string, number>());
     const messages = await getLegacyMessages(proxyName, retrieveCount);
+    const remoteExisting = new Set(messages.messages.map(m => m.hash));
     let earliest = Number.MAX_SAFE_INTEGER;
     let latest = 0;
     const row = await db.get<DbMessage>('SELECT time FROM messages ORDER BY time DESC LIMIT 1');
@@ -203,11 +205,13 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
 
       if (row) {
         // Within 5 seconds of the timestamp in the DB, update the synced_time column.
-        if (Math.abs(time - row.synced_time) < 5)
+        if (time !== row.synced_time && Math.abs(time - row.synced_time) < 5)
           await db.run('UPDATE messages SET synced_time = ? WHERE hash = ?', time, messageHash(row.name, row.trip, time));
         // Otherwise, presume the message was administratively deleted on the legacy site and follow suit here.
-        else
+        else if (!remoteExisting.has(hash)) {
           await db.run('UPDATE messages SET deleted = 1 WHERE hash = ?', hash);
+          existing.delete(hash);
+        }
       }
     }
 
@@ -258,7 +262,11 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
     console.error('Error polling legacy chat, %s: %s', new Date().toISOString().substring(0, 19), simplifyError(err));
   }
 
-  setTimeout(pollLegacyMessages, 10_000);
+  if (existing.size < 1000)
+    setTimeout(() => pollLegacyMessages(1000), 10_000);
+  else
+    setTimeout(pollLegacyMessages, 10_000);
+
   lastLegacyPoll = processMillis();
 }
 

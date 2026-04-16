@@ -276,41 +276,19 @@ app.get('/api/messages', async (req, res) => {
   }
 
   // Some duplicate messages are still slipping through, so one more check is needed
-  // const dupMap = new Map<string, Set<number>>();
-  // const addKeyIdPair = (key: string, id: number) => {
-  //   if (!dupMap.has(key)) dupMap.set(key, new Set());
-  //   dupMap.get(key).add(id);
-  // };
-  //
-  // for (const message of messages) {
-  //   if (message.time < now - 600) // Only consider messages from the last 10 minutes
-  //     continue;
-  //
-  //   addKeyIdPair(`${message.name}\t${Math.floor(message.time / 10)}\t${message.bbCode}`, message.msgId);
-  //   addKeyIdPair(`${message.name}\t${Math.floor((message.time + 5) / 10)}\t${message.bbCode}`, message.msgId);
-  // }
-  //
-  // const dupes = [...dupMap.values()].filter(s => s.size > 1);
-  //
-  // for (const dupSet of dupes) {
-  //   const ids = [...dupSet].join(',');
-  //   const matches = await db.all<DbMessage>(`SELECT * FROM messages WHERE deleted = 0 AND id IN (${ids})`);
-  //   const remotes = matches.filter(m => m.remote);
-  //
-  //   for (const remote of remotes) {
-  //     const index = messages.findIndex(msg => msg.msgId === remote.id);
-  //
-  //     if (index >= 0) {
-  //       messages.splice(index, 1);
-  //       // TODO: Fully delete the record rather than just marking it as deleted if further testing is successful.
-  //       await db.run('UPDATE messages SET deleted = 1 WHERE id = ?', remote.id);
-  //       dupSet.delete(remote.id);
-  //     }
-  //   }
-  //
-  //   if (dupSet.size > 1)
-  //     console.log(`Duplicate messages found: ${[...dupSet].join(', ')}`);
-  // }
+  for (let i = messages.length - 1; i > messages.length - 25 && i >= 0; --i) {
+    const message = messages[i];
+
+    for (let j = i - 1; j > i - 5 && j >= 0; --j) {
+      const message2 = messages[j];
+
+      if (message2.name === message.name && Math.abs(message2.time - message.time) < 10 && message2.html === message.html) {
+        messages.splice(j, 1);
+        await db.run('UPDATE messages SET deleted = 1 WHERE id = ?', message2.msgId);
+        --i;
+      }
+    }
+  }
 
   if (!isEqual(lastMessages, messages)) {
     lastMessages = messages;
