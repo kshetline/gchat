@@ -34,8 +34,8 @@ const config: Config = {
 const URL_MATCHER = /\b(https?:\/\/[-A-Za-z0-9+&@#/%?=~_()|!:,.;]*[-A-Za-z0-9+&@#/%=~_()|])/g;
 const MONITOR_INTERVAL = 60000; // 1 minute
 const MAX_DM_AGE = 7200; // 2 hours
-const MAX_HISTORY = 2000; // number of chat messages to keep in DB
-const MAX_HISTORY_TOLERANCE = 200; // Overflow before deleting messages
+const MAX_HISTORY = 5000; // number of chat messages to keep in DB
+const MAX_HISTORY_TOLERANCE = 500; // Overflow before deleting messages
 
 let proxyStarted = false;
 let lastContentUpdate = 0;
