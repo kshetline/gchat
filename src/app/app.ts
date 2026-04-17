@@ -172,7 +172,8 @@ export class App implements OnInit {
         event.preventDefault();
         this.enterMainChat().finally();
       }
-      else if (event.key === 'p' && (event.ctrlKey || event.metaKey) || this.framed && this.messageEntry?.getText() === 'peek') {
+      else if (event.key === 'p' && (event.ctrlKey || event.metaKey) && this.framed &&
+               this.messageEntry?.getText().trim() === 'peek') {
         event.preventDefault();
         parent.postMessage(['peek'], '*');
       }
@@ -397,6 +398,13 @@ export class App implements OnInit {
     });
   }
 
+  private saveTripCode(): void {
+    if (this.prefs.tripCode !== this.tripCode()) {
+      this.prefs.tripCode = this.tripCode();
+      this.prefService.set(this.prefs);
+    }
+  }
+
   protected async sendComment(comment: string): Promise<void> {
     if (!comment?.trim() || (this.selectedChat() > 0 && !await this.verifyAllowingDMs()))
       return;
@@ -416,10 +424,7 @@ export class App implements OnInit {
       }
     }
 
-    if (this.prefs.tripCode !== this.tripCode()) {
-      this.prefs.tripCode = this.tripCode();
-      this.prefService.set(this.prefs);
-    }
+    this.saveTripCode();
 
     const params = { ...this.prefs, comment, framed: this.framed, dm };
 
@@ -461,6 +466,8 @@ export class App implements OnInit {
   }
 
   protected updateMessage(evt: MessageUpdateEvent): void {
+    this.saveTripCode();
+
     const params = clone(evt) as any;
 
     delete params.callback;
@@ -481,6 +488,7 @@ export class App implements OnInit {
   }
 
   protected deleteMessage(evt: DeleteEvent): void {
+    this.saveTripCode();
     this.notificationMessage.set('Are you sure you want to delete this message?');
     this.showConfirmation.set(true);
     this.confirmCallback = (approved: boolean): void => {
@@ -506,7 +514,7 @@ export class App implements OnInit {
     }
 
     if (this.selectedChat() > 0) {
-      if (!this.tripCode()?.trim()) {
+      if (!this.tripCode()?.trim() && !evt.external) {
         notify('error', 'You cannot upload files in a private chat with setting a tripcode.');
         return;
       }
