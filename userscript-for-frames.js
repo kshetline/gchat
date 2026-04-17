@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comchat-Mods
 // @namespace    https://chatproxy.chat/
-// @version      2026-04-12
+// @version      2026-04-17
 // @description  Enhance Comchat functionality
 // @author       Anonymous
 // @license      MIT
@@ -166,6 +166,7 @@
 
   function sendChatMessage(comment, color, tripCode) {
     let face = '';
+    let commentField;
     const $ = /^(.*)(\u2000(.+)\u2000)\s*$/.exec(comment);
 
     if ($) {
@@ -175,13 +176,14 @@
 
     formDoc.querySelector('select[name="color"]').value = color || 0;
     formDoc.querySelector('#face').value = face;
-    formDoc.querySelector('input[name="comment"]').value = comment || '';
+    (commentField = formDoc.querySelector('input[name="comment"]')).value = comment || '';
     formDoc.querySelector('input[name="password"]').value = tripCode || '';
     formDoc.querySelector('form').setAttribute('target', 'hidden_frame');
 
     hiddenFrame.contentDocument.body.innerHTML = '';
     form.submit();
     logFrame.contentWindow.focus();
+    setTimeout(() => commentField.value = '', 100);
 
     documentCheck(hiddenFrame, 'sendChatMessage', 'div[class="messageRow"]');
   }
