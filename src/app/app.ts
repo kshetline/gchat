@@ -783,6 +783,6 @@ export class App implements OnInit {
     const idleOrInactive = this.isIdle() || !this.chatActive;
 
     if (this.prefs.notifySound && (idleOrInactive || forDM || (!forDM && this.selectedChat() !== 0)))
-      (forDM ? this.chime : this.chimeDM).play().finally();
+      (forDM ? this.chimeDM : this.chime).play().finally();
   }
 }

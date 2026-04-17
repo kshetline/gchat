@@ -2,8 +2,14 @@ import { checksum53, htmlEscape, htmlUnescape, isNumber } from '@tubular/util';
 import { DomElement, DomNode } from 'fortissimo-html/dist/dom.js';
 import express from 'express';
 
+const IP_MATCHER = /(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/;
+
 export function getIp(req: express.Request): string {
   return req.ip || req.socket?.remoteAddress || (req as any).connection?.remoteAddress || (req as any).connection?.socket?.remoteAddress;
+}
+
+export function extractIp(str: string): string {
+  return IP_MATCHER.exec(str)?.[0] || '';
 }
 
 export function getToken(req: express.Request): string {

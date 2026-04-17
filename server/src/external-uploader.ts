@@ -5,6 +5,7 @@ import { sleep, toNumber } from '@tubular/util';
 import express from 'express';
 import { reportUploadProgress } from './app.js';
 import { restartLocalSocksProxy, startLocalSocksProxy } from './socks-proxy.js';
+import { extractIp } from './chat-util.js';
 
 const PROXY_UPDATE_INTERVAL = 7200000; // 2 hours
 
@@ -15,6 +16,7 @@ let page: puppeteer.Page;
 let inInit = false;
 let proxyPort: number;
 let lastProxyUpdate = 0;
+export let proxyIp: string;
 
 export async function initExternalUploader(force = false, newProxy = false): Promise<void> {
   if (inInit) return new Promise<void>(resolve => {
@@ -26,48 +28,62 @@ export async function initExternalUploader(force = false, newProxy = false): Pro
     }, 100);
   });
 
-  if (browser && !force) return;
+  if (browser && page && !force) return;
 
-  try {
-    inInit = true;
+  inInit = true;
 
-    if (page) await page.close();
-    if (browser) await browser.close();
+  let done = false;
+  let error: string;
 
-    if (!proxyPort)
-      proxyPort = await startLocalSocksProxy();
-    else if (newProxy) {
-      proxyPort = 0;
-      proxyPort = await restartLocalSocksProxy();
+  for (let i = 0; i < 3; ++i) {
+    try {
+      if (page) await page.close();
+      page = undefined;
+      if (browser) await browser.close();
+      browser = undefined;
+
+      if (!proxyPort)
+        proxyPort = await startLocalSocksProxy();
+      else if (newProxy) {
+        proxyPort = 0;
+        proxyPort = await restartLocalSocksProxy();
+      }
+
+      const options: puppeteer.LaunchOptions = {
+        args: [`--proxy-server=socks5://127.0.0.1:${proxyPort}`],
+      };
+
+      if (process.env.CHROME_PATH) {
+        options.executablePath = process.env.CHROME_PATH;
+        options.args.push('--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage');
+      }
+
+      browser = await puppeteer.launch(options);
+      page = await browser.newPage();
+      await page.goto(process.env.GET_IP_SERVICE);
+      proxyIp = extractIp(await page.content());
+      await page.goto(process.env.EXTERNAL_UPLOADER);
+      console.info('External uploader initialized: ' + proxyIp);
+      done = true;
+      break;
     }
-
-    const options: puppeteer.LaunchOptions = {
-      args: [`--proxy-server=socks5://127.0.0.1:${proxyPort}`],
-    };
-
-    if (process.env.CHROME_PATH) {
-      options.executablePath = process.env.CHROME_PATH;
-      options.args.push('--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage');
+    catch (e) {
+      page?.close();
+      page = undefined;
+      browser?.close();
+      browser = undefined;
+      newProxy = true;
+      error = (e as any).message || e.toString();
     }
+  }
 
-    browser = browser || (await puppeteer.launch(options));
-    page = page || (await browser.newPage());
-    await page.goto(process.env.EXTERNAL_UPLOADER);
-    console.info('External uploader initialized');
-  }
-  catch (error) {
-    page?.close();
-    page = undefined;
-    browser?.close();
-    browser = undefined;
-    console.error('Failed to initialize external uploader:', error);
-  }
-  finally {
-    inInit = false;
-  }
+  if (!done)
+    throw new Error('Failed to initialize external uploader' + (error ? ': ' + error : ''));
 }
 
 export async function getExternalUploadLink(req: express.Request, file: MFile): Promise<string> {
+  let uploaderReady = false;
+
   try {
     if (Date.now() - lastProxyUpdate > PROXY_UPDATE_INTERVAL) {
       lastProxyUpdate = Date.now();
@@ -75,10 +91,13 @@ export async function getExternalUploadLink(req: express.Request, file: MFile): 
     }
     else
       await initExternalUploader();
+
+    uploaderReady = !!page;
   }
-  catch {
+  catch {}
+
+  if (!uploaderReady)
     throw new Error('External uploader not available');
-  }
 
   const fileBuffer = await readFile(file.path);
   const CHUNK_SIZE = 1024 * 1024; // 1MB chunks

@@ -9,10 +9,10 @@ import { addPendingDuplicate, enterLegacyChat, leaveLegacyChat, legacySendMessag
 import { getDb, getNamedParticipantRecord } from './db.js';
 import ip_ from 'ip';
 import axios from 'axios';
-import { convertBBCodeToHtml, getIp, getToken, messageHash, unescapeUnicode } from './chat-util.js';
+import { convertBBCodeToHtml, extractIp, getIp, getToken, messageHash, unescapeUnicode } from './chat-util.js';
 import tripcode from 'tripcode';
 import path from 'path';
-import { initExternalUploader } from './external-uploader.js';
+import { initExternalUploader, proxyIp } from './external-uploader.js';
 import { rateLimiter } from './rate-limiter.js';
 
 export const MAX_IDLE_PARTICIPANT_AGE = 7200; // 2 hours
@@ -43,11 +43,10 @@ let lastContentUpdate = 0;
 let lastMessages: Message[] = null;
 
 let serverIp: string;
-const IP_MATCHER = /(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/;
 
 async function getServerIp(): Promise<string> {
   if (!serverIp)
-    serverIp = (IP_MATCHER.exec((await axios.get(process.env.GET_IP_SERVICE)).data) || [])[0] || '127.0.0.1';
+    serverIp = extractIp((await axios.get(process.env.GET_IP_SERVICE)).data) || '127.0.0.1';
 
   return serverIp;
 }
@@ -300,7 +299,7 @@ app.get('/api/messages', async (req, res) => {
   }
 
   await sessionsCheck();
-  res.json({ messages, participants, dms: await getDirectMessages(name), progress: session?.progress });
+  res.json({ messages, participants, dms: await getDirectMessages(name), progress: session?.progress, proxyIp });
 });
 
 app.post('/api/enter', async (req, res) => {
