@@ -6,6 +6,11 @@ export function getIp(req: express.Request): string {
   return req.ip || req.socket?.remoteAddress || (req as any).connection?.remoteAddress || (req as any).connection?.socket?.remoteAddress;
 }
 
+export function getToken(req: express.Request): string {
+  const auth = req.headers.authorization;
+  return auth?.startsWith('Bearer ') ? auth.slice(7) : null;
+}
+
 export function messageHash(name: string, trip: string, timestamp: string | number): string {
   if (isNumber(timestamp))
     timestamp = new Date(timestamp * 1000).toISOString().slice(0, 19);

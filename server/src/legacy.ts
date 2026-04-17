@@ -8,6 +8,7 @@ import { getDb } from './db.js';
 import { convertBBCodeToHtml, getTextAndMarkupAsBBCode, messageHash, simplifyError } from './chat-util.js';
 import tripcode from 'tripcode';
 import { MAX_IDLE_PARTICIPANT_AGE } from './app.js';
+import { clearLegacyAccessTimes, tallyForLockout, TIME_WINDOW } from './rate-limiter.js';
 
 const domain = process.env.CHAT_DOMAIN;
 const proxyName = process.env.CHAT_PROXY || 'CHAT②';
@@ -68,11 +69,40 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
   const body = dom.querySelector('body');
   const participantDiv = body?.querySelector('#participantList');
   const participants = Array.from(new Set(participantDiv.children[0].content.trim().replace(/^.*:\s*/g, '').split(/[◆◇]/)
-  .map(p => p.trim()).filter(p => !!p)).values()).sort().map(p => ({ name: p }) as ParticipantInfo);
+    .map(p => p.trim()).filter(p => !!p)).values()).sort().map(p => ({ name: p }) as ParticipantInfo);
   const messageRows = body?.querySelectorAll('.messageRow').reverse();
   let messages = messageRows.map(row => extractMessage(row)).filter(m => m.name !== proxyName);
   const proxyMessages = messageRows.map(row => extractMessage(row)).filter(m => m.name === proxyName);
   const hashes = new Set<string>();
+
+  clearLegacyAccessTimes();
+
+  // Purge likely spam
+  for (let i = 0; i < messages.length; i++) {
+    const message = messages[i];
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [_ids, shouldLockout, wasLockedOut] = tallyForLockout(message.time, false, null, null, message.name, message.email, true);
+
+    if (shouldLockout) {
+      if (!!wasLockedOut) {
+        for (let j = i - 1; j >= 0; --j) {
+          const prevMessage = messages[j];
+
+          if (prevMessage.time < message.time - TIME_WINDOW * 2)
+            break;
+
+          if ((prevMessage.name && prevMessage.name === message.name) ||
+              (prevMessage.email && prevMessage.email === message.email)) {
+            messages.splice(j, 1);
+            --i;
+          }
+        }
+      }
+
+      messages.splice(i, 1);
+      --i;
+    }
+  }
 
   // Filter duplicate messages by hashcode.
   messages = messages.filter(m => !hashes.has(m.hash) && hashes.add(m.hash));
@@ -142,13 +172,13 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
 
   try {
     const db = await getDb();
-    existing = (await db.all<any>('SELECT hash, synced_time FROM messages WHERE deleted = 0'))
+    existing = (await db.all<any>('SELECT hash, synced_time FROM messages WHERE dm = 0 AND deleted = 0'))
       .reduce((acc, row) => acc.set(row.hash, row.synced_time), new Map<string, number>());
     const messages = await getLegacyMessages(proxyName, retrieveCount);
     const remoteExisting = new Set(messages.messages.map(m => m.hash));
     let earliest = Number.MAX_SAFE_INTEGER;
     let latest = 0;
-    const row = await db.get<DbMessage>('SELECT time FROM messages ORDER BY time DESC LIMIT 1');
+    const row = await db.get<DbMessage>('SELECT time FROM messages WHERE dm = 0 ORDER BY time DESC LIMIT 1');
     const latestInDb = row?.time;
     const clockNow = Math.floor(Date.now() / 1000);
 
@@ -182,10 +212,10 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
         latest = Math.max(message.time, latest);
 
         if (message.time > latestInDb - 300 || retrieveCount >= 1000) {
-          let row = await db.get<DbMessage>('SELECT hash FROM messages WHERE hash = ? LIMIT 1', message.hash);
+          let row = await db.get<DbMessage>('SELECT hash FROM messages WHERE dm = 0 AND hash = ? LIMIT 1', message.hash);
 
           if (!row)
-            row = await db.get<DbMessage>(`SELECT hash FROM messages WHERE name = ? AND message = ? AND
+            row = await db.get<DbMessage>(`SELECT hash FROM messages WHERE dm = 0 AND name = ? AND message = ? AND
                                              (synced_time = ?3 OR time = ?3) LIMIT 1`,
               message.name, message.bbCode, message.time);
 
@@ -201,15 +231,15 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
     // Check messages in our DB which are not found in the legacy chat anymore, at least with a matching hash.
     for (const hash of existing.keys()) {
       const time = existing.get(hash);
-      const row = await db.get<DbMessage>('SELECT * FROM messages WHERE hash = ? LIMIT 1', hash);
+      const row = await db.get<DbMessage>('SELECT * FROM messages WHERE dm = 0 AND hash = ? LIMIT 1', hash);
 
       if (row) {
         // Within 5 seconds of the timestamp in the DB, update the synced_time column.
         if (time !== row.synced_time && Math.abs(time - row.synced_time) < 5)
-          await db.run('UPDATE messages SET synced_time = ? WHERE hash = ?', time, messageHash(row.name, row.trip, time));
+          await db.run('UPDATE messages SET synced_time = ? WHERE dm = 0 AND hash = ?', time, messageHash(row.name, row.trip, time));
         // Otherwise, presume the message was administratively deleted on the legacy site and follow suit here.
         else if (!remoteExisting.has(hash)) {
-          await db.run('UPDATE messages SET deleted = 1 WHERE hash = ?', hash);
+          await db.run('UPDATE messages SET deleted = 1 WHERE dm = 0 AND hash = ?', hash);
           existing.delete(hash);
         }
       }

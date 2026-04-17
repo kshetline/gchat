@@ -9,10 +9,11 @@ import { addPendingDuplicate, enterLegacyChat, leaveLegacyChat, legacySendMessag
 import { getDb, getNamedParticipantRecord } from './db.js';
 import ip_ from 'ip';
 import axios from 'axios';
-import { convertBBCodeToHtml, getIp, messageHash, unescapeUnicode } from './chat-util.js';
+import { convertBBCodeToHtml, getIp, getToken, messageHash, unescapeUnicode } from './chat-util.js';
 import tripcode from 'tripcode';
 import path from 'path';
 import { initExternalUploader } from './external-uploader.js';
+import { rateLimiter } from './rate-limiter.js';
 
 export const MAX_IDLE_PARTICIPANT_AGE = 7200; // 2 hours
 
@@ -142,11 +143,6 @@ app.use(cors({
   credentials: true,
 }));
 
-function getToken(req: express.Request): string {
-  const auth = req.headers.authorization;
-  return auth?.startsWith('Bearer ') ? auth.slice(7) : null;
-}
-
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   reportUploadProgress(req, 0);
   console.error('Global error:', err); // For immediate server visibility
@@ -188,6 +184,7 @@ app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
 });
 
+app.use(rateLimiter);
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/token', async (req, res) => {
@@ -455,7 +452,7 @@ app.post('/api/send', async (req, res) => {
   if (participant)
     await db.run('UPDATE participants SET last_post = ?1, last_active = ?1 WHERE id = ?2', now, participant.id);
 
-  if (!dm && !framed) {
+  if (!dm && !framed && !comment.includes('##cpc-only##')) {
     if (!proxyStarted) {
       await enterLegacyChat(proxyName, null, 0);
       proxyStarted = true;

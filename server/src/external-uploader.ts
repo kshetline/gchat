@@ -68,12 +68,17 @@ export async function initExternalUploader(force = false, newProxy = false): Pro
 }
 
 export async function getExternalUploadLink(req: express.Request, file: MFile): Promise<string> {
-  if (Date.now() - lastProxyUpdate > PROXY_UPDATE_INTERVAL) {
-    lastProxyUpdate = Date.now();
-    await initExternalUploader(true, true);
+  try {
+    if (Date.now() - lastProxyUpdate > PROXY_UPDATE_INTERVAL) {
+      lastProxyUpdate = Date.now();
+      await initExternalUploader(true, true);
+    }
+    else
+      await initExternalUploader();
   }
-  else
-    await initExternalUploader();
+  catch {
+    throw new Error('External uploader not available');
+  }
 
   const fileBuffer = await readFile(file.path);
   const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
