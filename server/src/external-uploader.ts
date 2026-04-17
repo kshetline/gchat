@@ -15,7 +15,7 @@ let browser: puppeteer.Browser;
 let page: puppeteer.Page;
 let inInit = false;
 let proxyPort: number;
-let lastProxyUpdate = 0;
+let lastProxyUpdate = Date.now();
 export let proxyIp: string;
 
 export async function initExternalUploader(force = false, newProxy = false): Promise<void> {
@@ -68,14 +68,16 @@ export async function initExternalUploader(force = false, newProxy = false): Pro
       break;
     }
     catch (e) {
-      page?.close();
+      await page?.close().catch(() => {});
       page = undefined;
-      browser?.close();
+      await browser?.close().catch(() => {});
       browser = undefined;
       newProxy = true;
       error = (e as any).message || e.toString();
     }
   }
+
+  inInit = false;
 
   if (!done)
     throw new Error('Failed to initialize external uploader' + (error ? ': ' + error : ''));
