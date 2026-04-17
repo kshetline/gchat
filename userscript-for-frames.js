@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comchat-Mods
 // @namespace    https://chatproxy.chat/
-// @version      2026-04-17b
+// @version      v2026.04.17.1
 // @description  Enhance Comchat functionality
 // @author       Anonymous
 // @license      MIT
