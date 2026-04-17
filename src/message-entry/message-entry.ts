@@ -516,6 +516,10 @@ export class MessageEntry implements OnInit{
     this.focus();
   }
 
+  getText(): string {
+    return this.quill.getText();
+  }
+
   private togglePanel(state: WritableSignal<any>, position: WritableSignal<any>, btn: string, panel: string): void {
     state.set(!state());
 

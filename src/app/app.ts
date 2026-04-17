@@ -147,30 +147,34 @@ export class App implements OnInit {
       this.activity = true;
 
       if (event.key === 'Escape' && this.showNotification()) {
-        this.showNotification.set(false);
         event.preventDefault();
+        this.showNotification.set(false);
       }
       else if (event.key === 'Escape' && this.showThemes()) {
-        this.showThemes.set(false);
         event.preventDefault();
+        this.showThemes.set(false);
       }
       else if (event.key === 'Escape' && this.showConfirmation()) {
+        event.preventDefault();
         this.showConfirmation.set(false);
         this.confirmCallback && this.confirmCallback(false);
-        event.preventDefault();
       }
       else if (event.key === 'Escape') {
-        this.messageEntry.cancelEdit();
         event.preventDefault();
+        this.messageEntry.cancelEdit();
       }
       else if (event.key === 'Enter' && this.showConfirmation()) {
+        event.preventDefault();
         this.showConfirmation.set(false);
         this.confirmCallback && this.confirmCallback(true);
-        event.preventDefault();
       }
       else if (event.key === 'Enter' && this.name().trim() && !this.inChat()) {
-        this.enterMainChat().finally();
         event.preventDefault();
+        this.enterMainChat().finally();
+      }
+      else if (event.key === 'p' && (event.ctrlKey || event.metaKey) || this.framed && this.messageEntry?.getText() === 'peek') {
+        event.preventDefault();
+        parent.postMessage(['peek'], '*');
       }
     });
 

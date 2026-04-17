@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comchat-Mods
 // @namespace    https://chatproxy.chat/
-// @version      2026-04-17
+// @version      2026-04-17b
 // @description  Enhance Comchat functionality
 // @author       Anonymous
 // @license      MIT
@@ -98,7 +98,7 @@
         callback();
       }
     }
-    else if (++tries < 50) {
+    else if (++tries < 60) {
       setTimeout(() => documentCheck(frame, action, selector, callback, ++tries), 100);
     }
     else {
@@ -156,11 +156,11 @@
       formDoc.querySelector('input[type="button"]');
 
     if (leaveButton) {
-      form.setAttribute('target', '_self');
+      form.setAttribute('target', 'hidden_frame');
       leaveButton.click();
     }
 
-    formFrame.src = formSrc;
+    setTimeout(() => formFrame.src = formSrc, 500);
     documentCheck(formFrame, 'leaveChatRoom', 'input[name="name"]');
   }
 
@@ -188,6 +188,14 @@
     documentCheck(hiddenFrame, 'sendChatMessage', 'div[class="messageRow"]');
   }
 
+  // Check in on what's up in the hidden OG frame -- or hide it again
+  function peek() {
+    if (frames.getAttribute('rows').startsWith('0,'))
+      frames.setAttribute('rows', savedRows);
+    else
+      frames.setAttribute('rows', '0,*');
+  }
+
   window.addEventListener('message', evt => {
     formDoc = formFrame.contentDocument;
     form = formDoc.querySelector('form');
@@ -207,6 +215,9 @@
         break;
       case 'revert':
         revert();
+        break;
+      case 'peek':
+        peek();
         break;
     }
   });
