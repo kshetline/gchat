@@ -415,7 +415,7 @@ export class App implements OnInit {
 
     if (this.framed && dm === 0) {
       setTimeout(() => parent.postMessage(['sendChatMessage', comment, this.color(), this.tripCode()], '*'));
-      const error = await awaitMessage('sendChatMessage', 5000);
+      const error = await awaitMessage('sendChatMessage', 10000);
 
       if (error) {
         notify('error', error);

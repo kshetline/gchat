@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comchat-Mods
 // @namespace    https://chatproxy.chat/
-// @version      v2026.04.17.1
+// @version      v2026.04.18
 // @description  Enhance Comchat functionality
 // @author       Anonymous
 // @license      MIT
@@ -22,7 +22,9 @@
   const logFrame = /** @type {HTMLIFrameElement} */ (document.querySelector('frame[name="log"]'));
   let formDoc;
   let form;
-  let formSrc;
+  let enterFormSrc;
+  let username;
+  let commentFormSource;
   let savedRows;
   let savedLogFrameSrc;
   let originalSound = localStorage.getItem('originalSoundEnabled') || localStorage.getItem('notificationSoundEnabled') || 'true';
@@ -121,12 +123,14 @@
       return;
     }
 
-    if (!formSrc) {
-      formSrc = formFrame.src;
+    if (!enterFormSrc) {
+      enterFormSrc = formFrame.src;
+      commentFormSource = enterFormSrc.replace(/\bmode=form\b/, 'mode=into');
     }
 
     let tripCode;
     [name, tripCode] = name.split('#');
+    username = name;
 
     if (tripCode) {
       localStorage.setItem('password', tripCode);
@@ -160,13 +164,33 @@
       leaveButton.click();
     }
 
-    setTimeout(() => formFrame.src = formSrc, 500);
+    setTimeout(() => formFrame.src = enterFormSrc, 500);
     documentCheck(formFrame, 'leaveChatRoom', 'input[name="name"]');
   }
 
-  function sendChatMessage(comment, color, tripCode) {
+  function sendChatMessage(comment, color, tripCode, retry = 0) {
+    const commentField = formDoc.querySelector('input[name="comment"]');
+
+    // This shouldn't happen, but sometimes the form disappears.
+    if (!commentField) {
+      if (retry > 8)
+        logFrame.contentWindow.postMessage(['sendChatMessage', 'Timed out'], '*');
+      else {
+        if (retry === 0)
+          formFrame.src = commentFormSource;
+
+        setTimeout(() => sendChatMessage(comment, color, tripCode, ++retry), 1000);
+      }
+
+      return;
+    }
+    else if (retry > 0) {
+      // Name has to be stored back into the refreshed comment form.
+      formDoc.querySelector('input[type=hidden][name=name]').value = username;
+      formDoc.querySelector('div.chatFormSection > span:nth-child(2)').innerText = username;
+    }
+
     let face = '';
-    let commentField;
     const $ = /^(.*)(\u2000(.+)\u2000)\s*$/.exec(comment);
 
     if ($) {
@@ -176,7 +200,7 @@
 
     formDoc.querySelector('select[name="color"]').value = color || 0;
     formDoc.querySelector('#face').value = face;
-    (commentField = formDoc.querySelector('input[name="comment"]')).value = comment || '';
+    commentField.value = comment || '';
     formDoc.querySelector('input[name="password"]').value = tripCode || '';
     formDoc.querySelector('form').setAttribute('target', 'hidden_frame');
 
