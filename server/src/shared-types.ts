@@ -38,7 +38,7 @@ export interface Message {
 }
 
 export interface DbMessage {
-  deleted: boolean;
+  deleted: number;
   dm: number;
   edit_count: number;
   email: string;
@@ -47,8 +47,9 @@ export interface DbMessage {
   ip: string;
   message: string;
   name: string;
-  remote: boolean;
+  remote: number;
   session_id: string;
+  spam: number;
   style: string;
   synced_time: number;
   time: number;

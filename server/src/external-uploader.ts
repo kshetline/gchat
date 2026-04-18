@@ -105,7 +105,7 @@ export async function getExternalUploadLink(req: express.Request, file: MFile): 
   const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
 
   await page.reload();
-  (await page.waitForSelector('[id="72h"]', { timeout: 10000 }))?.click();
+  (await page.waitForSelector('button.timeSelector:nth-child(5)', { timeout: 10000 }))?.click();
 
   // Initialize accumulator in the browser
   // @ts-ignore
@@ -209,6 +209,6 @@ export async function getExternalUploadLink(req: express.Request, file: MFile): 
   if (link)
     return link;
 
-  initExternalUploader(true).finally();
+  initExternalUploader(true).catch().finally();
   throw new Error('External uploader: ' + (error || 'failed to upload file'));
 }

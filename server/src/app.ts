@@ -69,7 +69,7 @@ async function monitor(): Promise<void> {
 }
 
 monitor().finally();
-initExternalUploader().finally();
+initExternalUploader().catch().finally();
 
 async function sessionsCheck(): Promise<void> {
   const now = Math.floor(Date.now() / 1000);

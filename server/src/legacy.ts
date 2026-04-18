@@ -13,6 +13,7 @@ import { clearLegacyAccessTimes, tallyForLockout, TIME_WINDOW } from './rate-lim
 const domain = process.env.CHAT_DOMAIN;
 const proxyName = process.env.CHAT_PROXY || 'CHAT②';
 const proxyTrip = process.env.CHAT_PROXY_TRIPCODE;
+const proxyTripEncoded = tripcode(proxyTrip);
 const parser = new HtmlParser();
 export const MAX_IDLE_PARTICIPANT_LEEWAY = 600000; // 10 minutes
 
@@ -71,9 +72,22 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
   const participants = Array.from(new Set(participantDiv.children[0].content.trim().replace(/^.*:\s*/g, '').split(/[◆◇]/)
     .map(p => p.trim()).filter(p => !!p)).values()).sort().map(p => ({ name: p }) as ParticipantInfo);
   const messageRows = body?.querySelectorAll('.messageRow').reverse();
-  let messages = messageRows.map(row => extractMessage(row)).filter(m => m.name !== proxyName);
-  const proxyMessages = messageRows.map(row => extractMessage(row)).filter(m => m.name === proxyName);
+  let messages = messageRows.map(row => extractMessage(row)).filter(m => m.name !== proxyName || m.trip !== proxyTripEncoded);
+  const proxyMessages = messageRows.map(row => extractMessage(row)).filter(m => m.name === proxyName && m.trip === proxyTripEncoded);
   const hashes = new Set<string>();
+
+  for (const message of messages) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [_$0, name, trip, msg] = /^《(.+?)([◆◇].+?)?》(.*)$/.exec(message.bbCode) || [];
+
+    if (message.name === proxyName && name && msg) {
+      message.name = name;
+      message.trip = trip?.slice(1) || '';
+      message.html = message.html.substring(message.bbCode.length - msg.length);
+      message.bbCode = msg;
+      message.hash = messageHash(name, message.trip, message.time);
+    }
+  }
 
   clearLegacyAccessTimes();
 
@@ -172,7 +186,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
 
   try {
     const db = await getDb();
-    existing = (await db.all<any>('SELECT hash, synced_time FROM messages WHERE dm = 0 AND deleted = 0'))
+    existing = (await db.all<any>('SELECT hash, synced_time, name, trip, message FROM messages WHERE dm = 0 AND deleted = 0'))
       .reduce((acc, row) => acc.set(row.hash, row.synced_time), new Map<string, number>());
     const messages = await getLegacyMessages(proxyName, retrieveCount);
     const remoteExisting = new Set(messages.messages.map(m => m.hash));
@@ -214,14 +228,18 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
         if (message.time > latestInDb - 300 || retrieveCount >= 1000) {
           let row = await db.get<DbMessage>('SELECT hash FROM messages WHERE dm = 0 AND hash = ? LIMIT 1', message.hash);
 
-          if (!row)
-            row = await db.get<DbMessage>(`SELECT hash FROM messages WHERE dm = 0 AND name = ? AND message = ? AND
-                                             (synced_time = ?3 OR time = ?3) LIMIT 1`,
-              message.name, message.bbCode, message.time);
+          if (row && row.remote === 1 && row.deleted !== 0 && row.spam === 0)
+            await db.run('UPDATE messages SET deleted = 1 WHERE id = ?', message.msgId);
+          else {
+            if (!row)
+              row = await db.get<DbMessage>(`SELECT hash FROM messages WHERE dm = 0 AND name = ? AND message = ? AND
+                                               (synced_time = ?3 OR time = ?3) LIMIT 1`,
+                message.name, message.bbCode, message.time);
 
-          if (!row && message.name !== proxyName)
-            await db.run('INSERT INTO messages (time, synced_time, name, trip, email, remote, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-              message.time, message.time, message.name, message.trip, message.email, 1, message.style, message.bbCode, message.hash);
+            if (!row && message.name !== proxyName)
+              await db.run('INSERT INTO messages (time, synced_time, name, trip, email, remote, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                message.time, message.time, message.name, message.trip, message.email, 1, message.style, message.bbCode, message.hash);
+          }
         }
       }
     }
@@ -325,7 +343,7 @@ async function legacyBrowserSetup(): Promise<void> {
 }
 
 async function loadEnterForm(page: puppeteer.Page): Promise<void> {
-  await page.goto(`http://${domain}/comchat.cgi?mode=form&nam=&eml=&col=&retime=40&line=20`);
+  await page.goto(`https://${domain}/comchat.cgi?mode=form&nam=&eml=&col=&retime=40&line=20`);
   await page.waitForSelector('form');
   await page.$eval('form', form => form.setAttribute('target', '_self'));
 }
@@ -369,6 +387,15 @@ export async function legacySendMessage(name: string, _email: string, comment: s
 
   messagePage = messagePage || await browser.newPage();
   comment = `《${name}${tripCode ? '◆' + tripcode(tripCode) : ''}》${comment}`;
+
+  // Clean up spun-off pages created by previous message sending.
+  const pages = [...await browser.pages()];
+  const formUrl = `https://${domain}/comchat.cgi`;
+
+  for (const page of pages) {
+    if (page.url() === formUrl)
+      await page.close();
+  }
 
   let face = '';
   const $ = /^(.*)(\u2000(.+)\u2000)\s*$/.exec(comment);
