@@ -5,21 +5,27 @@ import { colors, Config, DbDmSession, DbMessage, DbParticipant, DmSession, Messa
 import { isEqual, processMillis, toBoolean, toInt } from '@tubular/util';
 import { uploadSingle } from './uploader.js';
 import { SessionInfo } from './session-info';
-import { addPendingDuplicate, enterLegacyChat, leaveLegacyChat, legacySendMessage } from './legacy.js';
+import { addPendingDuplicate, enterLegacyChat, leaveLegacyChat, legacySendMessage, stopLegacyPolling } from './legacy.js';
 import { getDb, getNamedParticipantRecord } from './db.js';
 import ip_ from 'ip';
 import axios from 'axios';
-import { convertBBCodeToHtml, extractIp, getIp, getToken, messageHash, unescapeUnicode } from './chat-util.js';
+import { convertBBCodeToHtml, extractIp, getIp, getToken, messageHash, Now, timeStamp, unescapeUnicode } from './chat-util.js';
 import tripcode from 'tripcode';
 import path from 'path';
 import { initExternalUploader, proxyIp } from './external-uploader.js';
 import { rateLimiter } from './rate-limiter.js';
+import { stopLocalSocksProxy } from './socks-proxy.js';
+
+// noinspection ES6ConvertVarToLetConst
+var shuttingDown = false;
+export function isShuttingDown(): boolean { return shuttingDown; }
 
 export const MAX_IDLE_PARTICIPANT_AGE = 7200; // 2 hours
 
 const app = express();
 const port = toInt(process.env.PORT) || 3000;
 const __dirname = process.cwd();
+const devMode = process.argv.includes('-d');
 const sessions = new Map<string, SessionInfo>();
 const proxyName = process.env.CHAT_PROXY || 'CHAT②';
 const config: Config = {
@@ -41,6 +47,7 @@ const MAX_HISTORY_TOLERANCE = 500; // Overflow before deleting messages
 let proxyStarted = false;
 let lastContentUpdate = 0;
 let lastMessages: Message[] = null;
+let monitorTimeout: NodeJS.Timeout;
 
 let serverIp: string;
 
@@ -52,8 +59,10 @@ async function getServerIp(): Promise<string> {
 }
 
 async function monitor(): Promise<void> {
+  if (shuttingDown) return;
+
   const db = await getDb();
-  const now = Math.floor(Date.now() / 1000);
+  const now = Now();
 
   await db.run('DELETE FROM messages WHERE dm > 0 AND synced_time < ?', now - MAX_DM_AGE);
   await db.run('DELETE FROM dm_session WHERE name1_present <= 0 AND name2_present <= 0 AND last_post < ?', now - MAX_DM_AGE);
@@ -65,14 +74,14 @@ async function monitor(): Promise<void> {
     await db.run('DELETE FROM messages WHERE id IN (SELECT id FROM messages ORDER BY messages.synced_time LIMIT ?)',
       messageCount - MAX_HISTORY);
 
-  setTimeout(monitor, MONITOR_INTERVAL);
+  monitorTimeout = setTimeout(monitor, MONITOR_INTERVAL);
 }
 
 monitor().finally();
 initExternalUploader().catch().finally();
 
 async function sessionsCheck(): Promise<void> {
-  const now = Math.floor(Date.now() / 1000);
+  const now = Now();
 
   for (const sessionId of sessions.keys()) {
     const session = sessions.get(sessionId);
@@ -168,7 +177,12 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(statusCode).json({ success: false, message });
 });
 
-app.use(async (req, _res, next) => {
+app.use(async (req, res, next) => {
+  if (shuttingDown) {
+    res.status(503).json({ error: 'Server is shutting down.' });
+    return;
+  }
+
   const token = getToken(req);
 
   if (token && !sessions.has(token)) {
@@ -203,7 +217,7 @@ app.get('/api/messages', async (req, res) => {
   const q = req.query as any;
   const tripCode = tripcode(q.tripCode);
   const name = ((q.name || '') as string).replace(/#.*$/, '');
-  const now = Math.floor(Date.now() / 1000);
+  const now = Now();
 
   if (session) {
     session.lastAlive = now;
@@ -307,7 +321,7 @@ app.post('/api/enter', async (req, res) => {
   const token = getToken(req);
   const session = sessions.get(token);
   const db = await getDb();
-  const now = Math.floor(Date.now() / 1000);
+  const now = Now();
   const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', q.name);
 
   if (!participant && q.name) {
@@ -409,7 +423,7 @@ app.post('/api/send', async (req, res) => {
   const token = getToken(req);
   const session = sessions.get(token);
   const db = await getDb();
-  const now = Math.floor(Date.now() / 1000);
+  const now = Now();
   const q = req.query as any;
   const style = colorToStyle(q.color);
   let comment = q.comment.replace(URL_MATCHER, '[url=$1]$1[/url]');
@@ -500,7 +514,7 @@ app.put('/api/update', async (req, res) => {
     const q = req.query as any;
     const id = toInt(q.msgId);
     const db = await getDb();
-    const now = Math.floor(Date.now() / 1000);
+    const now = Now();
     let bbCode = (q.bbCode as string).replace(URL_MATCHER, '[url=$1]$1[/url]');
     const dm = (await db.get<any>('SELECT dm FROM messages WHERE id = ?', id))?.dm as number;
 
@@ -561,7 +575,7 @@ app.post('/api/start-chat', async (req, res) => {
     return;
   }
 
-  const now = Math.floor(Date.now() / 1000);
+  const now = Now();
   const encryptionKey = randomBytes(32).toString('base64');
   const result = await db.run('INSERT INTO dm_session (name1, name2, name1_present, key, start_time) VALUES (?, ?, 1, ?, ?)',
     self, name, encryptionKey, now);
@@ -582,7 +596,7 @@ app.post('/api/leave-chat', async (req, res) => {
     else {
       const whichName = dmSession.name1 === self ? 'name1_present' : 'name2_present';
 
-      await db.run(`UPDATE dm_session SET ${whichName} = ? WHERE id = ?`, -Math.floor(Date.now() / 1000), id);
+      await db.run(`UPDATE dm_session SET ${whichName} = ? WHERE id = ?`, -Now(), id);
     }
   }
 
@@ -610,3 +624,19 @@ app.get('/api/error', (_req, res) => {
 app.get('/', (_req, res) => {
   res.send('Static home file not found');
 });
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
+process.on('SIGUSR2', shutdown);
+process.on('unhandledRejection', err => console.error(`${timeStamp()} -- Unhandled rejection:`, err));
+
+function shutdown(signal?: string): void {
+  if (devMode && signal === 'SIGTERM') return;
+
+  shuttingDown = true;
+  console.log(`${timeStamp()} -- Shutting down...`);
+  stopLocalSocksProxy().then(() => getDb().then(db => db.close().then(() => {
+    clearTimeout(monitorTimeout);
+    stopLegacyPolling();
+  })));
+}

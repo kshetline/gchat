@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import fs from 'fs/promises';
 import { sleep, toNumber } from '@tubular/util';
 import express from 'express';
-import { reportUploadProgress } from './app.js';
+import { isShuttingDown, reportUploadProgress } from './app.js';
 import { restartLocalSocksProxy, startLocalSocksProxy } from './socks-proxy.js';
 import { extractIp } from './chat-util.js';
 
@@ -21,7 +21,7 @@ export let proxyIp: string;
 export async function initExternalUploader(force = false, newProxy = false): Promise<void> {
   if (inInit) return new Promise<void>(resolve => {
     const interval = setInterval(() => {
-      if (!inInit) {
+      if (!inInit || isShuttingDown()) {
         clearInterval(interval);
         resolve();
       }
@@ -98,7 +98,7 @@ export async function getExternalUploadLink(req: express.Request, file: MFile): 
   }
   catch {}
 
-  if (!uploaderReady)
+  if (!uploaderReady || isShuttingDown())
     throw new Error('External uploader not available');
 
   const fileBuffer = await readFile(file.path);

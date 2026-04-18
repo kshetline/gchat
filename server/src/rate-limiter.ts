@@ -1,5 +1,5 @@
 import express from 'express';
-import { getIp, getToken } from './chat-util.js';
+import { getIp, getToken, Now } from './chat-util.js';
 import { clone } from '@tubular/util';
 import { getDb } from './db.js';
 
@@ -66,7 +66,7 @@ export function tallyForLockout(now: number, isGet: boolean, ip: string, token: 
 
 export const rateLimiter = async (req: express.Request, res: express.Response, next: express.NextFunction): Promise<void> => {
   const isGetRequest = req.method === 'GET';
-  const now = Date.now() / 1000;
+  const now = Now();
   const [ids, shouldLockout, wasLockedOut] = tallyForLockout(now, isGetRequest, getIp(req), getToken(req),
     req.query.name || req.body?.name, req.query.email as string);
 

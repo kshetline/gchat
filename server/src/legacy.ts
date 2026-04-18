@@ -5,9 +5,9 @@ import { HtmlParser } from 'fortissimo-html';
 import { DomNode } from 'fortissimo-html/dist/dom.js';
 import * as puppeteer from 'puppeteer';
 import { getDb } from './db.js';
-import { convertBBCodeToHtml, getTextAndMarkupAsBBCode, messageHash, simplifyError } from './chat-util.js';
+import { convertBBCodeToHtml, getTextAndMarkupAsBBCode, messageHash, Now, simplifyError } from './chat-util.js';
 import tripcode from 'tripcode';
-import { MAX_IDLE_PARTICIPANT_AGE } from './app.js';
+import { isShuttingDown, MAX_IDLE_PARTICIPANT_AGE } from './app.js';
 import { clearLegacyAccessTimes, tallyForLockout, TIME_WINDOW } from './rate-limiter.js';
 
 const domain = process.env.CHAT_DOMAIN;
@@ -23,6 +23,7 @@ let messagePage: puppeteer.Page;
 let inChat = false;
 let lastLegacyPoll = -1;
 let firstParticipantPoll = true;
+let pollingTimeout: NodeJS.Timeout;
 
 interface PendingDuplicate {
   id: number;
@@ -163,7 +164,7 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
     }
   }
 
-  const now = Math.floor(Date.now() / 1000);
+  const now = Now();
   const gettingOld = now - MAX_IDLE_PARTICIPANT_AGE + MAX_IDLE_PARTICIPANT_LEEWAY;
   const currentNames = participants.map(p => `'${p.name.replace(/'/g, "''")}'`).join(',');
 
@@ -179,6 +180,8 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
 }
 
 async function pollLegacyMessages(overrideCount?: number): Promise<void> {
+  if (isShuttingDown()) return;
+
   const now = processMillis();
   const retrieveCount = overrideCount ??
     (lastLegacyPoll < 0 || now > lastLegacyPoll + 3_600_000 ? 1000 : now > lastLegacyPoll + 600_000 ? 200 : 30);
@@ -194,7 +197,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
     let latest = 0;
     const row = await db.get<DbMessage>('SELECT time FROM messages WHERE dm = 0 ORDER BY time DESC LIMIT 1');
     const latestInDb = row?.time;
-    const clockNow = Math.floor(Date.now() / 1000);
+    const clockNow = Now();
 
     for (let i = pendingDuplicates.length - 1; i >= 0; --i) {
       const time = pendingDuplicates[i].time;
@@ -310,10 +313,12 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
     console.error('Error polling legacy chat, %s: %s', new Date().toISOString().substring(0, 19), simplifyError(err));
   }
 
-  if (existing.size < 1000)
-    setTimeout(() => pollLegacyMessages(1000), 10_000);
-  else
-    setTimeout(pollLegacyMessages, 10_000);
+  if (!isShuttingDown()) {
+    if (existing.size < 1000)
+      pollingTimeout = setTimeout(() => pollLegacyMessages(1000), 10_000);
+    else
+      pollingTimeout = setTimeout(pollLegacyMessages, 10_000);
+  }
 
   lastLegacyPoll = processMillis();
 }
@@ -412,4 +417,11 @@ export async function legacySendMessage(name: string, _email: string, comment: s
   await messagePage.$eval('input[name="password"]', (input, tripCode) => input.value = tripCode, proxyTrip || '');
   await messagePage.focus('input[name="comment"]');
   await messagePage.keyboard.press('Enter');
+}
+
+export function stopLegacyPolling(): void {
+  if (pollingTimeout) {
+    clearTimeout(pollingTimeout);
+    pollingTimeout = undefined;
+  }
 }

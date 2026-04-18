@@ -91,7 +91,7 @@ export async function uploadSingle(req: express.Request, res: express.Response):
 
   if (!uploadPage) {
     uploadPage = uploadPage = await browser.newPage();
-    await uploadPage.goto(`http://${domain}/up.php`);
+    await uploadPage.goto(`https://${domain}/up.php`);
     await uploadPage.waitForSelector('form');
   }
 
