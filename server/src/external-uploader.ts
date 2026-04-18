@@ -105,7 +105,14 @@ export async function getExternalUploadLink(req: express.Request, file: MFile): 
   const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
 
   await page.reload();
-  (await page.waitForSelector('button.timeSelector:nth-child(5)', { timeout: 10000 }))?.click();
+  const buttons = await page.$$('button.timeSelector');
+  // '72h' is not a proper ID, so selecting for it is a bit of a hack
+  for (const button of buttons) {
+    if ((await page.evaluate(button => button.getAttribute('id'), button)) === '72h') {
+      await button.click();
+      break;
+    }
+  }
 
   // Initialize accumulator in the browser
   // @ts-ignore
