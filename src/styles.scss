@@ -21,13 +21,13 @@
 }
 
 b, h1, h2, h3, h4, h5, h6, strong, th {
-  color: #000;
+  color: oklch(from currentColor calc(l - 0.17) c h);
   font-weight: 900;
 }
 
 .theme-dark {
   b, h1, h2, h3, h4, h5, h6, strong, th {
-    color: #FFF;
+    color: oklch(from currentColor calc(l + 0.17) c h);
   }
 }
 
@@ -64,35 +64,46 @@ a {
   }
 }
 
-.local-light a {
-  color: #00E;
-
-  &:visited {
-    color: #528;
+.local-light {
+  b, h1, h2, h3, h4, h5, h6, strong, th {
+    color: oklch(from currentColor calc(l - 0.17) c h);
+    font-weight: 900;
   }
 
-  &:hover {
-    color: #06F;
-  }
+  a {
+    color: #00E;
 
-  &:active {
-    color: #F00;
+    &:visited {
+      color: #528;
+    }
+
+    &:hover {
+      color: #06F;
+    }
+
+    &:active {
+      color: #F00;
+    }
   }
 }
 
-.local-dark a {
-  color: #6AB0F3;
+.local-dark {
+  @extend .theme-dark;
 
-  &:visited {
-    color: #C084FC;
-  }
+  a {
+    color: #6AB0F3;
 
-  &:hover {
-    color: #93C5FD;
-  }
+    &:visited {
+      color: #C084FC;
+    }
 
-  &:active {
-    color: #FBBF24;
+    &:hover {
+      color: #93C5FD;
+    }
+
+    &:active {
+      color: #FBBF24;
+    }
   }
 }
 
