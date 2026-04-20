@@ -247,7 +247,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
       }
     }
 
-    [...existing.entries()].forEach(([hash, time]) => (time < earliest || time > latestInDb) && existing.delete(hash));
+    [...existing.entries()].forEach(([hash, time]) => (time < earliest + 600 || time > latestInDb - 300) && existing.delete(hash));
 
     // Check messages in our DB which are not found in the legacy chat anymore, at least with a matching hash.
     for (const hash of existing.keys()) {
@@ -259,8 +259,8 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
         if (time !== row.synced_time && Math.abs(time - row.synced_time) < 5)
           await db.run('UPDATE messages SET synced_time = ? WHERE dm = 0 AND hash = ?', time, messageHash(row.name, row.trip, time));
         // Otherwise, presume the message was administratively deleted on the legacy site and follow suit here.
-        else if (!remoteExisting.has(hash)) {
-          await db.run('UPDATE messages SET deleted = 1 WHERE dm = 0 AND hash = ?', hash);
+        else if (!remoteExisting.has(hash) && row.synced_time < clockNow - 600) {
+//          await db.run('UPDATE messages SET deleted = 1 WHERE dm = 0 AND hash = ?', hash); // Should be OK, but still worried about unwanted deletions
           existing.delete(hash);
         }
       }

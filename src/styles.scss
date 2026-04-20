@@ -21,13 +21,13 @@
 }
 
 b, h1, h2, h3, h4, h5, h6, strong, th {
-  color: oklch(from currentColor calc(l - 0.17) c h);
+  color: hsl(from currentColor h s calc(l * 0.83));
   font-weight: 900;
 }
 
 .theme-dark {
   b, h1, h2, h3, h4, h5, h6, strong, th {
-    color: oklch(from currentColor calc(l + 0.17) c h);
+    color: hsl(from currentColor h s calc(l * 1.17));
   }
 }
 
@@ -66,7 +66,7 @@ a {
 
 .local-light {
   b, h1, h2, h3, h4, h5, h6, strong, th {
-    color: oklch(from currentColor calc(l - 0.17) c h);
+    color: hsl(from currentColor h s calc(l * 0.83));
     font-weight: 900;
   }
 
