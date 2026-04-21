@@ -279,7 +279,7 @@ app.get('/api/messages', async (req, res) => {
     }
 
     if (participant) {
-      participantInfo.allowsDms = !!participant.allow_dm;
+      participantInfo.allowsDms = !!participant.allow_dm && !participant.remote;
       participantInfo.idle = now - participant.last_active > (participant.remote ? 1800 : 600) ? 1 : 0;
       participantInfo.remote = !!participant.remote;
     }
@@ -318,6 +318,7 @@ app.get('/api/messages', async (req, res) => {
 
 app.post('/api/enter', async (req, res) => {
   const q = req.query as any;
+  const framed = toBoolean(q.framed);
   const token = getToken(req);
   const session = sessions.get(token);
   const db = await getDb();
@@ -325,14 +326,14 @@ app.post('/api/enter', async (req, res) => {
   const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', q.name);
 
   if (!participant && q.name) {
-    await db.run('INSERT INTO participants (name, trip, email, ip, session_id, remote, last_active, last_post) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      q.name, q.tripCode, q.email, session.ip, token, 0, now, 0);
+    await db.run('INSERT INTO participants (name, trip, email, ip, session_id, remote, proxied, last_active, last_post) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      q.name, q.tripCode, q.email, session.ip, token, 0, +(!framed), now, 0);
     session.inChat = true;
   }
   else if (q.tripCode === participant.trip || !participant.ip || session.ip === participant.ip ||
            !participant.session_id || token === participant.session_id) {
-    await db.run('UPDATE participants SET trip = ?, email = ?, ip = ?, session_id = ?, remote = ?, last_active = ? WHERE id = ?',
-      q.tripCode, q.email, session.ip, token, 0, now, participant.id);
+    await db.run('UPDATE participants SET trip = ?, email = ?, ip = ?, session_id = ?, remote = ?, proxied = ?, last_active = ? WHERE id = ?',
+      q.tripCode, q.email, session.ip, token, 0, +(!framed), now, participant.id);
     session.inChat = true;
     await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', q.name);
   }
@@ -344,7 +345,7 @@ app.post('/api/enter', async (req, res) => {
     return;
   }
 
-  if (!toBoolean(q.framed) && !proxyStarted) {
+  if (!framed && !proxyStarted) {
     await enterLegacyChat(proxyName, null, 0);
     proxyStarted = true;
   }
@@ -370,9 +371,13 @@ app.post('/api/leave', async (req, res) => {
     session.inChat = false;
   }
 
-  if (!toBoolean(q.framed) && Array.from(sessions.values()).findIndex(s => s.inChat) < 0) {
-    await leaveLegacyChat();
-    proxyStarted = false;
+  if (!toBoolean(q.framed)) {
+    const proxiedCount = (await db.get<any>('SELECT COUNT(*) as count FROM participants WHERE proxied = 1'))?.count || 0;
+
+    if (!proxiedCount) {
+      await leaveLegacyChat();
+      proxyStarted = false;
+    }
   }
 
   res.json(null);

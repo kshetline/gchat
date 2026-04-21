@@ -39,6 +39,7 @@ export async function getDb(): Promise<AsyncDatabase> {
       "ip" TEXT,
       "session_id" TEXT,
       "remote" INTEGER NOT NULL,
+      "proxied" INTEGER NOT NULL DEFAULT 0,
       "last_active" INTEGER NOT NULL DEFAULT 0,
       "last_post" INTEGER NOT NULL DEFAULT 0,
       "allow_dm"  INTEGER NOT NULL DEFAULT 0,

@@ -493,8 +493,14 @@ export class MessageEntry implements OnInit{
       this.changeColor.emit(this.color);
 
     if (this.quill?.root) {
+      const savedSelection = this.quill.getSelection();
+      const content = this.quill.getContents();
+
       this.quill.root.style.color = colorByIndex(this.color, this.darkMode());
       this.quill.root.style.backgroundColor = getTextBackground(this.quill.root.style.color);
+      this.quill.setText('');
+      this.quill.setContents(content);
+      this.quill.setSelection(savedSelection);
     }
   }
 
