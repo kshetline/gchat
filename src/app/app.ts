@@ -576,7 +576,6 @@ export class App implements OnInit {
   protected toggleMessageOrder(): void {
     this.prefs.newOnBottom = this.newOnBottom();
     this.prefService.set(this.prefs);
-    this.messages.set(this.messages().reverse());
     this.adjustScrolling();
     this.pendingFocus = true;
   }

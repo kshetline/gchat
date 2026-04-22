@@ -5,7 +5,8 @@
   @if (closed() && !isAtBottom()) {
     <div class="closed-chat">This chat session is closed</div>
   }
-  @for (message of messages(); track message.hash) {
+  @let msgs = isAtBottom() ? messages() : messages().slice(0).reverse();
+  @for (message of msgs; track message.hash) {
     <div class="message-row">
       <div class="name" [class.me]="message.isMe">
           <span [style.color]="getColor(message)" [style.background-color]="getBackground(message)">{{
