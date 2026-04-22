@@ -77,6 +77,7 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
   const proxyMessages = messageRows.map(row => extractMessage(row)).filter(m => m.name === proxyName && m.trip === proxyTripEncoded);
   const hashes = new Set<string>();
 
+  // Find proxied messages (with alternate tripcode) and reformat them to remove CHAT② proxy.
   for (const message of messages) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [_$0, name, trip, msg] = /^《(.+?)([◆◇].+?)?》(.*)$/.exec(message.bbCode) || [];
@@ -122,14 +123,6 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
   // Filter duplicate messages by hashcode.
   messages = messages.filter(m => !hashes.has(m.hash) && hashes.add(m.hash));
 
-  const latestPosts = new Map<string, number>();
-
-  for (const message of messages) {
-    const latest = latestPosts.get(message.name) || message.time;
-
-    latestPosts.set(message.name, message.time > latest ? message.time : latest);
-  }
-
   const db = await getDb();
 
   for (const message of proxyMessages) {
@@ -149,8 +142,9 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
         // Still not found? Then it probably comes from a different chat proxy. Fix the name and treat it as a new message.
         if (result.changes === 0) {
           message.name = name;
-          message.bbCode = msg;
           message.trip = trip?.slice(1) || '';
+          message.html = message.html.substring(message.bbCode.length - msg.length);
+          message.bbCode = msg;
           message.hash = messageHash(name, trip, message.time);
 
           const index = messages.findIndex(m => m.time >= message.time);
@@ -170,6 +164,14 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
 
   await db.run(`UPDATE participants SET last_active = ? WHERE remote = 1 AND name IN (${currentNames}) AND last_active < ?`,
     gettingOld + MAX_IDLE_PARTICIPANT_LEEWAY, gettingOld);
+
+  const latestPosts = new Map<string, number>();
+
+  for (const message of messages) {
+    const latest = latestPosts.get(message.name) || message.time;
+
+    latestPosts.set(message.name, Math.max(message.time, latest));
+  }
 
   for (const participant of Array.from(latestPosts.keys()))
     if (latestPosts.get(participant))
@@ -260,7 +262,9 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
           await db.run('UPDATE messages SET synced_time = ? WHERE dm = 0 AND hash = ?', time, messageHash(row.name, row.trip, time));
         // Otherwise, presume the message was administratively deleted on the legacy site and follow suit here.
         else if (!remoteExisting.has(hash) && row.synced_time < clockNow - 600) {
-//          await db.run('UPDATE messages SET deleted = 1 WHERE dm = 0 AND hash = ?', hash); // Should be OK, but still worried about unwanted deletions
+          // TODO: Should be OK, but still worried about unwanted deletions.
+          //   Change `flagged` to `deleted` if flagged messages prove to be proper targets for deletion.
+          await db.run('UPDATE messages SET flagged = 1 WHERE dm = 0 AND hash = ?', hash);
           existing.delete(hash);
         }
       }

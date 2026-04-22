@@ -26,6 +26,7 @@ export interface Config {
 export interface Message {
   bbCode?: string;
   email?: string;
+  flagged?: number;
   hash: string;
   html: string;
   isMe?: boolean;
@@ -42,6 +43,7 @@ export interface DbMessage {
   dm: number;
   edit_count: number;
   email: string;
+  flagged?: number;
   hash: string;
   id: number;
   ip: string;
@@ -94,6 +96,8 @@ export interface DmSession {
 }
 
 export interface Messages {
+  append?: boolean;
+  deleteCount?: number;
   dms?: DmSession[];
   errorMessage?: string;
   messages?: Message[];

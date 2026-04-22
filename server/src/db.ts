@@ -27,6 +27,7 @@ export async function getDb(): Promise<AsyncDatabase> {
       "edit_count" INTEGER NOT NULL DEFAULT 0,
       "deleted" INTEGER NOT NULL DEFAULT 0,
       "spam" INTEGER NOT NULL DEFAULT 0,
+      "flagged" INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY("id" AUTOINCREMENT)
     )`);
 

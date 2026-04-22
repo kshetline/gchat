@@ -290,22 +290,27 @@ export class App implements OnInit {
           this.checkChatActive();
 
           if (!isEqual(messages.messages, [null])) {
-            if (!this.newOnBottom())
-              messages.messages.reverse();
+            const newMessages = (messages.deleteCount || messages.append) ? clone(this.messages(), true) : messages.messages;
 
-            const changed = !isEqual(messages.messages, this.messages());
-            const newMessages = this.countNewMessages(this.messages(), messages.messages);
+            if (messages.deleteCount)
+              newMessages.splice(0, messages.deleteCount);
+
+            if (messages.append)
+              newMessages.push(...messages.messages);
+
+            const changed = !isEqual(newMessages, this.messages());
+            const newMessageCount = this.countNewMessages(this.messages(), newMessages);
 
             if (changed) {
               if (this.messages().length > 0 && (!this.chatActive || this.selectedChat() !== 0)) {
-                this.unseenMessages.set(this.unseenMessages() + newMessages);
+                this.unseenMessages.set(this.unseenMessages() + newMessageCount);
                 this.updateTitle();
 
-                if (newMessages && this.prefs.notifySound)
+                if (newMessageCount && this.prefs.notifySound)
                   this.playNotificationSound();
               }
 
-              this.messages.set(messages.messages);
+              this.messages.set(newMessages);
               this.adjustScrolling(true);
             }
           }

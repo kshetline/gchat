@@ -20,7 +20,8 @@ import { stopLocalSocksProxy } from './socks-proxy.js';
 var shuttingDown = false;
 export function isShuttingDown(): boolean { return shuttingDown; }
 
-export const MAX_IDLE_PARTICIPANT_AGE = 7200; // 2 hours
+export const MAX_IDLE_PARTICIPANT_AGE = 172800; // 2 days
+export const MAX_IDLE_PARTICIPANT_SHOW = 7200; // 2 hours
 
 const app = express();
 const port = toInt(process.env.PORT) || 3000;
@@ -45,6 +46,7 @@ const MAX_HISTORY = 5000; // number of chat messages to keep in DB
 const MAX_HISTORY_TOLERANCE = 500; // Overflow before deleting messages
 
 let proxyStarted = false;
+let nextToLastContentUpdate = 0;
 let lastContentUpdate = 0;
 let lastMessages: Message[] = null;
 let monitorTimeout: NodeJS.Timeout;
@@ -122,6 +124,7 @@ async function getDirectMessages(name: string): Promise<DmSession[]> {
       dmSession.id)).slice(-1000);
     const messages = rows.filter(row => !row.deleted).map(row => ({
       email: row.email,
+      flagged: row.flagged,
       hash: row.hash,
       html: convertBBCodeToHtml(decryptMessage(row.message, dmSession.key)) || '???',
       isMe: row.name === name,
@@ -231,6 +234,7 @@ app.get('/api/messages', async (req, res) => {
   const rows = (await db.all<DbMessage>('SELECT * FROM messages WHERE deleted = 0 AND dm = 0 ORDER BY messages.synced_time')).slice(-1000);
   let messages = rows.filter(row => !row.deleted).map(row => ({
     email: row.email,
+    flagged: row.flagged,
     hash: row.hash,
     html: convertBBCodeToHtml(row.message),
     isMe: row.name === name && (row.session_id === getToken(req) || row.ip === session.ip ||
@@ -245,7 +249,7 @@ app.get('/api/messages', async (req, res) => {
 
   const active = toBoolean(req.query.active);
   const force = toBoolean(req.query.force);
-  const twoHoursAgo = now - 7200;
+  const idleTimeLimit = now - MAX_IDLE_PARTICIPANT_SHOW;
   let participant = await getNamedParticipantRecord(name);
 
   if (participant) {
@@ -256,8 +260,8 @@ app.get('/api/messages', async (req, res) => {
   }
 
   const participantNames = (await db.all<any>(
-    'SELECT name FROM participants WHERE name != ?1 AND (last_active > ?2 OR last_post > ?2)',
-      proxyName, twoHoursAgo)).map(r => r.name);
+    'SELECT name FROM participants WHERE name != ?1 AND ((last_active > ?2 OR last_post > ?2) OR remote = 0)',
+      proxyName, idleTimeLimit)).map(r => r.name);
   const participants = [...new Set(participantNames)].sort().map(p => ({ name: p } as ParticipantInfo));
 
   for (let i = participants.length - 1; i >= 0; --i) {
@@ -300,20 +304,55 @@ app.get('/api/messages', async (req, res) => {
     }
   }
 
+  let deleteCount = 0;
+  let appendAt = 0;
+  let oldMessages: Message[];
+
   if (!isEqual(lastMessages, messages)) {
+    if (lastMessages?.length > 50 && messages?.length > 50) {
+      deleteCount = Math.max(lastMessages.findIndex(m => m.hash === messages[0].hash), 0);
+      appendAt = messages.findIndex(m => m.hash === lastMessages.at(-1).hash);
+      oldMessages = lastMessages.slice(deleteCount);
+
+      if (appendAt < 0)
+        appendAt = messages.length;
+    }
+
     lastMessages = messages;
+    nextToLastContentUpdate = lastContentUpdate;
     lastContentUpdate = processMillis();
   }
 
   if (session) {
-    if (force || session.lastContentUpdate !== lastContentUpdate)
-      session.lastContentUpdate = lastContentUpdate;
+    if (!force) {
+      if (session.lastContentUpdate === nextToLastContentUpdate && appendAt > 0) {
+        const overlappingMessages = messages.slice(0, appendAt + 1);
+
+        if (isEqual(oldMessages, overlappingMessages))
+          messages = messages.slice(appendAt + 1);
+        else
+          deleteCount = appendAt = 0;
+      }
+      else if (session.lastContentUpdate === lastContentUpdate)
+        messages = [null];
+    }
     else
-      messages = [null];
+      deleteCount = appendAt = 0;
+
+    session.lastContentUpdate = lastContentUpdate;
   }
+  else
+    deleteCount = appendAt = 0;
 
   await sessionsCheck();
-  res.json({ messages, participants, dms: await getDirectMessages(name), progress: session?.progress, proxyIp });
+
+  res.json({
+    messages,
+    deleteCount,
+    append: appendAt > 0,
+    participants,
+    dms: await getDirectMessages(name),
+    progress: session?.progress, proxyIp });
 });
 
 app.post('/api/enter', async (req, res) => {
