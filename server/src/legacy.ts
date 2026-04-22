@@ -1,5 +1,5 @@
 import { DbMessage, DbParticipant, kaomojiEndRegex, Message, Messages, ParticipantInfo } from './shared-types.js';
-import { encodeForUri, processMillis } from '@tubular/util';
+import { encodeForUri, htmlUnescape, processMillis } from '@tubular/util';
 import axios from 'axios';
 import { HtmlParser } from 'fortissimo-html';
 import { DomNode } from 'fortissimo-html/dist/dom.js';
@@ -53,7 +53,7 @@ function extractMessage(messageRow: DomNode): Message {
     ++nameIndex;
   }
 
-  const name = (nameElem?.children?.at(nameIndex) as DomNode)?.children?.at(0)?.content;
+  const name = htmlUnescape((nameElem?.children?.at(nameIndex) as DomNode)?.children?.at(0)?.content || '');
   const rawTime = messageRow.querySelector('.messageDate')?.children?.at(0)?.content?.slice(1, -1);
   const parts = rawTime?.split(/[- :/]/).map((p, i) => p.padStart(i === 0 ? 4 : 2, '0'));
   const timestamp = parts?.length !== 6 ? null : `${parts[0]}-${parts[1]}-${parts[2]}T${parts[3]}:${parts[4]}:${parts[5]}`;
