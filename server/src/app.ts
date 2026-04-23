@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { randomUUID, randomBytes, createCipheriv, createDecipheriv } from 'crypto';
 import { colors, Config, DbDmSession, DbMessage, DbParticipant, DmSession, Message, ParticipantInfo } from './shared-types.js';
-import { isEqual, processMillis, toBoolean, toInt } from '@tubular/util';
+import { isEqual, isString, processMillis, toBoolean, toInt } from '@tubular/util';
 import { uploadSingle } from './uploader.js';
 import { SessionInfo } from './session-info';
 import { addPendingDuplicate, enterLegacyChat, leaveLegacyChat, legacySendMessage, stopLegacyPolling } from './legacy.js';
@@ -12,6 +12,7 @@ import axios from 'axios';
 import { convertBBCodeToHtml, extractIp, getIp, getToken, messageHash, Now, timeStamp, unescapeUnicode } from './chat-util.js';
 import tripcode from 'tripcode';
 import path from 'path';
+import fs from 'fs';
 import { initExternalUploader, proxyIp } from './external-uploader.js';
 import { rateLimiter } from './rate-limiter.js';
 import { stopLocalSocksProxy } from './socks-proxy.js';
@@ -19,6 +20,31 @@ import { stopLocalSocksProxy } from './socks-proxy.js';
 // noinspection ES6ConvertVarToLetConst
 var shuttingDown = false;
 export function isShuttingDown(): boolean { return shuttingDown; }
+
+// Send console output to a log file
+const logFile = fs.createWriteStream(
+  path.join(process.cwd(), '../logs/app.log'), { flags: 'a' }
+);
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+for (const [method, _stream, prefix] of [
+  ['log',   process.stdout, ''],
+  ['info',  process.stdout, ''],
+  ['error', process.stderr, '[ERR] '],
+  ['warn',  process.stderr, '[WARN] '],
+] as const) {
+  const orig = console[method].bind(console);
+
+  console[method] = (...args: unknown[]) => {
+    orig(...args);
+
+    if (isString(args[0] && (args[0] as string).includes('%s'))) {
+      args[0] = (args[0] as string).replace(/(?<!%)%s/g, () => args.length > 1 ? String(args.splice(1, 1)) : '%s');
+    }
+
+    logFile.write(prefix + args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') + '\n');
+  };
+}
 
 export const MAX_IDLE_PARTICIPANT_AGE = 172800; // 2 days
 export const MAX_IDLE_PARTICIPANT_SHOW = 7200; // 2 hours

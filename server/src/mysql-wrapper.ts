@@ -120,7 +120,7 @@ export class AsyncDatabaseWrapperForMySQL extends AsyncDatabase {
         else {
           index = ++highestIndex;
         }
-        outParams.push(params[index - 1]);
+        outParams.push(params[index - 1] ?? null);
         result += '?';
         continue;
       }
