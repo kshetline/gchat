@@ -21,29 +21,31 @@ import { stopLocalSocksProxy } from './socks-proxy.js';
 var shuttingDown = false;
 export function isShuttingDown(): boolean { return shuttingDown; }
 
-// Send console output to a log file
-const logFile = fs.createWriteStream(
-  path.join(process.cwd(), '../logs/app.log'), { flags: 'a' }
-);
+if (process.env.LOG_FILE_PATH) {
+  // Send console output to a log file
+  const logFile = fs.createWriteStream(
+    path.join(process.cwd(), process.env.LOG_FILE_PATH), { flags: 'a' }
+  );
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-for (const [method, _stream, prefix] of [
-  ['log',   process.stdout, ''],
-  ['info',  process.stdout, ''],
-  ['error', process.stderr, '[ERR] '],
-  ['warn',  process.stderr, '[WARN] '],
-] as const) {
-  const orig = console[method].bind(console);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  for (const [method, _stream, prefix] of [
+    ['log',   process.stdout, ''],
+    ['info',  process.stdout, ''],
+    ['error', process.stderr, '[ERR] '],
+    ['warn',  process.stderr, '[WARN] '],
+  ] as const) {
+    const orig = console[method].bind(console);
 
-  console[method] = (...args: unknown[]) => {
-    orig(...args);
+    console[method] = (...args: unknown[]) => {
+      orig(...args);
 
-    if (isString(args[0] && (args[0] as string).includes('%s'))) {
-      args[0] = (args[0] as string).replace(/(?<!%)%s/g, () => args.length > 1 ? String(args.splice(1, 1)) : '%s');
-    }
+      if (isString(args[0] && (args[0] as string).includes('%s'))) {
+        args[0] = (args[0] as string).replace(/(?<!%)%s/g, () => args.length > 1 ? String(args.splice(1, 1)) : '%s');
+      }
 
-    logFile.write(prefix + args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') + '\n');
-  };
+      logFile.write(prefix + args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') + '\n');
+    };
+  }
 }
 
 export const MAX_IDLE_PARTICIPANT_AGE = 172800; // 2 days

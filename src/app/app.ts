@@ -769,6 +769,7 @@ export class App implements OnInit {
       }
       else if (this.prefs.allowDMs && !this.dmsJustClosed.get(dm.id)) {
         currentDMs.push({ id: dm.id, name: dm.name, messages: signal(dm.messages), missed: signal(0) });
+        totalNewMessages += 1;
         changed = true;
       }
     }

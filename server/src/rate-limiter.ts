@@ -3,11 +3,13 @@ import { getIp, getToken, Now } from './chat-util.js';
 import { clone } from '@tubular/util';
 import { getDb } from './db.js';
 
-export const TIME_WINDOW = 60; // seconds
-const ALLOWED_GET_REQUESTS = 40;
-const ALLOWED_REQUESTS = 12;
+export const TIME_WINDOW = 120; // seconds
+
+const ALLOWED_GET_REQUESTS = 80;
+const ALLOWED_REQUESTS = 24;
 const LOCKOUT_TIME = 900; // 15 minutes
 const LOCKOUT_TIME_GET = 60; // 1 minute
+const SPAM_PATTERN = process.env.SPAM_PATTERN && new RegExp(process.env.SPAM_PATTERN.replace(/#/g, '\\'), 'i');
 
 interface Identifiers {
   ip: string;
@@ -27,14 +29,25 @@ const legacyAccessTimes = clone(accessTimes);
 const lockouts: Record<string, number> = {};
 
 export function tallyForLockout(now: number, isGet: boolean, ip: string, token: string,
-                                name: string, email: string, legacy = false): [Identifiers, boolean, boolean] {
+                                name: string, email: string, comment: string, legacy = false): [Identifiers, boolean, boolean] {
   const ids = { ip, token, name, email };
   const times = isGet ? getAccessTimes : legacy ? legacyAccessTimes : accessTimes;
   const limit = isGet ? ALLOWED_GET_REQUESTS : ALLOWED_REQUESTS;
   const lockoutTime = isGet ? LOCKOUT_TIME_GET : LOCKOUT_TIME;
+  let spammish = SPAM_PATTERN.test(comment) || SPAM_PATTERN.test(name);
 
-  for (const key in ids)
-    times[key].push({ ids, time: now });
+  if (spammish) {
+    const parts = comment.split(/◀︎| < /);
+
+    if (parts.length === 2)
+      spammish = SPAM_PATTERN.test(parts[1]) || SPAM_PATTERN.test(name);
+  }
+
+  // Spammish comments count triple
+  for (let i = 0; i < (spammish ? 3 : 1); ++i) {
+    for (const key in ids)
+      times[key].push({ ids, time: now + i / 10 });
+  }
 
   for (const key in times)
     times[key] = times[key].filter(entry => now - entry.time < TIME_WINDOW);
@@ -67,8 +80,9 @@ export function tallyForLockout(now: number, isGet: boolean, ip: string, token: 
 export const rateLimiter = async (req: express.Request, res: express.Response, next: express.NextFunction): Promise<void> => {
   const isGetRequest = req.method === 'GET';
   const now = Now();
+  const q = req.query as Record<string, string> || {};
   const [ids, shouldLockout, wasLockedOut] = tallyForLockout(now, isGetRequest, getIp(req), getToken(req),
-    req.query.name || req.body?.name, req.query.email as string);
+    q.name || req.body?.name, q.email, q.message);
 
   if (shouldLockout) {
     if (!wasLockedOut) {

@@ -97,7 +97,7 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
   for (let i = 0; i < messages.length; i++) {
     const message = messages[i];
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [_ids, shouldLockout, wasLockedOut] = tallyForLockout(message.time, false, null, null, message.name, message.email, true);
+    const [_ids, shouldLockout, wasLockedOut] = tallyForLockout(message.time, false, null, null, message.name, message.email, message.bbCode, true);
 
     if (shouldLockout) {
       if (!!wasLockedOut) {

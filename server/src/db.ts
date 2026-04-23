@@ -27,7 +27,8 @@ export async function getDb(): Promise<AsyncDatabase> {
     forMySQL = true;
 
     const connection = await mysql.createConnection({
-      host: process.env.MYSQL_HOST,
+      host: process.env.MYSQL_HOST.split(':')[0]?.trim() || 'localhost',
+      port: parseInt(process.env.MYSQL_HOST.split(':')[1]?.trim() || '3306'),
       user: process.env.MYSQL_USER,
       password: process.env.MYSQL_PASSWORD,
       database: process.env.MYSQL_DB

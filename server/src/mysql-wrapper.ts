@@ -90,10 +90,9 @@ export class AsyncDatabaseWrapperForMySQL extends AsyncDatabase {
       }
 
       // Identifier: check for MAX/MIN with multiple args → GREATEST/LEAST
-      if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || ch === '_') {
+      if (/[_A-Z]/i.test(ch)) {
         let ident = '';
-        while (i < sql.length && ((sql[i] >= 'A' && sql[i] <= 'Z') || (sql[i] >= 'a' && sql[i] <= 'z') ||
-               (sql[i] >= '0' && sql[i] <= '9') || sql[i] === '_')) ident += sql[i++];
+        while (i < sql.length && /[_A-Z0-9]/i.test(sql[i])) ident += sql[i++];
         const upper = ident.toUpperCase();
         if (upper === 'MAX' || upper === 'MIN') {
           let j = i;
@@ -111,9 +110,9 @@ export class AsyncDatabaseWrapperForMySQL extends AsyncDatabase {
       if (ch === '?') {
         i++;
         let index: number;
-        if (i < sql.length && sql[i] >= '1' && sql[i] <= '9') {
+        if (i < sql.length && /[1-9]/i.test(sql[i])) {
           let numStr = '';
-          while (i < sql.length && sql[i] >= '0' && sql[i] <= '9') numStr += sql[i++];
+          while (i < sql.length && /[0-9]/i.test(sql[i])) numStr += sql[i++];
           index = parseInt(numStr, 10);
           if (index > highestIndex) highestIndex = index;
         }
