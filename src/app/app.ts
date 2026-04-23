@@ -260,6 +260,9 @@ export class App implements OnInit {
   }
 
   private repollMessages(forProgress = false): void {
+    if (this.messageTimer)
+      clearTimeout(this.messageTimer);
+
     this.messageTimer = setTimeout(() => this.getMessages(), forProgress ? REPOLL_RATE_CHECK_PROGRESS : REPOLL_RATE);
   }
 

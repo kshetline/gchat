@@ -175,7 +175,7 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
 
   for (const participant of Array.from(latestPosts.keys()))
     if (latestPosts.get(participant))
-      await db.run('UPDATE participants SET last_post = ?1, last_active = MAX(last_active, ?1) WHERE name = ?2 and remote = 1',
+      await db.run('UPDATE participants SET last_post = ?1, last_active = MAX(last_active, ?1) WHERE name = ?2 AND remote = 1',
         latestPosts.get(participant), participant);
 
   return { messages, participants };

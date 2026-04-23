@@ -126,7 +126,7 @@ async function getDirectMessages(name: string): Promise<DmSession[]> {
       email: row.email,
       flagged: row.flagged,
       hash: row.hash,
-      html: convertBBCodeToHtml(decryptMessage(row.message, dmSession.key)) || '???',
+      html: convertBBCodeToHtml(decryptMessage(row.message, dmSession.ekey)) || '???',
       isMe: row.name === name,
       msgId: row.id,
       name: row.name,
@@ -490,7 +490,7 @@ app.post('/api/send', async (req, res) => {
       return;
     }
     else
-      comment = encryptMessage(comment, dmSession.key);
+      comment = encryptMessage(comment, dmSession.ekey);
   }
 
   const result = await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -499,7 +499,7 @@ app.post('/api/send', async (req, res) => {
   if (!dm && framed)
     addPendingDuplicate(result.lastID, now, q.name, comment);
 
-  await db.run('UPDATE participants SET last_post = ?1, last_active = ?1 WHERE name = ?2 and remote = 0', now, q.name);
+  await db.run('UPDATE participants SET last_post = ?1, last_active = ?1 WHERE name = ?2 AND remote = 0', now, q.name);
 
   if (dmSession)
     await db.run('UPDATE dm_session SET last_post = ? WHERE id = ?', now, dmSession.id);
@@ -535,7 +535,7 @@ async function allowedToEdit(req: express.Request, res: express.Response, action
       const dmSession = await db.get<DbDmSession>('SELECT * FROM dm_session WHERE id = ?', message.dm);
 
       if (dmSession)
-        message.message = decryptMessage(message.message, dmSession.key);
+        message.message = decryptMessage(message.message, dmSession.ekey);
     }
 
     return message;
@@ -566,7 +566,7 @@ app.put('/api/update', async (req, res) => {
       const dmSession = await db.get<DbDmSession>('SELECT * FROM dm_session WHERE id = ?', dm);
 
       if (dmSession)
-        bbCode = encryptMessage(bbCode, dmSession.key);
+        bbCode = encryptMessage(bbCode, dmSession.ekey);
     }
 
     await db.run('UPDATE messages SET edit_count = edit_count + 1, time = ?, message = ?, style = ? WHERE id = ?',
@@ -621,7 +621,7 @@ app.post('/api/start-chat', async (req, res) => {
 
   const now = Now();
   const encryptionKey = randomBytes(32).toString('base64');
-  const result = await db.run('INSERT INTO dm_session (name1, name2, name1_present, key, start_time) VALUES (?, ?, 1, ?, ?)',
+  const result = await db.run('INSERT INTO dm_session (name1, name2, name1_present, ekey, start_time) VALUES (?, ?, 1, ?, ?)',
     self, name, encryptionKey, now);
 
   res.json({ id: result.lastID });

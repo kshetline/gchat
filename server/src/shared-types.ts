@@ -79,8 +79,8 @@ export interface ParticipantInfo {
 }
 
 export interface DbDmSession {
+  ekey: string;
   id: number;
-  key: string;
   name1: string;
   name1_present: number;
   name2: string;
