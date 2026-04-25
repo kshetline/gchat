@@ -8,6 +8,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const mode = process.env.NODE_ENV || 'production';
 
 const externals = {
+  'mysql2': { import: 'mysql2' },
   'promised-sqlite3': { import: 'promised-sqlite3' },
   'puppeteer': { import: 'puppeteer' },
   'sqlite3': { import: 'sqlite3' },
