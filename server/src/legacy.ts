@@ -8,7 +8,7 @@ import { getDb } from './db.js';
 import { convertBBCodeToHtml, getTextAndMarkupAsBBCode, messageHash, Now, simplifyError } from './chat-util.js';
 import tripcode from 'tripcode';
 import { isShuttingDown, MAX_IDLE_PARTICIPANT_AGE } from './app.js';
-import { clearLegacyAccessTimes, tallyForLockout, TIME_WINDOW } from './rate-limiter.js';
+import { clearLegacyAccessTimes, tallyForLockout, TIME_WINDOW } from './spam-detector.js';
 
 const domain = process.env.CHAT_DOMAIN;
 const proxyName = process.env.CHAT_PROXY || 'CHAT②';
@@ -97,10 +97,11 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
   for (let i = 0; i < messages.length; i++) {
     const message = messages[i];
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [_ids, shouldLockout, wasLockedOut] = tallyForLockout(message.time, false, null, null, message.name, message.email, message.bbCode, true);
+    const [_ids, shouldLockout, wasLockedOut] =
+      await tallyForLockout(message.time, false, null, null, message.name, message.trip, message.email, message.bbCode, true);
 
     if (shouldLockout) {
-      if (!!wasLockedOut) {
+      if (!wasLockedOut) {
         for (let j = i - 1; j >= 0; --j) {
           const prevMessage = messages[j];
 

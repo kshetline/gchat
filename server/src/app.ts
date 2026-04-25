@@ -14,7 +14,7 @@ import tripcode from 'tripcode';
 import path from 'path';
 import fs from 'fs';
 import { initExternalUploader, proxyIp } from './external-uploader.js';
-import { rateLimiter } from './rate-limiter.js';
+import { isBannedName, spamDetector } from './spam-detector.js';
 import { stopLocalSocksProxy } from './socks-proxy.js';
 
 // noinspection ES6ConvertVarToLetConst
@@ -228,7 +228,7 @@ app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
 });
 
-app.use(rateLimiter);
+app.use(spamDetector);
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/token', async (req, res) => {
@@ -336,7 +336,7 @@ app.get('/api/messages', async (req, res) => {
   let appendAt = 0;
   let oldMessages: Message[];
 
-  if (!isEqual(lastMessages, messages)) {
+  if (!isEqual(lastMessages, messages, { keysToIgnore: ['isMe'] })) {
     if (lastMessages?.length > 50 && messages?.length > 50) {
       deleteCount = Math.max(lastMessages.findIndex(m => m.hash === messages[0].hash), 0);
       appendAt = messages.findIndex(m => m.hash === lastMessages.at(-1).hash);
@@ -356,7 +356,7 @@ app.get('/api/messages', async (req, res) => {
       if (session.lastContentUpdate === nextToLastContentUpdate && appendAt > 0) {
         const overlappingMessages = messages.slice(0, appendAt + 1);
 
-        if (isEqual(oldMessages, overlappingMessages))
+        if (isEqual(oldMessages, overlappingMessages, { keysToIgnore: ['isMe'] }))
           messages = messages.slice(appendAt + 1);
         else
           deleteCount = appendAt = 0;
@@ -385,6 +385,12 @@ app.get('/api/messages', async (req, res) => {
 
 app.post('/api/enter', async (req, res) => {
   const q = req.query as any;
+
+  if (await isBannedName(q.name, tripcode(q.tripCode))) {
+    res.status(400).json({ error: 'Entry into chat room failed' });
+    return;
+  }
+
   const framed = toBoolean(q.framed);
   const token = getToken(req);
   const session = sessions.get(token);
@@ -492,11 +498,17 @@ export function decryptMessage(encryptedText: string, keyBase64: string): string
 }
 
 app.post('/api/send', async (req, res) => {
+  const q = req.query as any;
+
+  if (await isBannedName(q.name, tripcode(q.tripCode))) {
+    res.status(400).json({ error: 'Entry into chat room failed' });
+    return;
+  }
+
   const token = getToken(req);
   const session = sessions.get(token);
   const db = await getDb();
   const now = Now();
-  const q = req.query as any;
   const style = colorToStyle(q.color);
   let comment = q.comment.replace(URL_MATCHER, '[url=$1]$1[/url]');
   const hash = messageHash(q.name, q.tripCode, now);

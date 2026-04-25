@@ -19,6 +19,7 @@ import { ConfirmationService } from 'primeng/api';
 
 const REPOLL_RATE = 5000; // 5 seconds
 const REPOLL_RATE_CHECK_PROGRESS = 2500; // 2.5 seconds
+const REPOLL_RATE_429 = 60000; // 1 minute
 const CONSIDER_AFK_TIME = 600000; // 10 minutes
 
 interface DmInfo {
@@ -54,6 +55,7 @@ export class App implements OnInit {
   private lastReceiveTime = 0
   private _messageEntry: MessageEntry;
   private messageTimer: any;
+  private messageTimerLastDelay = Number.MAX_SAFE_INTEGER;
   private pendingFocus = false;
   private uploader: Uploader;
 
@@ -259,11 +261,15 @@ export class App implements OnInit {
     }
   }
 
-  private repollMessages(forProgress = false): void {
-    if (this.messageTimer)
+  private repollMessages(delay = REPOLL_RATE): void {
+    if (this.messageTimer && delay >= this.messageTimerLastDelay)
+      return;
+    else if (this.messageTimer)
       clearTimeout(this.messageTimer);
 
-    this.messageTimer = setTimeout(() => this.getMessages(), forProgress ? REPOLL_RATE_CHECK_PROGRESS : REPOLL_RATE);
+    this.lastReceiveTime = processMillis() + delay;
+    this.messageTimerLastDelay = delay;
+    this.messageTimer = setTimeout(() => this.getMessages(), delay);
   }
 
   protected getMessages(): void {
@@ -325,11 +331,11 @@ export class App implements OnInit {
 
         this.receiveDirectMessages(messages.dms);
         this.messageEntry?.setProgress(messages.progress);
-        this.repollMessages(messages.progress > 0);
+        this.repollMessages(messages.progress > 0 ? REPOLL_RATE_CHECK_PROGRESS : REPOLL_RATE);
       },
-      error: (_error): void => {
+      error: (error): void => {
         this.connectionTrouble.set(true);
-        this.repollMessages();
+        this.repollMessages(error.status === 429 ? REPOLL_RATE_429 : REPOLL_RATE);
       }
     });
   }
@@ -414,7 +420,7 @@ export class App implements OnInit {
   }
 
   protected async sendComment(comment: string): Promise<void> {
-    if (!comment?.trim() || (this.selectedChat() > 0 && !await this.verifyAllowingDMs()))
+    if (this.sending() || !comment?.trim() || (this.selectedChat() > 0 && !await this.verifyAllowingDMs()))
       return;
 
     this.sending.set(true);
@@ -801,6 +807,9 @@ export class App implements OnInit {
 
   private playNotificationSound(forDM = false): void {
     const idleOrInactive = this.isIdle() || !this.chatActive;
+
+    this.chime.volume = 0.25; // TODO: Create volume preference
+    this.chimeDM.volume = 0.25;
 
     if (this.prefs.notifySound && (idleOrInactive || forDM || (!forDM && this.selectedChat() !== 0)))
       (forDM ? this.chimeDM : this.chime).play().finally();

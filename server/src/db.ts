@@ -3,6 +3,7 @@ import { DbParticipant } from './shared-types.js';
 import mysql from 'mysql2/promise';
 import { AsyncDatabaseWrapperForMySQL } from './mysql-wrapper.js';
 import { isShuttingDown } from './app.js';
+import { RunResult } from 'sqlite3';
 
 let db: AsyncDatabase;
 let inInit = false;
@@ -40,7 +41,10 @@ export async function getDb(): Promise<AsyncDatabase> {
     db = await AsyncDatabase.open(process.env.CHAT_DB_PATH || 'chat.sqlite');
 
   const modifyIfNeeded = forMySQL ?
-    (sql: string) => sql.replace(/\bUNIQUE PRIMARY KEY AUTOINCREMENT\b/g, 'AUTO_INCREMENT PRIMARY KEY')
+    (sql: string) => sql
+      .replace(/\bUNIQUE PRIMARY KEY AUTOINCREMENT\b/g, 'AUTO_INCREMENT PRIMARY KEY')
+      .replace(/\bUNIQUE PRIMARY KEY\b/g, '')
+      .replace(/\b(value TEXT NOT NULL)\b/, '$1,\n    PRIMARY KEY (key0(255))')
       + ' CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci' :
     (sql: string) => sql;
 
@@ -92,9 +96,28 @@ export async function getDb(): Promise<AsyncDatabase> {
       last_post INTEGER NOT NULL DEFAULT 0
   )`));
 
+  await db.exec(modifyIfNeeded(
+    `CREATE TABLE IF NOT EXISTS key_value (
+      key0 TEXT NOT NULL UNIQUE PRIMARY KEY,
+      value TEXT NOT NULL
+  )`));
+
   inInit = false;
 
   return db;
+}
+
+export async function getKeyValue(key: string): Promise<string> {
+  const db = await getDb();
+
+  return (await db.get<any>(`SELECT value FROM key_value WHERE key0 = ?`, key))?.value;
+}
+
+// noinspection JSUnusedGlobalSymbols
+export async function setKeyValue(key: string, value: string): Promise<RunResult> {
+  const db = await getDb();
+
+  return db.run(`INSERT OR REPLACE INTO key_value (key0, value) VALUES (?, ?)`, key, value);
 }
 
 export async function getNamedParticipantRecord(name: string): Promise<DbParticipant> {
