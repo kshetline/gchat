@@ -19,6 +19,8 @@ export const MAX_IDLE_PARTICIPANT_LEEWAY = 600000; // 10 minutes
 
 export let browser: puppeteer.Browser;
 
+export let lastSuccessfulLegacyPoll = -1;
+
 let messagePage: puppeteer.Page;
 let inChat = false;
 let lastLegacyPoll = -1;
@@ -178,6 +180,8 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
     if (latestPosts.get(participant))
       await db.run('UPDATE participants SET last_post = ?1, last_active = MAX(last_active, ?1) WHERE name = ?2 AND remote = 1',
         latestPosts.get(participant), participant);
+
+  lastSuccessfulLegacyPoll = now;
 
   return { messages, participants };
 }

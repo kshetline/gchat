@@ -12,7 +12,7 @@ import { DeleteEvent, EditEvent, MessageList } from '../message-list/message-lis
 import { ColorSelector } from '../color-selector/color-selector';
 import { Uploader } from '../uploader';
 import { TabsModule } from 'primeng/tabs';
-import { NgTemplateOutlet } from '@angular/common';
+import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { toObservable } from '@angular/core/rxjs-interop';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
@@ -33,7 +33,7 @@ interface DmInfo {
 
 @Component({
   selector: 'chat-root',
-  imports: [ColorSelector, ConfirmDialogModule, FormsModule, MessageEntry, MessageList, NgTemplateOutlet, TabsModule],
+  imports: [ColorSelector, ConfirmDialogModule, DecimalPipe, FormsModule, MessageEntry, MessageList, NgTemplateOutlet, TabsModule],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -68,6 +68,7 @@ export class App implements OnInit {
   protected email = signal('');
   protected framed = /\bframed=true\b/.test(location.toString());
   protected inChat = signal(false);
+  protected lastSuccessfulLegacyPoll = signal(-1);
   protected localTime = signal(true);
   protected messageEntrySignal = signal<MessageEntry>(undefined);
   protected messages = signal([] as Message[]);
@@ -297,6 +298,7 @@ export class App implements OnInit {
           this.lastReceiveTime = processMillis();
           this.connectionTrouble.set(false);
           this.checkChatActive();
+          this.lastSuccessfulLegacyPoll.set(messages.lastSuccessfulLegacyPoll);
 
           if (!isEqual(messages.messages, [null])) {
             const newMessages = (messages.deleteCount || messages.append) ? clone(this.messages(), true) : messages.messages;
@@ -817,5 +819,9 @@ export class App implements OnInit {
 
     if (this.prefs.notifySound && (idleOrInactive || forDM || (!forDM && this.selectedChat() !== 0)))
       (forDM ? this.chimeDM : this.chime).play().finally();
+  }
+
+  protected getLegacyAge(): number {
+    return (Math.floor(Date.now() / 1000) - this.lastSuccessfulLegacyPoll()) / 60;
   }
 }

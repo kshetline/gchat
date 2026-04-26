@@ -5,7 +5,7 @@ import { colors, Config, DbDmSession, DbMessage, DbParticipant, DmSession, Messa
 import { isEqual, isString, processMillis, toBoolean, toInt } from '@tubular/util';
 import { uploadSingle } from './uploader.js';
 import { SessionInfo } from './session-info';
-import { addPendingDuplicate, enterLegacyChat, leaveLegacyChat, legacySendMessage, stopLegacyPolling } from './legacy.js';
+import { addPendingDuplicate, enterLegacyChat, lastSuccessfulLegacyPoll, leaveLegacyChat, legacySendMessage, stopLegacyPolling } from './legacy.js';
 import { getDb, getNamedParticipantRecord } from './db.js';
 import ip_ from 'ip';
 import axios from 'axios';
@@ -374,13 +374,20 @@ app.get('/api/messages', async (req, res) => {
 
   await sessionsCheck();
 
+  let lslp = lastSuccessfulLegacyPoll;
+
+  if (lslp <= 0)
+    lslp = messages.findLast(m => m.remote)?.time ?? -1;
+
   res.json({
     messages,
     deleteCount,
     append: appendAt > 0,
     participants,
     dms: await getDirectMessages(name),
-    progress: session?.progress, proxyIp });
+    lastSuccessfulLegacyPoll: lslp,
+    progress: session?.progress, proxyIp
+  });
 });
 
 app.post('/api/enter', async (req, res) => {

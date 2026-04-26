@@ -112,7 +112,11 @@
       }
     </p-tablist>
     <p-tabpanels>
-      <p-tabpanel [value]="0">
+      <p-tabpanel class="main-chat" [value]="0">
+        @let legacyAge = lastSuccessfulLegacyPoll() > 0 ? getLegacyAge() : -1;
+        @if (legacyAge > 1) {
+          <div class="warning">Last update from original chat site {{ legacyAge | number:'1.1-1' }} minute{{ legacyAge > 1.05 ? 's' : '' }} ago</div>
+        }
         <chat-message-list
             (connectionTrouble)="connectionTrouble.set(true)" [name]="name()" [tripCode]="tripCode()"
             [isAdmin]="isAdmin()" [darkMode]="darkMode()" [inChat]="inChat()" [localTime]="localTime()"

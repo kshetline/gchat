@@ -100,6 +100,7 @@ export interface Messages {
   deleteCount?: number;
   dms?: DmSession[];
   errorMessage?: string;
+  lastSuccessfulLegacyPoll?: number;
   messages?: Message[];
   participants?: ParticipantInfo[];
   progress?: number;
