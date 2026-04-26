@@ -84,9 +84,12 @@ export function notify(type: NotificationType, message: string): void {
 
 export async function awaitMessage(messageName: string, maxWait = 0): Promise<string> {
   return new Promise<string>(resolve => {
+    let resolved = false;
+
     const listener = (evt: MessageEvent) => {
-      if (evt.data[0] === messageName) {
+      if (!resolved && evt.data[0] === messageName) {
         window.removeEventListener('message', listener);
+        resolved = true;
         resolve(evt.data[1]);
       }
     };
@@ -94,9 +97,10 @@ export async function awaitMessage(messageName: string, maxWait = 0): Promise<st
     window.addEventListener('message', listener);
 
     if (maxWait > 0)
-      setTimeout(() => {
+      setTimeout(() => { if (!resolved) {
         window.removeEventListener('message', listener);
+        resolved = true;
         resolve(`Timed out waiting for message ${messageName}`);
-      }, maxWait);
+      } }, maxWait);
   });
 }

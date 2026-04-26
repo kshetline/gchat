@@ -435,9 +435,12 @@ export class App implements OnInit {
 
     if (this.framed && dm === 0) {
       setTimeout(() => parent.postMessage(['sendChatMessage', comment, this.color(), this.tripCode()], '*'));
-      const error = await awaitMessage('sendChatMessage', 10000);
+      let error = await awaitMessage('sendChatMessage', 10000);
 
       if (error) {
+        if (error === 'Timed out')
+          error = 'Original chat site not accepting messages. Refreshing your browser might help.';
+
         notify('error', error);
         this.sending.set(false);
         return;
