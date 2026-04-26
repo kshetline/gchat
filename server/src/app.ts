@@ -14,7 +14,7 @@ import tripcode from 'tripcode';
 import path from 'path';
 import fs from 'fs';
 import { initExternalUploader, proxyIp } from './external-uploader.js';
-import { isBannedName, spamDetector } from './spam-detector.js';
+import { isBannedName, intrusionDetector, isBannedIp } from './intrusion-detector.js';
 import { stopLocalSocksProxy } from './socks-proxy.js';
 
 // noinspection ES6ConvertVarToLetConst
@@ -228,7 +228,7 @@ app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
 });
 
-app.use(spamDetector);
+app.use(intrusionDetector);
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/token', async (req, res) => {
@@ -386,7 +386,7 @@ app.get('/api/messages', async (req, res) => {
 app.post('/api/enter', async (req, res) => {
   const q = req.query as any;
 
-  if (await isBannedName(q.name, tripcode(q.tripCode))) {
+  if (await isBannedName(q.name, tripcode(q.tripCode)) || await isBannedIp(getIp(req))) {
     res.status(400).json({ error: 'Entry into chat room failed' });
     return;
   }
@@ -500,8 +500,8 @@ export function decryptMessage(encryptedText: string, keyBase64: string): string
 app.post('/api/send', async (req, res) => {
   const q = req.query as any;
 
-  if (await isBannedName(q.name, tripcode(q.tripCode))) {
-    res.status(400).json({ error: 'Entry into chat room failed' });
+  if (await isBannedName(q.name, tripcode(q.tripCode)) || await isBannedIp(getIp(req))) {
+    res.status(400).json({ error: 'Send message failed' });
     return;
   }
 
@@ -564,21 +564,24 @@ app.post('/api/send', async (req, res) => {
 async function allowedToEdit(req: express.Request, res: express.Response, action = 'edit'): Promise<DbMessage> {
   const q = req.query as any;
   const tripCode = q.tripCode && tripcode(q.tripCode);
-  const id = toInt(q.msgId);
-  const db = await getDb();
-  const message = await db.get<DbMessage>('SELECT * FROM messages WHERE id = ? LIMIT 1', id);
 
-  if (message && message.name === q.name &&
-      ((message.trip && (message.trip === q.tripCode || message.trip === tripCode)) ||
-        message.session_id !== getToken(req))) {
-    if (message.dm) {
-      const dmSession = await db.get<DbDmSession>('SELECT * FROM dm_session WHERE id = ?', message.dm);
+  if (!await isBannedName(q.name, tripCode) && !await isBannedIp(getIp(req))) {
+    const id = toInt(q.msgId);
+    const db = await getDb();
+    const message = await db.get<DbMessage>('SELECT * FROM messages WHERE id = ? LIMIT 1', id);
 
-      if (dmSession)
-        message.message = decryptMessage(message.message, dmSession.ekey);
+    if (message && message.name === q.name &&
+        ((message.trip && (message.trip === q.tripCode || message.trip === tripCode)) ||
+          message.session_id !== getToken(req))) {
+      if (message.dm) {
+        const dmSession = await db.get<DbDmSession>('SELECT * FROM dm_session WHERE id = ?', message.dm);
+
+        if (dmSession)
+          message.message = decryptMessage(message.message, dmSession.ekey);
+      }
+
+      return message;
     }
-
-    return message;
   }
 
   res.status(400).json({ error: `You are not authorized to ${action} this message.` });

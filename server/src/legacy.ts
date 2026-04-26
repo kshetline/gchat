@@ -8,7 +8,7 @@ import { getDb } from './db.js';
 import { convertBBCodeToHtml, getTextAndMarkupAsBBCode, messageHash, Now, simplifyError } from './chat-util.js';
 import tripcode from 'tripcode';
 import { isShuttingDown, MAX_IDLE_PARTICIPANT_AGE } from './app.js';
-import { clearLegacyAccessTimes, tallyForLockout, TIME_WINDOW } from './spam-detector.js';
+import { clearLegacyAccessTimes, tallyForLockout, TIME_WINDOW } from './intrusion-detector.js';
 
 const domain = process.env.CHAT_DOMAIN;
 const proxyName = process.env.CHAT_PROXY || 'CHAT②';

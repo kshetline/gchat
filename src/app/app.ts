@@ -307,6 +307,10 @@ export class App implements OnInit {
             if (messages.append)
               newMessages.push(...messages.messages);
 
+            // Safety check: Make sure no glitch causes client to choke on an ever-growing message list
+            if (newMessages.length > 2000)
+              newMessages.splice(newMessages.length - 2000);
+
             const changed = !isEqual(newMessages, this.messages());
             const newMessageCount = this.countNewMessages(this.messages(), newMessages);
 

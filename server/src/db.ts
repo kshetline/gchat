@@ -45,6 +45,7 @@ export async function getDb(): Promise<AsyncDatabase> {
       .replace(/\bUNIQUE PRIMARY KEY AUTOINCREMENT\b/g, 'AUTO_INCREMENT PRIMARY KEY')
       .replace(/\bUNIQUE PRIMARY KEY\b/g, '')
       .replace(/\b(value TEXT NOT NULL)\b/, '$1,\n    PRIMARY KEY (key0(255))')
+      .replace(/\b(note TEXT)\b/, '$1,\n    PRIMARY KEY (ip(255))')
       + ' CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci' :
     (sql: string) => sql;
 
@@ -94,6 +95,13 @@ export async function getDb(): Promise<AsyncDatabase> {
       name2_present INTEGER NOT NULL DEFAULT 0,
       start_time INTEGER NOT NULL,
       last_post INTEGER NOT NULL DEFAULT 0
+  )`));
+
+  await db.exec(modifyIfNeeded(
+    `CREATE TABLE IF NOT EXISTS banned_ips (
+      ip TEXT NOT NULL UNIQUE PRIMARY KEY,
+      expiry TEXT,
+      note TEXT
   )`));
 
   await db.exec(modifyIfNeeded(

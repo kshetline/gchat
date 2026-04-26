@@ -3,6 +3,7 @@ import { getIp, getToken, Now } from './chat-util.js';
 import { clone } from '@tubular/util';
 import { getDb, getKeyValue } from './db.js';
 import tripcode from 'tripcode';
+import ip_ from 'ip';
 
 export const TIME_WINDOW = 120; // seconds
 
@@ -16,6 +17,11 @@ interface Identifiers {
   token: string;
   name: string;
   email: string;
+}
+
+interface IpEntry {
+  ip: string;
+  expiry: number;
 }
 
 const accessTimes: Record<string, { ids: Identifiers; time: number }[]> = {
@@ -85,6 +91,35 @@ export async function isBannedName(name: string, trip: string): Promise<boolean>
   return bTrip != null && (!bTrip || '+' + trip === bTrip || (bTrip.startsWith('-') === (trip !== bTrip.slice(1))));
 }
 
+let cachedBannedIps: IpEntry[];
+
+export async function isBannedIp(ip: string): Promise<boolean> {
+  let bannedIps = cachedBannedIps;
+
+  if (!bannedIps) {
+    try {
+      const db = await getDb();
+      bannedIps = (await db.all<any>('SELECT ip, expiry FROM banned_ips'))
+        .map(ipEntry => ({ ip: ipEntry.ip, expiry: ipEntry.expiry ? new Date(ipEntry.expiry).getTime() : null }));
+      cachedBannedIps = bannedIps;
+      setTimeout(() => cachedBannedIps = null, 10000);
+    }
+    catch (e) {
+      console.error('Failed to get banned IP list', e);
+    }
+  }
+
+  if (bannedIps) {
+    const now = Date.now();
+
+    return (bannedIps.some(ipEntry =>
+      (ip.includes('/') ? ip_.cidrSubnet(ipEntry.ip).contains(ip) : ipEntry.ip === ip)
+      && (!ipEntry.expiry || ipEntry.expiry > now)));
+  }
+
+  return false;
+}
+
 export async function tallyForLockout(now: number, isGet: boolean, ip: string, token: string, name: string,
     tripcode: string, email: string, comment: string, legacy = false): Promise<[Identifiers, boolean, boolean]> {
   const ids = { ip, token, name, email };
@@ -128,7 +163,7 @@ export async function tallyForLockout(now: number, isGet: boolean, ip: string, t
       shouldLockout = true;
   }
 
-  shouldLockout ||= await isBannedName(name, tripcode);
+  shouldLockout ||= await isBannedName(name, tripcode) || await isBannedIp(ip);
 
   for (const key in lockouts)
     if (now - lockouts[key] > lockoutTime)
@@ -137,7 +172,7 @@ export async function tallyForLockout(now: number, isGet: boolean, ip: string, t
   return [ids, shouldLockout, wasLockedOut];
 }
 
-export const spamDetector = async (req: express.Request, res: express.Response, next: express.NextFunction): Promise<void> => {
+export const intrusionDetector = async (req: express.Request, res: express.Response, next: express.NextFunction): Promise<void> => {
   const isGetRequest = req.method === 'GET';
   const now = Now();
   const q = req.query as Record<string, string> || {};
@@ -151,8 +186,9 @@ export const spamDetector = async (req: express.Request, res: express.Response, 
       if (!isGetRequest) {
         try {
           await (await getDb()).run(
-            'UPDATE messages SET deleted = 1, spam = 1 WHERE ip = ? OR name = ? OR session_id = ? OR email = ?',
-            ids.ip, ids.name, ids.token, ids.email);
+            `UPDATE messages SET deleted = 1, spam = 1
+                WHERE synced_time > ? AND (ip = ? OR name = ? OR session_id = ? OR email = ?)`,
+            now - TIME_WINDOW * 2, ids.ip, ids.name, ids.token, ids.email);
         }
         catch {}
       }
