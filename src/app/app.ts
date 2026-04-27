@@ -1,12 +1,16 @@
 import { ChangeDetectorRef, Component, OnInit, signal, ViewChild, WritableSignal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { Config, DmSession, Message, Messages, ParticipantInfo, Preferences } from '../../server/src/shared-types';
+import {
+  Config, DmSession, NotifySound, Message, Messages, ParticipantInfo, Preferences
+} from '../../server/src/shared-types';
 import { clone, forEach, isAndroid, isEqual, processMillis } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { FileUploadEvent, MessageEntry, MessageUpdateEvent } from '../message-entry/message-entry';
-import { awaitMessage, NotificationHandler, notify, registerNotificationHandler, shouldIgnoreClick, startClickSuppress } from '../main';
+import {
+  awaitMessage, NotificationHandler, notify, registerNotificationHandler, shouldIgnoreClick, startClickSuppress
+} from '../main';
 import { applyTheme, getThemeMenuStyle, getThemes, resetDefaultThemeBackground } from '../themes';
 import { DeleteEvent, EditEvent, MessageList } from '../message-list/message-list';
 import { ColorSelector } from '../color-selector/color-selector';
@@ -16,6 +20,8 @@ import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { toObservable } from '@angular/core/rxjs-interop';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
+import { SelectModule } from 'primeng/select';
+import { SliderModule } from 'primeng/slider';
 
 const REPOLL_RATE = 5000; // 5 seconds
 const REPOLL_RATE_CHECK_PROGRESS = 2500; // 2.5 seconds
@@ -33,7 +39,8 @@ interface DmInfo {
 
 @Component({
   selector: 'chat-root',
-  imports: [ColorSelector, ConfirmDialogModule, DecimalPipe, FormsModule, MessageEntry, MessageList, NgTemplateOutlet, TabsModule],
+  imports: [ColorSelector, ConfirmDialogModule, DecimalPipe, FormsModule, MessageEntry, MessageList,
+            NgTemplateOutlet, SelectModule, SliderModule, TabsModule],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -77,7 +84,7 @@ export class App implements OnInit {
   protected navigation = signal([] as { name: string; url: string; target?: string }[]);
   protected notificationMessage = signal('');
   protected notificationType = signal('');
-  protected notifySound = signal(true);
+  protected notifySound = signal('never' as NotifySound);
   protected participants = signal([] as ParticipantInfo[]);
   protected selectedChat = signal(0);
   protected sending = signal(false);
@@ -87,6 +94,13 @@ export class App implements OnInit {
   protected title = signal(this.baseTitle);
   protected tripCode = signal('');
   protected unseenMessages = signal(0);
+  protected volume = signal(3);
+
+  protected notifyOptions = [
+    { label: 'No notification sounds', value: 'never' },
+    { label: 'Notify in background', value: 'background' },
+    { label: 'Notify always', value: 'always' },
+  ];
 
   get messageEntry(): MessageEntry { return this._messageEntry; }
   @ViewChild(MessageEntry) set messageEntry(value: MessageEntry) {
@@ -317,11 +331,13 @@ export class App implements OnInit {
             const newMessageCount = this.countNewMessages(this.messages(), newMessages);
 
             if (changed) {
-              if (this.messages().length > 0 && (!this.chatActive || this.selectedChat() !== 0)) {
-                this.unseenMessages.set(this.unseenMessages() + newMessageCount);
-                this.updateTitle();
+              if (this.messages().length > 0) {
+                if (!this.chatActive || this.selectedChat() !== 0) {
+                  this.unseenMessages.set(this.unseenMessages() + newMessageCount);
+                  this.updateTitle();
+                }
 
-                if (newMessageCount && this.prefs.notifySound)
+                if (newMessageCount)
                   this.playNotificationSound();
               }
 
@@ -575,11 +591,6 @@ export class App implements OnInit {
     doUpload();
   }
 
-  protected toggleNotifySound(): void {
-    this.prefs.notifySound = this.notifySound();
-    this.prefService.set(this.prefs);
-  }
-
   protected toggleLocalTime(): void {
     this.prefs.localTime = this.localTime();
     this.prefService.set(this.prefs);
@@ -765,6 +776,7 @@ export class App implements OnInit {
     const currentDMs = clone(this.dms(), true);
     let changed = false;
     let totalNewMessages = 0;
+    let notificationTab = this.selectedChat();
 
     for (const dm of dms) {
       const index = currentDMs.findIndex(d => d.id === dm.id);
@@ -776,7 +788,10 @@ export class App implements OnInit {
         if (!isEqual(oldMessages, dm.messages)) {
           const newMessages = this.countNewMessages(oldMessages, dm.messages);
 
-          totalNewMessages += (index === this.selectedChat() && !this.isIdle() ? 0 : newMessages);
+          if (newMessages > 0 && index !== this.selectedChat())
+            notificationTab = index + 1;
+
+          totalNewMessages += newMessages;
           currentDM.missed.set(currentDM.missed() + newMessages);
           currentDM.messages.set(dm.messages);
           changed = true;
@@ -785,6 +800,7 @@ export class App implements OnInit {
       else if (this.prefs.allowDMs && !this.dmsJustClosed.get(dm.id)) {
         currentDMs.push({ id: dm.id, name: dm.name, messages: signal(dm.messages), missed: signal(0) });
         totalNewMessages += 1;
+        notificationTab = currentDMs.length;
         changed = true;
       }
     }
@@ -807,21 +823,29 @@ export class App implements OnInit {
     }
 
     if (totalNewMessages > 0)
-      this.playNotificationSound(true);
+      this.playNotificationSound(notificationTab);
   }
 
   private isIdle(): boolean {
     return this.lastActive < processMillis() - CONSIDER_AFK_TIME;
   }
 
-  private playNotificationSound(forDM = false): void {
+  private playNotificationSound(chat = 0): void {
     const idleOrInactive = this.isIdle() || !this.chatActive;
 
-    this.chime.volume = 0.25; // TODO: Create volume preference
-    this.chimeDM.volume = 0.25;
+    this.chime.volume = this.volume() / 100;
+    this.chimeDM.volume = this.volume() / 100;
 
-    if (this.prefs.notifySound && (idleOrInactive || forDM || (!forDM && this.selectedChat() !== 0)))
-      (forDM ? this.chimeDM : this.chime).play().finally();
+    if (this.notifySound() === 'always' ||
+        (this.notifySound() === 'background' && (idleOrInactive || this.selectedChat() !== chat)))
+      (chat > 0 ? this.chimeDM : this.chime).play().finally();
+  }
+
+  protected playSampleVolume(): void {
+    this.chime.volume = this.volume() / 100;
+    this.chime.play().finally();
+    this.prefs.volume = this.volume();
+    this.prefService.set(this.prefs);
   }
 
   protected getLegacyAge(): number {

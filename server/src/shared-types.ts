@@ -106,6 +106,8 @@ export interface Messages {
   progress?: number;
 }
 
+export type NotifySound = boolean | 'never' | 'background' | 'always'
+
 export interface Preferences {
   allowDMs: boolean;
   color: number;
@@ -113,11 +115,12 @@ export interface Preferences {
   localTime: boolean;
   name: string;
   newOnBottom: boolean;
-  notifySound: boolean;
+  notifySound: NotifySound;
   suppressExternalUploadWarning: boolean;
   suppressUploadWarning: boolean;
   theme?: string;
   tripCode: string;
+  volume: number;
 }
 
 // Original list, but without .doc*, .exe, .jar (.scr and .cpl already excluded)

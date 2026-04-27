@@ -9,10 +9,11 @@ const defaultPrefs: Preferences = {
   localTime: true,
   name: '',
   newOnBottom: true,
-  notifySound: true,
+  notifySound: 'background',
   suppressExternalUploadWarning: false,
   suppressUploadWarning: false,
-  tripCode: ''
+  tripCode: '',
+  volume: 33
 };
 
 @Injectable({
@@ -29,8 +30,13 @@ export class PreferencesService {
         this.prefs = JSON.parse(prefsStr);
 
         if (!this.prefs || (typeof this.prefs !== 'object'))
-          this.prefs = undefined;
+          this.prefs = clone(defaultPrefs);
         else {
+          if (this.prefs.notifySound === false)
+            this.prefs.notifySound = 'never';
+          else if (this.prefs.notifySound === true)
+            this.prefs.notifySound = 'background';
+
           const prefs = this.prefs as any;
 
           forEach(defaultPrefs as Record<string, any>, (key, value) => {
