@@ -320,6 +320,8 @@ app.get('/api/messages', async (req, res) => {
     }
   }
 
+  participants.sort((a, b) => (a.remote !== b.remote) ? (a.remote ? 1 : -1) : a.name.localeCompare(b.name));
+
   // Some duplicate messages are still slipping through, so one more check is needed
   for (let i = messages.length - 1; i > messages.length - 25 && i >= 0; --i) {
     const message = messages[i];

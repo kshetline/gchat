@@ -92,12 +92,12 @@ export class MessageList implements OnInit {
     let start = '';
     let qm = '';
     let end = text;
-    let pos = text.match(QUOTE_MARKER_PATTERN)?.index ?? -1;
+    let match = text.match(QUOTE_MARKER_PATTERN);
 
-    if (pos >= 0) {
-      start = text.substring(0, pos);
+    if (match) {
+      start = text.substring(0, match.index);
       qm = QUOTE_MARKER;
-      end = text.substring(pos + QUOTE_MARKER.length);
+      end = text.substring(match.index + match[0].length);
     }
 
     end = end.replace(matchEmoji, '<span class="big-emoji">$1</span>');

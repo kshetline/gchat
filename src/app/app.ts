@@ -862,12 +862,12 @@ export class App implements OnInit {
 
     if (this.notifySound() === 'always' ||
         (this.notifySound() === 'background' && (idleOrInactive || this.selectedChat() !== chat)))
-      (chat > 0 ? this.chimeDM : this.chime).play().finally();
+      (chat > 0 ? this.chimeDM : this.chime).play().catch(() => notify('warning', 'Notification sound was disallowed'));
   }
 
   protected playSampleVolume(): void {
     this.chime.volume = this.volume() / 100;
-    this.chime.play().finally();
+    this.chime.play().catch(() => notify('warning', 'Notification sound was disallowed'));
     this.prefs.volume = this.volume();
     this.prefService.set(this.prefs);
   }

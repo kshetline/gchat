@@ -15,7 +15,7 @@ const proxyName = process.env.CHAT_PROXY || 'CHAT②';
 const proxyTrip = process.env.CHAT_PROXY_TRIPCODE;
 const proxyTripEncoded = tripcode(proxyTrip);
 const parser = new HtmlParser();
-export const MAX_IDLE_PARTICIPANT_LEEWAY = 600000; // 10 minutes
+export const MAX_IDLE_PARTICIPANT_LEEWAY = 600; // 10 minutes
 
 export let browser: puppeteer.Browser;
 
