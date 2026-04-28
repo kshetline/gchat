@@ -52,7 +52,7 @@ if (!localStorage.getItem('emoji-mart.frequently'))
     '{"grinning":9,"laughing":8,"joy":7,"wink":6,"skull":5,"scream":4,"slightly_frowning_face":3,"+1":2,"-1":1}');
 
 const QUOTE_NAME_DELIM = ': ';
-const QUOTE_MARKER = '\u00A0◀︎ ';
+const QUOTE_MARKER = '\u00A0⏴ ';
 const INPUT_LENGTH_LIMIT = 1000;
 const INPUT_LENGTH_WARN = 950;
 

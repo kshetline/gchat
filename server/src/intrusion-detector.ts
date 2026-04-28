@@ -130,7 +130,7 @@ export async function tallyForLockout(now: number, isGet: boolean, ip: string, t
   let spammish = spamPattern && (spamPattern.test(comment) || spamPattern.test(name));
 
   if (spammish) {
-    const parts = comment?.split(/◀︎| < /);
+    const parts = comment?.split(/⏴|◁|◀︎| < /);
 
     if (parts?.length === 2)
       spammish = spamPattern.test(parts[1]) || spamPattern.test(name);

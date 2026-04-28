@@ -72,6 +72,7 @@ const MONITOR_INTERVAL = 60000; // 1 minute
 const MAX_DM_AGE = 7200; // 2 hours
 const MAX_HISTORY = 5000; // number of chat messages to keep in DB
 const MAX_HISTORY_TOLERANCE = 500; // Overflow before deleting messages
+const MAX_CLIENT_MESSAGES = 2000;
 
 let proxyStarted = false;
 let nextToLastContentUpdate = 0;
@@ -149,19 +150,20 @@ async function getDirectMessages(name: string): Promise<DmSession[]> {
 
     const rows = (await db.all<DbMessage>(
       'SELECT * FROM messages WHERE deleted = 0 AND dm = ? ORDER BY messages.synced_time',
-      dmSession.id)).slice(-1000);
+        dmSession.id)).slice(-MAX_CLIENT_MESSAGES);
     const messages = rows.filter(row => !row.deleted).map(row => ({
       email: row.email,
       flagged: row.flagged,
       hash: row.hash,
-      html: convertBBCodeToHtml(decryptMessage(row.message, dmSession.ekey)) || '???',
+      html: row.style?.length < 2 ? row.message :
+        convertBBCodeToHtml(decryptMessage(row.message, dmSession.ekey)) || '???',
       isMe: row.name === name,
       msgId: row.id,
       name: row.name,
       remote: !!row.remote,
       style: row.style,
       time: row.synced_time,
-      trip: row.remote ? row.trip : tripcode(row.trip)
+      trip: tripcode(row.trip ?? '')
     } as Message));
 
     const sessionName = dmSession.name1 === name ? dmSession.name2 : dmSession.name1;
@@ -259,7 +261,8 @@ app.get('/api/messages', async (req, res) => {
   }
 
   const db = await getDb();
-  const rows = (await db.all<DbMessage>('SELECT * FROM messages WHERE deleted = 0 AND dm = 0 ORDER BY messages.synced_time')).slice(-1000);
+  const rows = (await db.all<DbMessage>(
+    'SELECT * FROM messages WHERE deleted = 0 AND dm = 0 ORDER BY messages.synced_time')).slice(-MAX_CLIENT_MESSAGES);
   let messages = rows.filter(row => !row.deleted).map(row => ({
     email: row.email,
     flagged: row.flagged,
@@ -404,6 +407,7 @@ app.post('/api/enter', async (req, res) => {
   const db = await getDb();
   const now = Now();
   const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', q.name);
+  const wasInChat = session.inChat;
 
   if (!participant && q.name) {
     await db.run('INSERT INTO participants (name, trip, email, ip, session_id, remote, proxied, last_active, last_post) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -425,6 +429,20 @@ app.post('/api/enter', async (req, res) => {
     return;
   }
 
+  if (session.inChat && !wasInChat) {
+    const lastEnterOrLeave = await db.get<any>(`SELECT id, style FROM messages WHERE synced_time > ? AND dm = 0 AND name = ? AND trip = ? AND
+      remote = 0 AND LENGTH(style) = 1 ORDER BY synced_time DESC LIMIT 1`, now - 3600, q.name, q.tripCode);
+
+    if (lastEnterOrLeave?.style === 'E')
+      await db.run('UPDATE messages SET synced_time = ? WHERE id = ?', now, lastEnterOrLeave.id);
+    else {
+      const message = 'has joined ' + process.env.CHAT_TITLE;
+
+      await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        0, now, now, q.name, q.tripCode, q.email, 0, session.ip, token, 'E', message, '');
+    }
+  }
+
   if (!framed && !proxyStarted) {
     await enterLegacyChat(proxyName, null, 0);
     proxyStarted = true;
@@ -437,6 +455,7 @@ app.post('/api/leave', async (req, res) => {
   const q = req.query as any;
   const token = getToken(req);
   const session = sessions.get(token);
+  const wasInChat = session.inChat;
 
   if (!session?.inChat) {
     res.json(null);
@@ -449,6 +468,14 @@ app.post('/api/leave', async (req, res) => {
   if (participant && (q.tripCode === participant.trip || session.ip === participant.ip || token === participant.session_id)) {
     await db.run('DELETE FROM participants WHERE id = ?', participant.id);
     session.inChat = false;
+  }
+
+  if (!session.inChat && wasInChat) {
+    const now = Now();
+    const message = 'has left ' + process.env.CHAT_TITLE;
+
+    await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      0, now, now, q.name, q.tripCode, q.email, 0, session.ip, token, 'L', message, '');
   }
 
   if (!toBoolean(q.framed)) {
@@ -658,6 +685,7 @@ app.post('/api/start-chat', async (req, res) => {
     return;
   }
 
+  const now = Now();
   const db = await getDb();
   const dmSession = await db.get<DbDmSession>(`SELECT * FROM dm_session WHERE (name1 = ?1 AND name2 = ?2) OR
                                                  (name1 = ?2 AND name2 = ?1)`, name, self);
@@ -665,14 +693,24 @@ app.post('/api/start-chat', async (req, res) => {
     const whichName = dmSession.name1 === self ? 'name1_present' : 'name2_present';
 
     await db.run(`UPDATE dm_session SET ${whichName} = 1 WHERE id = ?`, dmSession.id);
+
+    const message = 'has joined this private chat';
+
+    await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      dmSession.id, now, now, self, q.tripCode, q.email, 0, getIp(req), '', 'E', message, '');
+
     res.json({ id: dmSession.id });
     return;
   }
 
-  const now = Now();
   const encryptionKey = randomBytes(32).toString('base64');
   const result = await db.run('INSERT INTO dm_session (name1, name2, name1_present, ekey, start_time) VALUES (?, ?, 1, ?, ?)',
     self, name, encryptionKey, now);
+
+  const message = 'has started this private chat';
+
+  await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    result.lastID, now, now, self, q.tripCode, q.email, 0, getIp(req), '', 'S', message, '');
 
   res.json({ id: result.lastID });
 });
@@ -685,13 +723,26 @@ app.post('/api/leave-chat', async (req, res) => {
   const dmSession = await db.get<DbDmSession>(`SELECT * FROM dm_session WHERE id = ?`, id);
 
   if (dmSession) {
+    const now = Now();
+    let message: string;
+
     if (!toBoolean(q.viewed))
       await db.run('DELETE FROM dm_session WHERE id = ?', id);
     else {
       const whichName = dmSession.name1 === self ? 'name1_present' : 'name2_present';
 
+      dmSession[whichName] = -Now();
       await db.run(`UPDATE dm_session SET ${whichName} = ? WHERE id = ?`, -Now(), id);
+
+      if (dmSession.name1_present < 0 && dmSession.name2_present < 0)
+        await db.run('DELETE FROM dm_session WHERE id = ?', id);
+      else
+        message = 'has left this private chat';
     }
+
+    if (message)
+      await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        dmSession.id, now, now, self, q.tripCode, q.email, 0, getIp(req), '', 'L', message, '');
   }
 
   res.json(null);

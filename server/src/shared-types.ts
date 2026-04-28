@@ -11,7 +11,7 @@ export const kaomoji = [
 ];
 
 export const kaomojiRegex = new RegExp(`(${kaomoji.map(regexEscape).join('|')})`, 'g');
-export const kaomojiEndRegex = new RegExp(`\u2000?(${kaomoji.map(regexEscape).join('|')})$`);
+export const kaomojiEndRegex = new RegExp(`\x20?\u2000?(${kaomoji.map(regexEscape).join('|')})$`);
 
 export interface Config {
   backgroundColor: string;

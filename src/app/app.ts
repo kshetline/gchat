@@ -324,8 +324,8 @@ export class App implements OnInit {
               newMessages.push(...messages.messages);
 
             // Safety check: Make sure no glitch causes client to choke on an ever-growing message list
-            if (newMessages.length > 2000)
-              newMessages.splice(newMessages.length - 2000);
+            if (newMessages.length > 4000)
+              newMessages.splice(newMessages.length - 4000);
 
             const changed = !isEqual(newMessages, this.messages());
             const newMessageCount = this.countNewMessages(this.messages(), newMessages);
@@ -634,7 +634,11 @@ export class App implements OnInit {
       if (dm?.id && !dm.viewed && !dm.closed) {
         dm.viewed = true;
         this.dms.set(dms);
-        this.httpClient.post('/api/start-chat', {}, { params: { id: dm.id } }).subscribe({ next: () => { } });
+        this.httpClient.post('/api/start-chat', {}, { params: {
+          id: dm.id,
+          self: this.name(),
+          tripCode: this.tripCode(),
+        } }).subscribe({ next: () => { } });
       }
     }
 
@@ -732,7 +736,12 @@ export class App implements OnInit {
       return;
     }
 
-    this.httpClient.post<{ id: number }>('/api/start-chat', {}, { params: { self: this.name(), name } }).subscribe({
+    this.httpClient.post<{ id: number }>('/api/start-chat', {}, {
+        params: {
+          self: this.name(),
+          tripCode: this.tripCode(),
+          name
+        } }).subscribe({
       next: data => {
         const match = this.dms().findIndex(dm => dm.id === data.id);
 
@@ -776,7 +785,7 @@ export class App implements OnInit {
     const currentDMs = clone(this.dms(), true);
     let changed = false;
     let totalNewMessages = 0;
-    let notificationTab = this.selectedChat();
+    let notificationTab = this.selectedChat() || 1;
 
     for (const dm of dms) {
       const index = currentDMs.findIndex(d => d.id === dm.id);
@@ -788,7 +797,7 @@ export class App implements OnInit {
         if (!isEqual(oldMessages, dm.messages)) {
           const newMessages = this.countNewMessages(oldMessages, dm.messages);
 
-          if (newMessages > 0 && index !== this.selectedChat())
+          if (newMessages > 0 && index + 1 !== this.selectedChat())
             notificationTab = index + 1;
 
           totalNewMessages += newMessages;

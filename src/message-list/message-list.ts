@@ -6,7 +6,8 @@ import { MessageEntry } from '../message-entry/message-entry';
 import { HttpClient } from '@angular/common/http';
 
 const matchEmoji = /(((\uD83C[\uD000-\uDFFF]|\uD83D[\uD000-\uDFFF]|\uD83E[\uD000-\uDFFF])[\uFE00-\uFE0F]*?\u200D?)+)/g;
-const QUOTE_MARKER = '\u00A0◀︎ ';
+const QUOTE_MARKER = '\u00A0◁ ';
+const QUOTE_MARKER_ALT = '\u00A0\u23F4 ';
 
 export interface DeleteEvent {
   chatIndex: number;
@@ -90,15 +91,20 @@ export class MessageList implements OnInit {
   protected adjustMarkup(text: string): string {
     let start = '';
     let end = text;
-    const pos = text.indexOf(QUOTE_MARKER);
+    let qm = '';
+    let pos = text.indexOf(QUOTE_MARKER);
+
+    if (pos < 0)
+      pos = text.indexOf(QUOTE_MARKER_ALT);
 
     if (pos >= 0) {
-      start = text.substring(0, pos + QUOTE_MARKER.length);
+      start = text.substring(0, pos);
       end = text.substring(pos + QUOTE_MARKER.length);
+      qm = QUOTE_MARKER.replace(/[◁⏴◀︎]/g, '︎︎\u25C0');
     }
 
     end = end.replace(matchEmoji, '<span class="big-emoji">$1</span>');
-    text = start + end;
+    text = start + qm + end;
 
     return text.replace(/(\u2000(.+?)\u2000)/g, (_$0, $1, $2) =>
       kaomoji.includes($2) ? `<span class="kaomoji">${$1}</span>` : $1
