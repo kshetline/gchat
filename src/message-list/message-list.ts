@@ -6,8 +6,8 @@ import { MessageEntry } from '../message-entry/message-entry';
 import { HttpClient } from '@angular/common/http';
 
 const matchEmoji = /(((\uD83C[\uD000-\uDFFF]|\uD83D[\uD000-\uDFFF]|\uD83E[\uD000-\uDFFF])[\uFE00-\uFE0F]*?\u200D?)+)/g;
-const QUOTE_MARKER = '\u00A0◁ ';
-const QUOTE_MARKER_ALT = '\u00A0\u23F4 ';
+const QUOTE_MARKER = '\u00A0◀︎ ';
+const QUOTE_MARKER_PATTERN = /\u00A0[◀︎◁◂⏴] /;
 
 export interface DeleteEvent {
   chatIndex: number;
@@ -90,17 +90,14 @@ export class MessageList implements OnInit {
 
   protected adjustMarkup(text: string): string {
     let start = '';
-    let end = text;
     let qm = '';
-    let pos = text.indexOf(QUOTE_MARKER);
-
-    if (pos < 0)
-      pos = text.indexOf(QUOTE_MARKER_ALT);
+    let end = text;
+    let pos = text.match(QUOTE_MARKER_PATTERN)?.index ?? -1;
 
     if (pos >= 0) {
       start = text.substring(0, pos);
+      qm = QUOTE_MARKER;
       end = text.substring(pos + QUOTE_MARKER.length);
-      qm = QUOTE_MARKER.replace(/[◁⏴◀︎]/g, '︎︎\u25C0');
     }
 
     end = end.replace(matchEmoji, '<span class="big-emoji">$1</span>');

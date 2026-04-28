@@ -31,6 +31,7 @@ const CONSIDER_AFK_TIME = 600000; // 10 minutes
 interface DmInfo {
   closed?: boolean;
   id: number;
+  leftMainChat?: boolean;
   messages: WritableSignal<Message[]>;
   missed: WritableSignal<number>;
   name: string;
@@ -397,6 +398,14 @@ export class App implements OnInit {
         this.connectionTrouble.set(false);
         this.pendingFocus = true;
         this.inChat.set(true);
+
+        if (this.selectedChat() > 0) {
+          const dms = clone(this.dms(), true);
+
+          this.reenterDm(dms[this.selectedChat() - 1]);
+          this.dms.set(dms);
+        }
+
         this.changeRef.detectChanges();
         this.delayedAdjustScrolling();
       },
@@ -428,6 +437,7 @@ export class App implements OnInit {
       next: (): void => {
         this.connectionTrouble.set(false);
         this.inChat.set(false);
+        this.dms.set(this.dms().map(dm => (dm.leftMainChat = true) && dm));
         this.delayedAdjustScrolling();
       },
       error: (_error): void => this.connectionTrouble.set(true)
@@ -619,6 +629,18 @@ export class App implements OnInit {
     return false;
   }
 
+  private reenterDm(dm: DmInfo): void {
+    if (dm?.id && ((!dm.viewed && !dm.closed) || dm.leftMainChat)) {
+      dm.viewed = true;
+      dm.leftMainChat = false;
+      this.httpClient.post('/api/start-chat', {}, { params: {
+          id: dm.id,
+          self: this.name(),
+          tripCode: this.tripCode(),
+        } }).subscribe({ next: () => { } });
+    }
+  }
+
   protected tabChanged(value: number | string): void {
     this.selectedChat.set(value as number);
 
@@ -631,15 +653,8 @@ export class App implements OnInit {
         this.updateTitle();
       }
 
-      if (dm?.id && !dm.viewed && !dm.closed) {
-        dm.viewed = true;
-        this.dms.set(dms);
-        this.httpClient.post('/api/start-chat', {}, { params: {
-          id: dm.id,
-          self: this.name(),
-          tripCode: this.tripCode(),
-        } }).subscribe({ next: () => { } });
-      }
+      this.reenterDm(dm);
+      this.dms.set(dms);
     }
 
     this.delayedAdjustScrolling();
