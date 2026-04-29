@@ -99,11 +99,14 @@ async function monitor(): Promise<void> {
   await db.run('DELETE FROM dm_session WHERE name1_present <= 0 AND name2_present <= 0 AND last_post < ?', now - MAX_DM_AGE);
   await db.run('DELETE FROM participants WHERE last_active < ?', now - MAX_IDLE_PARTICIPANT_AGE);
 
-  const messageCount = (await db.get<any>('SELECT COUNT(*) as count FROM messages'))?.count || 0;
+  const messageCount = (await db.get<any>('SELECT COUNT(*) as count FROM messages WHERE dm = 0'))?.count || 0;
 
   if (messageCount > MAX_HISTORY + MAX_HISTORY_TOLERANCE)
-    await db.run('DELETE FROM messages WHERE id IN (SELECT id FROM messages ORDER BY messages.synced_time LIMIT ?)',
-      messageCount - MAX_HISTORY);
+    await db.run(`DELETE FROM messages WHERE dm = 0 AND id IN (
+      SELECT id FROM (
+        SELECT id FROM messages ORDER BY synced_time LIMIT ?
+      ) AS subquery
+    )`, messageCount - MAX_HISTORY);
 
   monitorTimeout = setTimeout(monitor, MONITOR_INTERVAL);
 }
@@ -311,6 +314,9 @@ app.get('/api/messages', async (req, res) => {
         participants.splice(i, 1);
         continue;
       }
+      // last_post should only be greater than last_active for the same screen name posting as a remote participant
+      else if (participant.last_post > participant.last_active)
+        participant.remote = 1;
     }
 
     if (participant) {

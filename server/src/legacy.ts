@@ -55,7 +55,7 @@ function extractMessage(messageRow: DomNode): Message {
     ++nameIndex;
   }
 
-  const name = htmlUnescape((nameElem?.children?.at(nameIndex) as DomNode)?.children?.at(0)?.content || '');
+  const name = htmlUnescape((nameElem?.children?.at(nameIndex) as DomNode)?.children?.at(0)?.content || '').trim();
   const rawTime = messageRow.querySelector('.messageDate')?.children?.at(0)?.content?.slice(1, -1);
   const parts = rawTime?.split(/[- :/]/).map((p, i) => p.padStart(i === 0 ? 4 : 2, '0'));
   const timestamp = parts?.length !== 6 ? null : `${parts[0]}-${parts[1]}-${parts[2]}T${parts[3]}:${parts[4]}:${parts[5]}`;
@@ -176,10 +176,16 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
     latestPosts.set(message.name, Math.max(message.time, latest));
   }
 
-  for (const participant of Array.from(latestPosts.keys()))
-    if (latestPosts.get(participant))
+  for (const participant of Array.from(latestPosts.keys())) {
+    const latest = latestPosts.get(participant);
+
+    if (latest) {
       await db.run('UPDATE participants SET last_post = ?1, last_active = MAX(last_active, ?1) WHERE name = ?2 AND remote = 1',
-        latestPosts.get(participant), participant);
+        latest, participant);
+      await db.run('UPDATE participants SET last_post = ? WHERE name = ? AND remote = 0',
+        latest, participant);
+    }
+  }
 
   lastSuccessfulLegacyPoll = now;
 

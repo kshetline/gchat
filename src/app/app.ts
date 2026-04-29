@@ -210,7 +210,7 @@ export class App implements OnInit {
     document.addEventListener('visibilitychange', () => this.checkChatActive(document.hidden ? undefined : true));
     window.addEventListener('blur', () => this.checkChatActive());
     window.addEventListener('focus', () => this.checkChatActive(true));
-    window.addEventListener('mousemove', () => this.activity = true);
+    window.addEventListener('mousemove', () => (this.activity = true) && (this.lastActive = processMillis()));
     window.addEventListener('beforeunload', () => this.inChat() && this.leaveMainChat());
 
     toObservable(this.color).subscribe(color => this.prefs.color = color);
@@ -258,6 +258,8 @@ export class App implements OnInit {
   }
 
   private checkChatActive(active?: boolean): void {
+    this.lastActive = processMillis();
+
     if (active)
       this.activity = active;
 
