@@ -175,6 +175,14 @@ main {
         align-items: baseline;
       }
     }
+
+    &.closed {
+      grid-template-rows: 0fr;
+
+      .entry-panel {
+        overflow: hidden;
+      }
+    }
   }
 
   .name-email {
@@ -371,22 +379,8 @@ p-tabs {
 }
 
 .panel-hider {
-  display: none;
+  display: inline-block;
   top: 0.4em;
-}
-
-@media (max-height: 750px), (max-width: 900px) {
-  .header .entry-panel-wrapper.closed {
-    grid-template-rows: 0fr;
-
-    .entry-panel {
-      overflow: hidden;
-    }
-  }
-
-  .panel-hider {
-    display: inline-block;
-  }
 }
 
 @media (max-width: 900px) {
@@ -398,8 +392,14 @@ p-tabs {
 
   .upper-enter {
     display: inline;
+    opacity: 1;
     position: relative;
     top: -0.2em;
+    transition: opacity 0.3s ease;
+
+    &.closed {
+      opacity: 0;
+    }
   }
 
   .lower-enter {

@@ -27,7 +27,7 @@
       <p-toggleButton [(ngModel)]="panelToggle" offLabel="" onLabel=""
           offIcon="pi pi-chevron-down" onIcon="pi pi-chevron-right" class="rotate-button panel-hider"></p-toggleButton></h1>
     @if (!inChat()) {
-      <button class="upper-enter" (click)="enterMainChat()" [disabled]="!name().trim()">Enter&nbsp;room</button>
+      <button class="upper-enter" [class.closed]="panelToggle()" (click)="enterMainChat()" [disabled]="!name().trim()">Enter&nbsp;room</button>
     }
     <div class="entry-panel-wrapper" [class.closed]="panelToggle()">
       <div class="entry-panel" [class.in-chat]="inChat()">
