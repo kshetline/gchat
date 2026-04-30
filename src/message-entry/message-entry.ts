@@ -13,6 +13,7 @@ import { toObservable } from '@angular/core/rxjs-interop';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
 import { PreferencesService } from '../preferences.service';
+import { ToggleButton } from 'primeng/togglebutton';
 
 // I don't want to persist this setting in localStorage -- per session in a better time frame.
 let useExternalUploader = false;
@@ -207,7 +208,7 @@ export function bbCodeToQuillOps(bbCode: string): QuillOp[] {
 
 @Component({
   selector: 'chat-message-entry',
-  imports: [ConfirmDialogModule, ColorSelector, FormsModule, PickerComponent, QuillModule],
+  imports: [ConfirmDialogModule, ColorSelector, FormsModule, PickerComponent, QuillModule, ToggleButton],
   templateUrl: './message-entry.html',
   styleUrl: './message-entry.scss',
 })
@@ -234,6 +235,7 @@ export class MessageEntry implements OnInit{
   protected lengthWarning = signal(-1);
   protected maxExtFileSizeInMb = signal(200);
   protected maxFileSizeInMb = signal(15000);
+  protected panelToggle = signal(false);
   protected pickerPosition = signal({ top: '0', left: '0' });
   protected progress = signal(0);
   protected showEmoji = signal(false);
