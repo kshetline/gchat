@@ -22,6 +22,7 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
 import { SelectModule } from 'primeng/select';
 import { SliderModule } from 'primeng/slider';
+import { ToggleButtonModule } from 'primeng/togglebutton';
 
 const REPOLL_RATE = 5000; // 5 seconds
 const REPOLL_RATE_CHECK_PROGRESS = 2500; // 2.5 seconds
@@ -41,7 +42,7 @@ interface DmInfo {
 @Component({
   selector: 'chat-root',
   imports: [ColorSelector, ConfirmDialogModule, DecimalPipe, FormsModule, MessageEntry, MessageList,
-            NgTemplateOutlet, SelectModule, SliderModule, TabsModule],
+            NgTemplateOutlet, SelectModule, SliderModule, TabsModule, ToggleButtonModule],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -86,6 +87,7 @@ export class App implements OnInit {
   protected notificationMessage = signal('');
   protected notificationType = signal('');
   protected notifySound = signal('never' as NotifySound);
+  protected panelToggle = signal(false);
   protected participants = signal([] as ParticipantInfo[]);
   protected selectedChat = signal(0);
   protected sending = signal(false);

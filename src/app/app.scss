@@ -160,14 +160,20 @@ main {
   box-sizing: border-box;
   flex-shrink: 0;
 
-  .entry-panel {
-    align-items: flex-start;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5em;
+  .entry-panel-wrapper {
+    display: grid;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows 0.3s ease;
 
-    &.in-chat {
-      align-items: baseline;
+    .entry-panel {
+      align-items: flex-start;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5em;
+
+      &.in-chat {
+        align-items: baseline;
+      }
     }
   }
 
@@ -193,6 +199,10 @@ main {
     display: flex;
     flex-direction: column;
     gap: 0.5em;
+
+    p-select {
+      align-self: center;
+    }
 
     .checkbox-pair {
       display: flex;
@@ -360,6 +370,25 @@ p-tabs {
   }
 }
 
+.panel-hider {
+  display: none;
+  top: 0.4em;
+}
+
+@media (max-height: 750px), (max-width: 900px) {
+  .header .entry-panel-wrapper.closed {
+    grid-template-rows: 0fr;
+
+    .entry-panel {
+      overflow: hidden;
+    }
+  }
+
+  .panel-hider {
+    display: inline-block;
+  }
+}
+
 @media (max-width: 900px) {
   .form-h1 {
     display: inline-block;
@@ -369,6 +398,8 @@ p-tabs {
 
   .upper-enter {
     display: inline;
+    position: relative;
+    top: -0.2em;
   }
 
   .lower-enter {
@@ -383,6 +414,11 @@ p-tabs {
     .option-block {
       flex-direction: row;
       gap: 0.25em;
+
+      &.in-chat {
+        gap: 0.5em;
+        margin-left: 0;
+      }
     }
   }
 

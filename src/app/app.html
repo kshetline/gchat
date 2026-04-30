@@ -23,58 +23,62 @@
 <div class="connection-trouble" [style.display]="connectionTrouble() ? 'block' : 'none'">⚡️Connection trouble</div>
 <main xmlns="http://www.w3.org/1999/html">
   <div class="header">
-    <h1 class="form-h1">{{ title() }}</h1>
+    <h1 class="form-h1">{{ title() }}
+      <p-toggleButton [(ngModel)]="panelToggle" offLabel="" onLabel=""
+          offIcon="pi pi-chevron-down" onIcon="pi pi-chevron-right" class="rotate-button panel-hider"></p-toggleButton></h1>
     @if (!inChat()) {
       <button class="upper-enter" (click)="enterMainChat()" [disabled]="!name().trim()">Enter&nbsp;room</button>
     }
-    <div class="entry-panel" [class.in-chat]="inChat()">
-      @if (inChat()) {
-        <span>{{ name() }}</span>
-        <button (click)="leaveMainChat()">Leave&nbsp;room</button>
-      }
-      @else {
-        <div class="name-email">
-          <label for="name">Name</label>
-          <input id="name" type="text" [(ngModel)]="name"/>
-          <label for="name">Email</label>
-          <input id="name" type="text" placeholder="optional" [(ngModel)]="email"/>
-        </div>
-        <button class="lower-enter" (click)="enterMainChat()" [disabled]="!name().trim()">Enter&nbsp;room</button>
-        <div class="titled-color-selector">
-          <span>- select text color -</span>
-          <chat-color-selector [(color)]="color" [darkMode]="darkMode()"></chat-color-selector>
-        </div>
-      }
-      @if (inChat()) {
-        <div class="label-pair">
-          <label for="tripcode">Tripcode&nbsp;#</label>
-          <input id="tripcode" type="password" autocomplete="new-password" [(ngModel)]="tripCode">
-        </div>
-      }
-      <div class="option-block" [class.in-chat]="inChat()">
-        <p-select style="width: 13em" [options]="notifyOptions" [(ngModel)]="notifySound"
-                  optionLabel="label" optionValue="value">
-          <ng-template #footer>
-            <div class="volume-control">
-              <i class="fa-solid fa-volume-low"></i>
-              <p-slider [(ngModel)]="volume" class="w-full" min="5" step="1" (onSlideEnd)="playSampleVolume()"></p-slider>
-              <i class="fa-solid fa-volume-high"></i>
+    <div class="entry-panel-wrapper" [class.closed]="panelToggle()">
+      <div class="entry-panel" [class.in-chat]="inChat()">
+        @if (inChat()) {
+          <span>{{ name() }}</span>
+          <button (click)="leaveMainChat()">Leave&nbsp;room</button>
+        }
+        @else {
+          <div class="name-email">
+            <label for="name">Name</label>
+            <input id="name" type="text" [(ngModel)]="name"/>
+            <label for="name">Email</label>
+            <input id="name" type="text" placeholder="optional" [(ngModel)]="email"/>
+          </div>
+          <button class="lower-enter" (click)="enterMainChat()" [disabled]="!name().trim()">Enter&nbsp;room</button>
+          <div class="titled-color-selector">
+            <span>- select text color -</span>
+            <chat-color-selector [(color)]="color" [darkMode]="darkMode()"></chat-color-selector>
+          </div>
+        }
+        @if (inChat()) {
+          <div class="label-pair">
+            <label for="tripcode">Tripcode&nbsp;#</label>
+            <input id="tripcode" type="password" autocomplete="new-password" [(ngModel)]="tripCode">
+          </div>
+        }
+        <div class="option-block" [class.in-chat]="inChat()">
+          <p-select style="width: 13em" [options]="notifyOptions" [(ngModel)]="notifySound"
+                    optionLabel="label" optionValue="value">
+            <ng-template #footer>
+              <div class="volume-control">
+                <i class="fa-solid fa-volume-low"></i>
+                <p-slider [(ngModel)]="volume" class="w-full" min="5" step="1" (onSlideEnd)="playSampleVolume()"></p-slider>
+                <i class="fa-solid fa-volume-high"></i>
+              </div>
+            </ng-template>
+          </p-select>
+          <div class="checkbox-pair">
+            <div class="label-pair">
+              <input id="local-time" type="checkbox" [(ngModel)]="localTime" (ngModelChange)="toggleLocalTime()">
+              <label for="local-time">Local time</label>
             </div>
-          </ng-template>
-        </p-select>
-        <div class="checkbox-pair">
-          <div class="label-pair">
-            <input id="local-time" type="checkbox" [(ngModel)]="localTime" (ngModelChange)="toggleLocalTime()">
-            <label for="local-time">Local time</label>
+            <div class="label-pair">
+              <input id="allow-dms" type="checkbox" [(ngModel)]="allowDMs" (change)="toggleAllowDMs()">
+              <label for="allow-dms">Allow DMs</label>
+            </div>
           </div>
           <div class="label-pair">
-            <input id="allow-dms" type="checkbox" [(ngModel)]="allowDMs" (change)="toggleAllowDMs()">
-            <label for="allow-dms">Allow DMs</label>
+            <input id="new-on-bottom" type="checkbox" [(ngModel)]="newOnBottom" (change)="toggleMessageOrder()">
+            <label for="new-on-bottom">New messages at bottom</label>
           </div>
-        </div>
-        <div class="label-pair">
-          <input id="new-on-bottom" type="checkbox" [(ngModel)]="newOnBottom" (change)="toggleMessageOrder()">
-          <label for="new-on-bottom">New messages at bottom</label>
         </div>
       </div>
     </div>

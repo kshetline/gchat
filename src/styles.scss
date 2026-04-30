@@ -167,6 +167,26 @@ a {
   width: 2em !important;
 }
 
+.rotate-button {
+  background: none !important;
+  border: none !important;
+
+  .p-togglebutton-content {
+    background: none !important;
+    box-shadow: none !important;
+    padding: 0.1em;
+  }
+
+  .p-button-icon {
+    transition: transform 0.3s;
+  }
+}
+
+.rotate-button.p-togglebutton.p-togglebutton-checked .p-button-icon {
+  background: none !important;
+  transform: rotate(180deg);
+}
+
 @media (max-width: 900px) {
   input, textarea, select {
     font-size: 16px;
