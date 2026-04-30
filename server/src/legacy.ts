@@ -204,7 +204,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
     const db = await getDb();
     existing = (await db.all<any>('SELECT hash, synced_time, name, trip, message FROM messages WHERE dm = 0 AND deleted = 0'))
       .reduce((acc, row) => acc.set(row.hash, row.synced_time), new Map<string, number>());
-    const messages = await getLegacyMessages(proxyName, retrieveCount);
+    const messages = await getLegacyMessages(inChat ? proxyName : '', retrieveCount);
     const remoteExisting = new Set(messages.messages.map(m => m.hash));
     let earliest = Number.MAX_SAFE_INTEGER;
     let latest = 0;

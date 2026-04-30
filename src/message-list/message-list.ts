@@ -183,6 +183,17 @@ export class MessageList implements OnInit {
   }
 
   protected getImages(html: string): string[] {
+    const pos = html.indexOf(' &lt; ');
+
+    if (pos > 0)
+      html = html.substring(pos);
+    else {
+      const match = html.match(QUOTE_MARKER_PATTERN);
+
+      if (match)
+        html = html.substring(match.index + match[0].length);
+    }
+
     return html.split(/\bhref="(http(s?):\/\/.+?\.(avif|gif|jpeg|jpg|png|svg|webp))"/g).filter((_s, i) => (i - 1) % 4 === 0);
   }
 

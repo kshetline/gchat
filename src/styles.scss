@@ -182,6 +182,10 @@ a {
   }
 }
 
+.theme-dark .p-togglebutton-icon {
+  color: #DDD !important;
+}
+
 .rotate-button.p-togglebutton.p-togglebutton-checked .p-button-icon {
   background: none !important;
   transform: rotate(180deg);
