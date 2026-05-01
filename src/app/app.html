@@ -57,13 +57,15 @@
         <div class="option-block" [class.in-chat]="inChat()">
           <p-select style="width: 13em" [options]="notifyOptions" [(ngModel)]="notifySound"
                     optionLabel="label" optionValue="value">
-            <ng-template #footer>
-              <div class="volume-control">
-                <i class="fa-solid fa-volume-low"></i>
-                <p-slider [(ngModel)]="volume" class="w-full" min="5" step="1" (onSlideEnd)="playSampleVolume()"></p-slider>
-                <i class="fa-solid fa-volume-high"></i>
-              </div>
-            </ng-template>
+            @if (!isSafari()) {
+              <ng-template #footer>
+                <div class="volume-control">
+                  <i class="fa-solid fa-volume-low"></i>
+                  <p-slider [(ngModel)]="volume" class="w-full" min="5" step="1" (onSlideEnd)="playSampleVolume()"></p-slider>
+                  <i class="fa-solid fa-volume-high"></i>
+                </div>
+              </ng-template>
+            }
           </p-select>
           <div class="checkbox-pair">
             <div class="label-pair">

@@ -23,6 +23,7 @@ import { ConfirmationService } from 'primeng/api';
 import { SelectModule } from 'primeng/select';
 import { SliderModule } from 'primeng/slider';
 import { ToggleButtonModule } from 'primeng/togglebutton';
+import { isSafari } from '@tubular/util';
 
 const REPOLL_RATE = 5000; // 5 seconds
 const REPOLL_RATE_CHECK_PROGRESS = 2500; // 2.5 seconds
@@ -77,6 +78,7 @@ export class App implements OnInit {
   protected email = signal('');
   protected framed = /\bframed=true\b/.test(location.toString());
   protected inChat = signal(false);
+  protected isSafari = signal(isSafari());
   protected lastSuccessfulLegacyPoll = signal(-1);
   protected localTime = signal(true);
   protected messageEntrySignal = signal<MessageEntry>(undefined);

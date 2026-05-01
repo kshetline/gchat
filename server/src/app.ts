@@ -275,10 +275,12 @@ async function participantCheck(req: express.Request, forceInChat = false): Prom
 }
 
 app.get('/api/messages', async (req, res) => {
-  await participantCheck(req);
+  const q = req.query as any;
+
+  if (toBoolean(q.inChat))
+    await participantCheck(req);
 
   const session = sessions.get(getToken(req));
-  const q = req.query as any;
   const tripCode = tripcode(q.tripCode);
   const name = cleanName(q.name);
   const now = Now();
