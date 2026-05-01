@@ -21,7 +21,7 @@
       <button class="ql-underline"></button>
       <button class="ql-code"></button>
     </span>
-    @if (!panelToggle()) {
+    <div [style]="{ display: panelToggle() ? 'none' : 'contents' }">
       <span class="ql-formats">
         <select class="ql-size">
           <option value="0.625em">Tiny</option>
@@ -59,7 +59,7 @@
           <label for="ext-upload">{{ externalUploaderShortName() }}</label>
         </div>
       </div>
-    }
+    </div>
   </div>
   <quill-editor [formats]="formats" [modules]="modules" [sanitize]="true"
                 (onEditorCreated)="editorCreated($event)" placeholder="">

@@ -43,7 +43,7 @@ if (process.env.LOG_FILE_PATH) {
         args[0] = (args[0] as string).replace(/(?<!%)%s/g, () => args.length > 1 ? String(args.splice(1, 1)) : '%s');
       }
 
-      logFile.write(prefix + args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') + '\n');
+      logFile.write(prefix + timeStamp() + ' ' + args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') + '\n');
     };
   }
 }
@@ -248,7 +248,28 @@ app.get('/api/config', (_req, res) => {
   res.json(config);
 });
 
+async function participantCheck(req: express.Request, forceInChat = false): Promise<void> {
+  const session = sessions.get(getToken(req));
+  const inChat = session?.inChat || forceInChat;
+
+  if (session && !session.inChat && inChat)
+    session.inChat = true;
+
+  const q = req.query as any;
+  const name = ((q.name || '') as string).replace(/#.*$/, '');
+  const db = await getDb();
+  const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', name);
+
+  if (!participant)
+    await db.run('INSERT INTO participants (name, trip, email, ip, session_id, remote, proxied, last_active, last_post) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      name, q.tripCode, q.email, session.ip, getToken(req), 0, +(!toBoolean(q.framed)), Now(), 0);
+  else
+    await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', name);
+}
+
 app.get('/api/messages', async (req, res) => {
+  await participantCheck(req);
+
   const session = sessions.get(getToken(req));
   const q = req.query as any;
   const tripCode = tripcode(q.tripCode);
@@ -302,7 +323,7 @@ app.get('/api/messages', async (req, res) => {
     const participantInfo = participants[i];
     const participant = await getNamedParticipantRecord(participantInfo.name);
 
-    if (!participant.remote) {
+    if (participant && !participant.remote) {
       let session2 = sessions.get(participant.session_id);
 
       if (!session2 && participant.name === name) {
@@ -420,6 +441,7 @@ app.post('/api/enter', async (req, res) => {
   if (!participant && q.name) {
     await db.run('INSERT INTO participants (name, trip, email, ip, session_id, remote, proxied, last_active, last_post) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       q.name, q.tripCode, q.email, session.ip, token, 0, +(!framed), now, 0);
+    await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', q.name);
     session.inChat = true;
   }
   else if (q.tripCode === participant.trip || !participant.ip || session.ip === participant.ip ||
@@ -548,6 +570,8 @@ export function decryptMessage(encryptedText: string, keyBase64: string): string
 }
 
 app.post('/api/send', async (req, res) => {
+  await participantCheck(req, true);
+
   const q = req.query as any;
 
   if (await isBannedName(q.name, tripcode(q.tripCode)) || await isBannedIp(getIp(req))) {
@@ -647,6 +671,8 @@ app.get('/api/can-edit', async (req, res) => {
 });
 
 app.put('/api/update', async (req, res) => {
+  await participantCheck(req, true);
+
   if (await allowedToEdit(req, res)) {
     const q = req.query as any;
     const id = toInt(q.msgId);
@@ -670,6 +696,8 @@ app.put('/api/update', async (req, res) => {
 });
 
 app.delete('/api/delete', async (req, res) => {
+  await participantCheck(req, true);
+
   if (await allowedToEdit(req, res, 'delete')) {
     const id = toInt(req.query.msgId);
     const db = await getDb();
@@ -681,6 +709,8 @@ app.delete('/api/delete', async (req, res) => {
 });
 
 app.post('/api/start-chat', async (req, res) => {
+  await participantCheck(req, true);
+
   const q = req.query as any;
   const self = q.self;
   const name = q.name;
@@ -765,6 +795,8 @@ app.post('/api/leave-chat', async (req, res) => {
 });
 
 app.post('/api/upload', async (req, res) => {
+  await participantCheck(req);
+
   try {
     const url = await uploadSingle(req, res);
 

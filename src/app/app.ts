@@ -292,11 +292,18 @@ export class App implements OnInit {
     this.messageTimer = setTimeout(() => this.getMessages(), delay);
   }
 
+  private lastGetMessagesTime = 0;
+
   protected getMessages(): void {
     if (this.messageTimer) {
       clearTimeout(this.messageTimer);
       this.messageTimer = undefined;
     }
+
+    const now = processMillis();
+    if (now - this.lastGetMessagesTime < 2000)
+      return;
+    this.lastGetMessagesTime = now;
 
     const wasActive = this.activity;
     this.activity = false;
