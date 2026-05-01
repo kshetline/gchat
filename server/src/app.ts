@@ -72,7 +72,7 @@ const MONITOR_INTERVAL = 60000; // 1 minute
 const MAX_DM_AGE = 7200; // 2 hours
 const MAX_HISTORY = 5000; // number of chat messages to keep in DB
 const MAX_HISTORY_TOLERANCE = 500; // Overflow before deleting messages
-const MAX_CLIENT_MESSAGES = 2000;
+const MAX_CLIENT_MESSAGES = 1500;
 
 let proxyStarted = false;
 let nextToLastContentUpdate = 0;
@@ -96,7 +96,7 @@ async function monitor(): Promise<void> {
   const now = Now();
 
   await db.run('DELETE FROM messages WHERE dm > 0 AND synced_time < ?', now - MAX_DM_AGE);
-  await db.run('DELETE FROM dm_session WHERE name1_present <= 0 AND name2_present <= 0 AND last_post < ?', now - MAX_DM_AGE);
+  await db.run('DELETE FROM dm_session WHERE name1_present <= 1 AND name2_present <= 1 AND start_time < ?1 AND last_post < ?1', now - MAX_DM_AGE);
   await db.run('DELETE FROM participants WHERE last_active < ?', now - MAX_IDLE_PARTICIPANT_AGE);
 
   const messageCount = (await db.get<any>('SELECT COUNT(*) as count FROM messages WHERE dm = 0'))?.count || 0;
@@ -248,15 +248,22 @@ app.get('/api/config', (_req, res) => {
   res.json(config);
 });
 
+function cleanName(name: any): string {
+  return ((name || '') as string).replace(/#.*$/, '').trim();
+}
+
 async function participantCheck(req: express.Request, forceInChat = false): Promise<void> {
   const session = sessions.get(getToken(req));
   const inChat = session?.inChat || forceInChat;
+  const q = req.query as any;
+  const name = cleanName(q.name);
+
+  if (!name)
+    return;
 
   if (session && !session.inChat && inChat)
     session.inChat = true;
 
-  const q = req.query as any;
-  const name = ((q.name || '') as string).replace(/#.*$/, '');
   const db = await getDb();
   const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', name);
 
@@ -273,7 +280,7 @@ app.get('/api/messages', async (req, res) => {
   const session = sessions.get(getToken(req));
   const q = req.query as any;
   const tripCode = tripcode(q.tripCode);
-  const name = ((q.name || '') as string).replace(/#.*$/, '');
+  const name = cleanName(q.name);
   const now = Now();
 
   if (session) {
@@ -336,8 +343,10 @@ app.get('/api/messages', async (req, res) => {
         continue;
       }
       // last_post should only be greater than last_active for the same screen name posting as a remote participant
-      else if (participant.last_post > participant.last_active)
+      else if (participant.last_post > participant.last_active) {
         participant.remote = 1;
+        participant.last_active = participant.last_post;
+      }
     }
 
     if (participant) {
@@ -424,8 +433,9 @@ app.get('/api/messages', async (req, res) => {
 
 app.post('/api/enter', async (req, res) => {
   const q = req.query as any;
+  const name = cleanName(q.name);
 
-  if (await isBannedName(q.name, tripcode(q.tripCode)) || await isBannedIp(getIp(req))) {
+  if (await isBannedName(name, tripcode(q.tripCode)) || await isBannedIp(getIp(req))) {
     res.status(400).json({ error: 'Entry into chat room failed' });
     return;
   }
@@ -435,13 +445,13 @@ app.post('/api/enter', async (req, res) => {
   const session = sessions.get(token);
   const db = await getDb();
   const now = Now();
-  const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', q.name);
+  const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', name);
   const wasInChat = session.inChat;
 
-  if (!participant && q.name) {
+  if (!participant && name) {
     await db.run('INSERT INTO participants (name, trip, email, ip, session_id, remote, proxied, last_active, last_post) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      q.name, q.tripCode, q.email, session.ip, token, 0, +(!framed), now, 0);
-    await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', q.name);
+      name, q.tripCode, q.email, session.ip, token, 0, +(!framed), now, 0);
+    await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', name);
     session.inChat = true;
   }
   else if (q.tripCode === participant.trip || !participant.ip || session.ip === participant.ip ||
@@ -449,11 +459,11 @@ app.post('/api/enter', async (req, res) => {
     await db.run('UPDATE participants SET trip = ?, email = ?, ip = ?, session_id = ?, remote = ?, proxied = ?, last_active = ? WHERE id = ?',
       q.tripCode, q.email, session.ip, token, 0, +(!framed), now, participant.id);
     session.inChat = true;
-    await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', q.name);
+    await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', name);
   }
   else {
     res.status(400).json({
-      error: `Chat name '${q.name}' is already in use by another user.`
+      error: `Chat name '${name}' is already in use by another user.`
     });
 
     return;
@@ -461,7 +471,7 @@ app.post('/api/enter', async (req, res) => {
 
   if (session.inChat && !wasInChat) {
     const lastEnterOrLeave = await db.get<any>(`SELECT id, style FROM messages WHERE synced_time > ? AND dm = 0 AND name = ? AND trip = ? AND
-      remote = 0 AND LENGTH(style) = 1 ORDER BY synced_time DESC LIMIT 1`, now - 3600, q.name, q.tripCode);
+      remote = 0 AND LENGTH(style) = 1 ORDER BY synced_time DESC LIMIT 1`, now - 3600, name, q.tripCode);
 
     if (lastEnterOrLeave?.style === 'E')
       await db.run('UPDATE messages SET synced_time = ? WHERE id = ?', now, lastEnterOrLeave.id);
@@ -469,7 +479,7 @@ app.post('/api/enter', async (req, res) => {
       const message = 'has joined ' + process.env.CHAT_TITLE;
 
       await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        0, now, now, q.name, q.tripCode, q.email, 0, session.ip, token, 'E', message, messageHash('E:' + q.name, q.tripCode, now));
+        0, now, now, name, q.tripCode, q.email, 0, session.ip, token, 'E', message, messageHash('E:' + name, q.tripCode, now));
     }
   }
 
@@ -483,7 +493,7 @@ app.post('/api/enter', async (req, res) => {
 
 app.post('/api/leave', async (req, res) => {
   const q = req.query as any;
-  const name = q.name;
+  const name = cleanName(q.name);
   const token = getToken(req);
   const session = sessions.get(token);
   const wasInChat = session.inChat;
@@ -573,8 +583,9 @@ app.post('/api/send', async (req, res) => {
   await participantCheck(req, true);
 
   const q = req.query as any;
+  const name = cleanName(q.name);
 
-  if (await isBannedName(q.name, tripcode(q.tripCode)) || await isBannedIp(getIp(req))) {
+  if (await isBannedName(name, tripcode(q.tripCode)) || await isBannedIp(getIp(req))) {
     res.status(400).json({ error: 'Send message failed' });
     return;
   }
@@ -585,7 +596,7 @@ app.post('/api/send', async (req, res) => {
   const now = Now();
   const style = colorToStyle(q.color);
   let comment = q.comment.replace(URL_MATCHER, '[url=$1]$1[/url]');
-  const hash = messageHash(q.name, q.tripCode, now);
+  const hash = messageHash(name, q.tripCode, now);
   const framed = toBoolean(q.framed);
   const dm = toInt(q.dm);
   let dmSession: DbDmSession;
@@ -599,7 +610,7 @@ app.post('/api/send', async (req, res) => {
       res.status(400).json({ error: 'This chat session is closed.', closed: true });
       return;
     }
-    else if (!q.name?.trim()) {
+    else if (!name) {
       res.status(400).json({ error: 'You must use a non-blank chat name to send DMs.', closed: true });
       return;
     }
@@ -608,17 +619,17 @@ app.post('/api/send', async (req, res) => {
   }
 
   const result = await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    dm, now, now, q.name, q.tripCode, q.email, 0, session.ip, token, style, comment, hash);
+    dm, now, now, name, q.tripCode, q.email, 0, session.ip, token, style, comment, hash);
 
   if (!dm && framed)
-    addPendingDuplicate(result.lastID, now, q.name, comment);
+    addPendingDuplicate(result.lastID, now, name, comment);
 
-  await db.run('UPDATE participants SET last_post = ?1, last_active = ?1 WHERE name = ?2 AND remote = 0', now, q.name);
+  await db.run('UPDATE participants SET last_post = ?1, last_active = ?1 WHERE name = ?2 AND remote = 0', now, name);
 
   if (dmSession)
     await db.run('UPDATE dm_session SET last_post = ? WHERE id = ?', now, dmSession.id);
 
-  const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', q.name);
+  const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', name);
 
   if (participant)
     await db.run('UPDATE participants SET last_post = ?1, last_active = ?1 WHERE id = ?2', now, participant.id);
@@ -629,7 +640,7 @@ app.post('/api/send', async (req, res) => {
       proxyStarted = true;
     }
 
-    await legacySendMessage(q.name, null, q.comment, q.color, q.tripCode);
+    await legacySendMessage(name, null, q.comment, q.color, q.tripCode);
   }
 
   res.json(null);
@@ -637,14 +648,15 @@ app.post('/api/send', async (req, res) => {
 
 async function allowedToEdit(req: express.Request, res: express.Response, action = 'edit'): Promise<DbMessage> {
   const q = req.query as any;
+  const name = cleanName(q.name);
   const tripCode = q.tripCode && tripcode(q.tripCode);
 
-  if (!await isBannedName(q.name, tripCode) && !await isBannedIp(getIp(req))) {
+  if (!await isBannedName(name, tripCode) && !await isBannedIp(getIp(req))) {
     const id = toInt(q.msgId);
     const db = await getDb();
     const message = await db.get<DbMessage>('SELECT * FROM messages WHERE id = ? LIMIT 1', id);
 
-    if (message && message.name === q.name &&
+    if (message && message.name === name &&
         ((message.trip && (message.trip === q.tripCode || message.trip === tripCode)) ||
           message.session_id !== getToken(req))) {
       if (message.dm) {
@@ -712,14 +724,14 @@ app.post('/api/start-chat', async (req, res) => {
   await participantCheck(req, true);
 
   const q = req.query as any;
-  const self = q.self;
-  const name = q.name;
+  const self = cleanName(q.self);
+  const name = ((q.name || '') as string).trim();
 
   if (self === name) {
     res.status(400).json({ error: 'Cannot start a chat with yourself (not this way, at least).' });
     return;
   }
-  else if (!self?.trim()) {
+  else if (!self) {
     res.status(400).json({ error: 'You must use a non-blank chat name to send DMs.' });
     return;
   }
@@ -735,10 +747,11 @@ app.post('/api/start-chat', async (req, res) => {
   const db = await getDb();
   const dmSession = await db.get<DbDmSession>(`SELECT * FROM dm_session WHERE (name1 = ?1 AND name2 = ?2) OR
                                                  (name1 = ?2 AND name2 = ?1)`, name, self);
+
   if (dmSession) {
     const whichName = dmSession.name1 === self ? 'name1_present' : 'name2_present';
 
-    await db.run(`UPDATE dm_session SET ${whichName} = 1 WHERE id = ?`, dmSession.id);
+    await db.run(`UPDATE dm_session SET ${whichName} = ? WHERE id = ?`, now, dmSession.id);
 
     const message = 'has joined this private chat';
 
@@ -763,7 +776,7 @@ app.post('/api/start-chat', async (req, res) => {
 
 app.post('/api/leave-chat', async (req, res) => {
   const q = req.query as any;
-  const self = q.self;
+  const self = cleanName(q.self);
   const id = toInt(q.id);
   const db = await getDb();
   const dmSession = await db.get<DbDmSession>(`SELECT * FROM dm_session WHERE id = ?`, id);

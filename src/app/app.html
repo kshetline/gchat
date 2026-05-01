@@ -87,8 +87,9 @@
     <span>Participants:</span>
     @if (participants()?.length > 0) {
       @for (participant of participants(); track participant.name) {
+        @let canChat = participant.allowsDms && participant.name !== name();
         <span class="participant" [class.native]="!participant.remote" [class.idle]="!!participant.idle"
-              [class.can-chat]="participant.allowsDms && participant.name !== name()" (click)="startDmChat(participant.name)"
+              [class.can-chat]="canChat" (click)="canChat && startDmChat(participant.name)"
           >{{ participant.name }}
           @if (participant.allowsDms) {
             &nbsp;<i class="fa-regular fa-comment"></i>
