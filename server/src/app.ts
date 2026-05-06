@@ -266,9 +266,11 @@ async function participantCheck(req: express.Request, forceInChat = false): Prom
   const db = await getDb();
   const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', name);
 
-  if (!participant)
+  if (!participant) {
+    await db.run('DELETE FROM participants WHERE name = ?', name);
     await db.run('INSERT INTO participants (name, trip, email, ip, session_id, remote, proxied, last_active, last_post) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       name, q.tripCode, q.email, session?.ip, getToken(req), 0, +(!toBoolean(q.framed)), Now(), 0);
+  }
   else
     await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', name);
 }
@@ -448,22 +450,31 @@ app.post('/api/enter', async (req, res) => {
   const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', name);
   const wasInChat = session.inChat;
 
-  if (!participant && name) {
-    await db.run('INSERT INTO participants (name, trip, email, ip, session_id, remote, proxied, last_active, last_post) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      name, q.tripCode, q.email, session.ip, token, 0, +(!framed), now, 0);
-    await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', name);
-    session.inChat = true;
-  }
-  else if (q.tripCode === participant.trip || !participant.ip || session.ip === participant.ip ||
-           !participant.session_id || token === participant.session_id) {
-    await db.run('UPDATE participants SET trip = ?, email = ?, ip = ?, session_id = ?, remote = ?, proxied = ?, last_active = ? WHERE id = ?',
-      q.tripCode, q.email, session.ip, token, 0, +(!framed), now, participant.id);
-    session.inChat = true;
-    await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', name);
+  if (name) {
+    if (!participant) {
+      await db.run('DELETE FROM participants WHERE name = ?', name);
+      await db.run('INSERT INTO participants (name, trip, email, ip, session_id, remote, proxied, last_active, last_post) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        name, q.tripCode, q.email, session.ip, token, 0, +(!framed), now, 0);
+      session.inChat = true;
+    }
+    else if (q.tripCode === participant.trip || !participant.ip || session.ip === participant.ip ||
+             !participant.session_id || token === participant.session_id) {
+      await db.run('UPDATE participants SET trip = ?, email = ?, ip = ?, session_id = ?, remote = ?, proxied = ?, last_active = ? WHERE id = ?',
+        q.tripCode, q.email, session.ip, token, 0, +(!framed), now, participant.id);
+      session.inChat = true;
+      await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', name);
+    }
+    else {
+      res.status(400).json({
+        error: `Chat name '${name}' is already in use by another user.`
+      });
+
+      return;
+    }
   }
   else {
     res.status(400).json({
-      error: `Chat name '${name}' is already in use by another user.`
+      error: 'Blank chat name not allowed.'
     });
 
     return;

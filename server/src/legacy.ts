@@ -72,8 +72,8 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
   const dom = parser.parse(raw).domRoot;
   const body = dom.querySelector('body');
   const participantDiv = body?.querySelector('#participantList');
-  participantsRaw = participantDiv.children[0].content.trim().replace(/^.*:\s*/g, '').replace(/[◆◇]/g, '\t');
-  const participants = Array.from(new Set(participantsRaw.split('\t')
+  participantsRaw = participantDiv.children[0].content.trim().replace(/^.*:\s*/g, '').replace(/[◆◇]/g, '\t').trim();
+  const participants = Array.from(new Set(participantsRaw.split(/\t+/)
     .map(p => p.trim()).filter(p => !!p)).values()).sort().map(p => ({ name: p }) as ParticipantInfo);
   const messageRows = body?.querySelectorAll('.messageRow').reverse();
   let messages = messageRows.map(row => extractMessage(row)).filter(m => m.name !== proxyName || m.trip !== proxyTripEncoded);
