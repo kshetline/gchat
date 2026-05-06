@@ -72,7 +72,7 @@ const MONITOR_INTERVAL = 60000; // 1 minute
 const MAX_DM_AGE = 7200; // 2 hours
 const MAX_HISTORY = 5000; // number of chat messages to keep in DB
 const MAX_HISTORY_TOLERANCE = 500; // Overflow before deleting messages
-const MAX_CLIENT_MESSAGES = 1500;
+const MAX_CLIENT_MESSAGES = 2000;
 
 let proxyStarted = false;
 let nextToLastContentUpdate = 0;

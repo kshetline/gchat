@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comchat-Mods
 // @namespace    https://chatproxy.chat/
-// @version      v2026.04.18
+// @version      v2026.05.04
 // @description  Enhance Comchat functionality
 // @author       Anonymous
 // @license      MIT
@@ -204,7 +204,10 @@
     formDoc.querySelector('input[name="password"]').value = tripCode || '';
     formDoc.querySelector('form').setAttribute('target', 'hidden_frame');
 
-    hiddenFrame.contentDocument.body.innerHTML = '';
+    if (hiddenFrame?.contentDocument?.body) {
+      hiddenFrame.contentDocument.body.innerHTML = '';
+    }
+
     form.submit();
     logFrame.contentWindow.focus();
     setTimeout(() => commentField.value = '', 100);
@@ -224,25 +227,31 @@
     formDoc = formFrame.contentDocument;
     form = formDoc.querySelector('form');
 
-    switch (evt.data[0]) {
-      case 'enterChatRoom':
-        enterChatRoom(evt.data[1], evt.data[2], evt.data[3]);
-        break;
-      case 'leaveChatRoom':
-        leaveChatRoom();
-        break;
-      case 'sendChatMessage':
-        sendChatMessage(evt.data[1], evt.data[2], evt.data[3]);
-        break;
-      case 'updateTitle':
-        document.title = evt.data[1];
-        break;
-      case 'revert':
-        revert();
-        break;
-      case 'peek':
-        peek();
-        break;
+    try {
+      switch (evt.data[0]) {
+        case 'enterChatRoom':
+          enterChatRoom(evt.data[1], evt.data[2], evt.data[3]);
+          break;
+        case 'leaveChatRoom':
+          leaveChatRoom();
+          break;
+        case 'sendChatMessage':
+          sendChatMessage(evt.data[1], evt.data[2], evt.data[3]);
+          break;
+        case 'updateTitle':
+          document.title = evt.data[1];
+          break;
+        case 'revert':
+          revert();
+          break;
+        case 'peek':
+          peek();
+          break;
+      }
+    }
+    catch (error) {
+      console.error('Error handling %s:', evt.data[0], error);
+      logFrame.contentWindow.postMessage([evt.data[0], error.message || String(error)], '*');
     }
   });
 })();

@@ -214,6 +214,7 @@ export class App implements OnInit {
     document.addEventListener('visibilitychange', () => this.checkChatActive(document.hidden ? undefined : true));
     window.addEventListener('blur', () => this.checkChatActive());
     window.addEventListener('focus', () => this.checkChatActive(true));
+    window.addEventListener('scroll', () => this.checkChatActive(true));
     window.addEventListener('mousemove', () => (this.activity = true) && (this.lastActive = processMillis()));
     window.addEventListener('beforeunload', () => this.inChat() && this.leaveMainChat());
 
@@ -294,19 +295,20 @@ export class App implements OnInit {
     this.messageTimer = setTimeout(() => this.getMessages(), delay);
   }
 
-  private lastGetMessagesTime = 0;
+  private lastGetMessagesTime = -10000;
 
-  protected getMessages(): void {
+  protected getMessages(force = false): void {
     if (this.messageTimer) {
       clearTimeout(this.messageTimer);
       this.messageTimer = undefined;
     }
 
     const now = processMillis();
-    if (now - this.lastGetMessagesTime < 2000)
-      return;
-    this.lastGetMessagesTime = now;
 
+    if (!force && now - this.lastGetMessagesTime < 2000)
+      return;
+
+    this.lastGetMessagesTime = now;
     const wasActive = this.activity;
     this.activity = false;
 
@@ -338,8 +340,8 @@ export class App implements OnInit {
               newMessages.push(...messages.messages);
 
             // Safety check: Make sure no glitch causes client to choke on an ever-growing message list
-            if (newMessages.length > 3000)
-              newMessages.splice(newMessages.length - 3000);
+            if (newMessages.length > 4000)
+              newMessages.splice(newMessages.length - 4000);
 
             const changed = !isEqual(newMessages, this.messages());
             const newMessageCount = this.countNewMessages(this.messages(), newMessages);
@@ -497,7 +499,7 @@ export class App implements OnInit {
         this.changeRef.detectChanges();
         this.sending.set(false);
         this.messageEntry.reset();
-        setTimeout(() => this.getMessages(), 500);
+        setTimeout(() => this.getMessages(true), 500);
       },
       error: (error): void => {
         if (error.error?.error) {
@@ -539,7 +541,7 @@ export class App implements OnInit {
     this.httpClient.put('/api/update', null, { params }).subscribe({
       next: (): void => {
         evt.callback && evt.callback(true);
-        setTimeout(() => this.getMessages(), 500);
+        setTimeout(() => this.getMessages(true), 500);
       },
       error: (error): void => {
         notify('error', error.error?.error || 'Failed to update message');
@@ -559,7 +561,7 @@ export class App implements OnInit {
 
         this.httpClient.delete('/api/delete', { params }).subscribe({
           next: (): void => {
-            setTimeout(() => this.getMessages(), 500);
+            setTimeout(() => this.getMessages(true), 500);
           },
           error: (error): void => {
             notify('error', error.error?.error || 'Failed to delete message');
@@ -764,28 +766,36 @@ export class App implements OnInit {
       return;
     }
 
-    this.httpClient.post<{ id: number }>('/api/start-chat', {}, {
-        params: {
-          self: this.name(),
-          tripCode: this.tripCode(),
-          name
-        } }).subscribe({
-      next: data => {
-        const match = this.dms().findIndex(dm => dm.id === data.id);
+    this.saveTripCode();
+    this.notificationMessage.set(`Are you sure you want to DM "${name}"?`);
+    this.showConfirmation.set(true);
+    this.confirmCallback = (approved: boolean): void => {
+      if (!approved)
+        return;
 
-        if (match >= 0) {
-          this.selectedChat.set(match + 1);
-          return;
-        }
+      this.httpClient.post<{ id: number }>('/api/start-chat', {}, {
+          params: {
+            self: this.name(),
+            tripCode: this.tripCode(),
+            name
+          } }).subscribe({
+        next: data => {
+          const match = this.dms().findIndex(dm => dm.id === data.id);
 
-        const dms = clone(this.dms(), true);
+          if (match >= 0) {
+            this.selectedChat.set(match + 1);
+            return;
+          }
 
-        dms.push({ id: data.id, name, messages: signal<Message[]>([]), missed: signal(0) });
-        this.dms.set(dms);
-        this.selectedChat.set(dms.length);
-      },
-      error: (error): void => notify('error', error.error?.error || 'Failed to start chat')
-    })
+          const dms = clone(this.dms(), true);
+
+          dms.push({ id: data.id, name, messages: signal<Message[]>([]), missed: signal(0) });
+          this.dms.set(dms);
+          this.selectedChat.set(dms.length);
+        },
+        error: (error): void => notify('error', error.error?.error || 'Failed to start chat')
+      })
+    }
   }
 
   protected closeDmChat(evt: Event, tabIndex: number): void {

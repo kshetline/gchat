@@ -273,8 +273,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
           await db.run('UPDATE messages SET synced_time = ? WHERE dm = 0 AND hash = ?', time, messageHash(row.name, row.trip, time));
         // Otherwise, presume the message was administratively deleted on the legacy site and follow suit here.
         else if (!remoteExisting.has(hash) && row.synced_time < clockNow - 600) {
-          // TODO: Should be OK, but still worried about unwanted deletions.
-          //   Change `flagged` to `deleted` if flagged messages prove to be proper targets for deletion.
+          // TODO: Figure out why these flagged messages aren't the candidates for deletion that I think they should be.
           await db.run('UPDATE messages SET flagged = 1 WHERE dm = 0 AND hash = ?', hash);
           existing.delete(hash);
         }
