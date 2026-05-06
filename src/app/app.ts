@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, OnInit, signal, ViewChild, WritableSignal } from '@angular/core';
+import { ChangeDetectorRef, Component, inject, OnInit, signal, ViewChild, WritableSignal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import {
@@ -9,7 +9,7 @@ import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { FileUploadEvent, MessageEntry, MessageUpdateEvent } from '../message-entry/message-entry';
 import {
-  awaitMessage, NotificationHandler, notify, registerNotificationHandler, shouldIgnoreClick, startClickSuppress
+  NotificationHandler, notify, registerNotificationHandler, shouldIgnoreClick, startClickSuppress, userscriptAction
 } from '../main';
 import { applyTheme, getThemeMenuStyle, getThemes, resetDefaultThemeBackground } from '../themes';
 import { DeleteEvent, EditEvent, MessageList } from '../message-list/message-list';
@@ -23,7 +23,9 @@ import { ConfirmationService } from 'primeng/api';
 import { SelectModule } from 'primeng/select';
 import { SliderModule } from 'primeng/slider';
 import { ToggleButtonModule } from 'primeng/togglebutton';
-import { isSafari } from '@tubular/util';
+import { ToastModule } from 'primeng/toast';
+import { MessageService } from 'primeng/api';
+import { isIOS, isSafari } from '@tubular/util';
 
 const REPOLL_RATE = 5000; // 5 seconds
 const REPOLL_RATE_CHECK_PROGRESS = 2500; // 2.5 seconds
@@ -43,7 +45,8 @@ interface DmInfo {
 @Component({
   selector: 'chat-root',
   imports: [ColorSelector, ConfirmDialogModule, DecimalPipe, FormsModule, MessageEntry, MessageList,
-            NgTemplateOutlet, SelectModule, SliderModule, TabsModule, ToggleButtonModule],
+            NgTemplateOutlet, SelectModule, SliderModule, TabsModule, ToastModule, ToggleButtonModule],
+  providers: [MessageService],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -53,6 +56,7 @@ export class App implements OnInit {
 
   private readonly chime = new Audio('assets/notify.wav');
   private readonly chimeDM = new Audio('assets/notifyDM.wav');
+  private readonly messageService = inject(MessageService);
   private readonly prefs: Preferences;
 
   private activity = false;
@@ -78,7 +82,7 @@ export class App implements OnInit {
   protected email = signal('');
   protected framed = /\bframed=true\b/.test(location.toString());
   protected inChat = signal(false);
-  protected isSafari = signal(isSafari());
+  protected isIosSafari = signal(isSafari() && isIOS());
   protected lastSuccessfulLegacyPoll = signal(-1);
   protected localTime = signal(true);
   protected messageEntrySignal = signal<MessageEntry>(undefined);
@@ -197,7 +201,7 @@ export class App implements OnInit {
       else if (event.key === 'p' && (event.ctrlKey || event.metaKey) && this.framed &&
                this.messageEntry?.getText().trim() === 'peek') {
         event.preventDefault();
-        parent.postMessage(['peek'], '*');
+        userscriptAction('peek').catch(err => notify('error', err));
       }
     });
 
@@ -382,7 +386,7 @@ export class App implements OnInit {
     const unseen = this.unseenMessages() + this.dms().reduce((sum, dm) => sum + dm.missed(), 0);
 
     document.title = `${unseen ? '(' + unseen + ') ' : ''}${this.baseTitle}`;
-    parent.postMessage(['updateTitle', document.title], '*');
+    userscriptAction('updateTitle', document.title).finally();
   }
 
   protected async enterMainChat(): Promise<void> {
@@ -391,11 +395,11 @@ export class App implements OnInit {
     this.prefService.set(this.prefs);
 
     if (this.framed) {
-      setTimeout(() => parent.postMessage(['enterChatRoom', this.name(), this.email(), this.color()], '*'));
-      const error = await awaitMessage('enterChatRoom', 5000);
-
-      if (error) {
-        notify('error', error);
+      try {
+        await userscriptAction(5000, 'enterChatRoom', this.name(), this.email(), this.color());
+      }
+      catch (err) {
+        notify('error', String(err));
         return;
       }
     }
@@ -437,11 +441,11 @@ export class App implements OnInit {
 
   protected async leaveMainChat(): Promise<void> {
     if (this.framed) {
-      setTimeout(() => parent.postMessage(['leaveChatRoom'], '*'));
-      const error = await awaitMessage('leaveChatRoom', 5000);
-
-      if (error) {
-        notify('error', error);
+      try {
+        await userscriptAction(5000, 'leaveChatRoom');
+      }
+      catch (err) {
+        notify('error', String(err));
         return;
       }
     }
@@ -475,14 +479,14 @@ export class App implements OnInit {
     const dm = this.selectedChat() === 0 ? 0 : this.dms()[this.selectedChat() - 1].id;
 
     if (this.framed && dm === 0) {
-      setTimeout(() => parent.postMessage(['sendChatMessage', comment, this.color(), this.tripCode()], '*'));
-      let error = await awaitMessage('sendChatMessage', 10000);
+      try {
+        await userscriptAction(10000, 'sendChatMessage', comment, this.color(), this.tripCode());
+      }
+      catch (err) {
+        if (err === 'Timed out')
+          err = 'Original chat site not accepting messages. Refreshing your browser might help.';
 
-      if (error) {
-        if (error === 'Timed out')
-          error = 'Original chat site not accepting messages. Refreshing your browser might help.';
-
-        notify('error', error);
+        notify('error', String(err));
         this.sending.set(false);
         return;
       }
@@ -719,7 +723,7 @@ export class App implements OnInit {
     this.showConfirmation.set(true);
     this.confirmCallback = (approved: boolean): void => {
       if (approved)
-        parent.postMessage(['revert'], '*');
+        userscriptAction('revert').catch(err => notify('error', err));
     }
   }
 
@@ -885,12 +889,21 @@ export class App implements OnInit {
 
     if (this.notifySound() === 'always' ||
         (this.notifySound() === 'background' && (idleOrInactive || this.selectedChat() !== chat)))
-      (chat > 0 ? this.chimeDM : this.chime).play().catch(() => notify('warning', 'Notification sound was disallowed'));
+      (chat > 0 ? this.chimeDM : this.chime).play().catch(() => this.audioFailed());
+  }
+
+  private audioFailed(): void {
+    this.messageService.add({
+      life: 10000,
+      key: 'tc',
+      severity: 'warning',
+      summary: 'Notification sound was disallowed'
+    });
   }
 
   protected playSampleVolume(): void {
     this.chime.volume = this.volume() / 100;
-    this.chime.play().catch(() => notify('warning', 'Notification sound was disallowed'));
+    this.chime.play().catch(() => this.audioFailed());
     this.prefs.volume = this.volume();
     this.prefService.set(this.prefs);
   }

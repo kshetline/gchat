@@ -18,7 +18,7 @@ const parser = new HtmlParser();
 export const MAX_IDLE_PARTICIPANT_LEEWAY = 600; // 10 minutes
 
 export let browser: puppeteer.Browser;
-
+export let participantsRaw: string;
 export let lastSuccessfulLegacyPoll = -1;
 
 let messagePage: puppeteer.Page;
@@ -72,7 +72,8 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
   const dom = parser.parse(raw).domRoot;
   const body = dom.querySelector('body');
   const participantDiv = body?.querySelector('#participantList');
-  const participants = Array.from(new Set(participantDiv.children[0].content.trim().replace(/^.*:\s*/g, '').split(/[◆◇]/)
+  participantsRaw = participantDiv.children[0].content.trim().replace(/^.*:\s*/g, '').replace(/[◆◇]/g, '\t');
+  const participants = Array.from(new Set(participantsRaw.split('\t')
     .map(p => p.trim()).filter(p => !!p)).values()).sort().map(p => ({ name: p }) as ParticipantInfo);
   const messageRows = body?.querySelectorAll('.messageRow').reverse();
   let messages = messageRows.map(row => extractMessage(row)).filter(m => m.name !== proxyName || m.trip !== proxyTripEncoded);
@@ -189,7 +190,7 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
 
   lastSuccessfulLegacyPoll = now;
 
-  return { messages, participants };
+  return { messages, participants, participantsRaw };
 }
 
 async function pollLegacyMessages(overrideCount?: number): Promise<void> {
@@ -324,7 +325,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
     }
   }
   catch (err) {
-    console.error('Error polling legacy chat, %s: %s', new Date().toISOString().substring(0, 19), simplifyError(err));
+    console.error(`Error polling legacy chat: ${simplifyError(err)}`);
   }
 
   if (!isShuttingDown()) {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comchat-Mods
 // @namespace    https://chatproxy.chat/
-// @version      v2026.05.04
+// @version      v2026.05.06
 // @description  Enhance Comchat functionality
 // @author       Anonymous
 // @license      MIT
@@ -217,18 +217,26 @@
 
   // Check in on what's up in the hidden OG frame -- or hide it again
   function peek() {
-    if (frames.getAttribute('rows').startsWith('0,'))
+    if (frames.getAttribute('rows').startsWith('0,')) {
       frames.setAttribute('rows', savedRows);
-    else
+    }
+    else {
       frames.setAttribute('rows', '0,*');
+    }
   }
 
   window.addEventListener('message', evt => {
+    const action = evt.data[0];
+
+    if (logFrame?.contentWindow && action) {
+      logFrame.contentWindow.postMessage(['ack:' + action], '*');
+    }
+
     formDoc = formFrame.contentDocument;
     form = formDoc.querySelector('form');
 
     try {
-      switch (evt.data[0]) {
+      switch (action) {
         case 'enterChatRoom':
           enterChatRoom(evt.data[1], evt.data[2], evt.data[3]);
           break;

@@ -5,7 +5,7 @@ import { colors, Config, DbDmSession, DbMessage, DbParticipant, DmSession, Messa
 import { isEqual, isString, processMillis, toBoolean, toInt } from '@tubular/util';
 import { uploadSingle } from './uploader.js';
 import { SessionInfo } from './session-info';
-import { addPendingDuplicate, enterLegacyChat, lastSuccessfulLegacyPoll, leaveLegacyChat, legacySendMessage, stopLegacyPolling } from './legacy.js';
+import { addPendingDuplicate, enterLegacyChat, lastSuccessfulLegacyPoll, leaveLegacyChat, legacySendMessage, participantsRaw, stopLegacyPolling } from './legacy.js';
 import { getDb, getNamedParticipantRecord } from './db.js';
 import ip_ from 'ip';
 import axios from 'axios';
@@ -49,7 +49,6 @@ if (process.env.LOG_FILE_PATH) {
 }
 
 export const MAX_IDLE_PARTICIPANT_AGE = 172800; // 2 days
-export const MAX_IDLE_PARTICIPANT_SHOW = 7200; // 2 hours
 
 const app = express();
 const port = toInt(process.env.PORT) || 3000;
@@ -120,7 +119,7 @@ async function sessionsCheck(): Promise<void> {
   for (const sessionId of sessions.keys()) {
     const session = sessions.get(sessionId);
 
-    if (session.name && session.lastAlive < now - 1800) {
+    if (session?.name && session.lastAlive < now - 1800) {
       const db = await getDb();
 
       await db.run('DELETE FROM participants WHERE name = ? AND remote = 0', session.name);
@@ -269,7 +268,7 @@ async function participantCheck(req: express.Request, forceInChat = false): Prom
 
   if (!participant)
     await db.run('INSERT INTO participants (name, trip, email, ip, session_id, remote, proxied, last_active, last_post) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      name, q.tripCode, q.email, session.ip, getToken(req), 0, +(!toBoolean(q.framed)), Now(), 0);
+      name, q.tripCode, q.email, session?.ip, getToken(req), 0, +(!toBoolean(q.framed)), Now(), 0);
   else
     await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', name);
 }
@@ -313,19 +312,17 @@ app.get('/api/messages', async (req, res) => {
 
   const active = toBoolean(req.query.active);
   const force = toBoolean(req.query.force);
-  const idleTimeLimit = now - MAX_IDLE_PARTICIPANT_SHOW;
   let participant = await getNamedParticipantRecord(name);
 
   if (participant) {
     await db.run('UPDATE participants SET allow_dm = ? WHERE id = ?', +toBoolean(q.allowDMs), participant.id);
 
-    if (active && session.inChat)
+    if (active && session?.inChat)
       await db.run('UPDATE participants SET last_active = ?, remote = 0 WHERE id = ?', now, participant.id);
   }
 
-  const participantNames = (await db.all<any>(
-    'SELECT name FROM participants WHERE name != ?1 AND ((last_active > ?2 OR last_post > ?2) OR remote = 0)',
-      proxyName, idleTimeLimit)).map(r => r.name);
+  const participantNames = (await db.all<any>('SELECT name FROM participants WHERE name != ?',
+    proxyName)).map(r => r.name);
   const participants = [...new Set(participantNames)].sort().map(p => ({ name: p } as ParticipantInfo));
 
   for (let i = participants.length - 1; i >= 0; --i) {
@@ -427,6 +424,7 @@ app.get('/api/messages', async (req, res) => {
     deleteCount,
     append: appendAt > 0,
     participants,
+    participantsRaw,
     dms: await getDirectMessages(name),
     lastSuccessfulLegacyPoll: lslp,
     progress: session?.progress, proxyIp
@@ -444,7 +442,7 @@ app.post('/api/enter', async (req, res) => {
 
   const framed = toBoolean(q.framed);
   const token = getToken(req);
-  const session = sessions.get(token);
+  const session = sessions.get(token) ?? {} as SessionInfo;
   const db = await getDb();
   const now = Now();
   const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', name);
@@ -498,7 +496,7 @@ app.post('/api/leave', async (req, res) => {
   const name = cleanName(q.name);
   const token = getToken(req);
   const session = sessions.get(token);
-  const wasInChat = session.inChat;
+  const wasInChat = session?.inChat;
 
   if (!session?.inChat) {
     res.json(null);
@@ -603,7 +601,8 @@ app.post('/api/send', async (req, res) => {
   const dm = toInt(q.dm);
   let dmSession: DbDmSession;
 
-  session.inChat = true;
+  if (session)
+    session.inChat = true;
 
   if (dm) {
     dmSession = await db.get<DbDmSession>('SELECT * FROM dm_session WHERE id = ?', dm);
@@ -621,7 +620,7 @@ app.post('/api/send', async (req, res) => {
   }
 
   const result = await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    dm, now, now, name, q.tripCode, q.email, 0, session.ip, token, style, comment, hash);
+    dm, now, now, name, q.tripCode, q.email, 0, session?.ip, token, style, comment, hash);
 
   if (!dm && framed)
     addPendingDuplicate(result.lastID, now, name, comment);

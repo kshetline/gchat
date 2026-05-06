@@ -103,6 +103,7 @@ export interface Messages {
   lastSuccessfulLegacyPoll?: number;
   messages?: Message[];
   participants?: ParticipantInfo[];
+  participantsRaw?: string;
   progress?: number;
 }
 

@@ -57,7 +57,7 @@
         <div class="option-block" [class.in-chat]="inChat()">
           <p-select style="width: 13em" [options]="notifyOptions" [(ngModel)]="notifySound"
                     optionLabel="label" optionValue="value">
-            @if (!isSafari()) {
+            @if (!isIosSafari()) {
               <ng-template #footer>
                 <div class="volume-control">
                   <i class="fa-solid fa-volume-low"></i>
@@ -166,3 +166,4 @@
   </div>
 </div>
 <p-confirmdialog key="app"></p-confirmdialog>
+<p-toast></p-toast>

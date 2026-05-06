@@ -1,7 +1,7 @@
 import { bootstrapApplication } from '@angular/platform-browser';
 import { appConfig } from './app/app.config';
 import { App } from './app/app';
-import { parseColor } from '@tubular/util';
+import { isString, parseColor } from '@tubular/util';
 import { colors } from '../server/src/shared-types';
 
 bootstrapApplication(App, appConfig)
@@ -82,13 +82,37 @@ export function notify(type: NotificationType, message: string): void {
   }
 }
 
-export async function awaitMessage(messageName: string, maxWait = 0): Promise<string> {
-  return new Promise<string>(resolve => {
+let acknowledgementFailed = false;
+
+export async function userscriptAction(actionOrMaxWait: string | number, ...args: any[]): Promise<string | null> {
+  let action: string;
+  let maxWait = 0;
+
+  if (isString(actionOrMaxWait))
+    action = actionOrMaxWait;
+  else {
+    maxWait = actionOrMaxWait;
+    action = args[0];
+    args.splice(0, 1);
+  }
+
+  return new Promise<string | null>(((resolve, reject) => {
+    let acknowledged = false;
     let resolved = false;
 
+    parent.postMessage([action, ...args], '*');
+
     const listener = (evt: MessageEvent) => {
-      if (!resolved && evt.data[0] === messageName) {
+      if (resolved)
+        return;
+
+      const message = evt.data[0];
+
+      if (message === 'ack:' + action)
+        acknowledged = true;
+      else if (message === action) {
         window.removeEventListener('message', listener);
+        acknowledged = true;
         resolved = true;
         resolve(evt.data[1]);
       }
@@ -96,11 +120,22 @@ export async function awaitMessage(messageName: string, maxWait = 0): Promise<st
 
     window.addEventListener('message', listener);
 
+    if (!acknowledgementFailed) {
+      setTimeout(() => {
+        if (!acknowledged) {
+          acknowledgementFailed = true;
+          window.removeEventListener('message', listener);
+          resolved = true;
+          reject('Userscript not responding. You may have to reload the page.\n\nUserscript v2026.05.06 or later now required.');
+        }
+      }, 2500);
+    }
+
     if (maxWait > 0)
       setTimeout(() => { if (!resolved) {
         window.removeEventListener('message', listener);
         resolved = true;
-        resolve(`Timed out waiting for message ${messageName}`);
+        reject(`Timed out waiting for message ${action}`);
       } }, maxWait);
-  });
+  }));
 }
