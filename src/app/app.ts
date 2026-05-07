@@ -494,9 +494,9 @@ export class App implements OnInit {
 
     this.saveTripCode();
 
-    const params = { ...this.prefs, comment, framed: this.framed, dm };
+    const params = { ...this.prefs, framed: this.framed, dm };
 
-    this.httpClient.post('/api/send', {}, { params }).subscribe({
+    this.httpClient.post('/api/send', { comment }, { params }).subscribe({
       next: (): void => {
         this.connectionTrouble.set(false);
         this.inChat.set(true);
@@ -537,12 +537,14 @@ export class App implements OnInit {
     this.saveTripCode();
 
     const params = clone(evt) as any;
+    const bbCode = evt.bbCode;
 
     delete params.callback;
+    delete params.bbCode;
     params.name = this.name();
     params.tripCode = this.tripCode();
 
-    this.httpClient.put('/api/update', null, { params }).subscribe({
+    this.httpClient.put('/api/update', { bbCode }, { params }).subscribe({
       next: (): void => {
         evt.callback && evt.callback(true);
         setTimeout(() => this.getMessages(true), 500);

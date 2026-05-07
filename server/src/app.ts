@@ -178,7 +178,7 @@ async function getDirectMessages(name: string): Promise<DmSession[]> {
 }
 
 app.set('trust proxy', 1);
-
+app.use(express.json());
 app.use(cors({
   origin: process.env.CHAT_DOMAIN ? `https://${process.env.CHAT_DOMAIN}` : '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
@@ -606,7 +606,8 @@ app.post('/api/send', async (req, res) => {
   const db = await getDb();
   const now = Now();
   const style = colorToStyle(q.color);
-  let comment = q.comment.replace(URL_MATCHER, '[url=$1]$1[/url]');
+  const rawComment = (req.body?.comment || q.comment || '');
+  let comment = rawComment.replace(URL_MATCHER, '[url=$1]$1[/url]');
   const hash = messageHash(name, q.tripCode, now);
   const framed = toBoolean(q.framed);
   const dm = toInt(q.dm);
@@ -652,7 +653,7 @@ app.post('/api/send', async (req, res) => {
       proxyStarted = true;
     }
 
-    await legacySendMessage(name, null, q.comment, q.color, q.tripCode);
+    await legacySendMessage(name, null, rawComment, q.color, q.tripCode);
   }
 
   res.json(null);
@@ -702,7 +703,7 @@ app.put('/api/update', async (req, res) => {
     const id = toInt(q.msgId);
     const db = await getDb();
     const now = Now();
-    let bbCode = (q.bbCode as string).replace(URL_MATCHER, '[url=$1]$1[/url]');
+    let bbCode = (req.body?.bbCode || q.bbCode as string || '').replace(URL_MATCHER, '[url=$1]$1[/url]');
     const dm = (await db.get<any>('SELECT dm FROM messages WHERE id = ?', id))?.dm as number;
 
     if (dm) {
