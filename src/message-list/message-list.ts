@@ -5,7 +5,7 @@ import { debounce, htmlUnescape } from '@tubular/util';
 import { MessageEntry } from '../message-entry/message-entry';
 import { HttpClient } from '@angular/common/http';
 
-const matchEmoji = /(((\uD83C[\uD000-\uDFFF]|\uD83D[\uD000-\uDFFF]|\uD83E[\uD000-\uDFFF])[\uFE00-\uFE0F]*?\u200D?)+)/g;
+const matchEmoji = /(((\uD83C[\uD000-\uDFFF]|\uD83D[\uD000-\uDFFF]|\uD83E[\uD000-\uDFFF])[\uFE00-\uFE0F]*?(\u200D.)?)+)/g;
 const QUOTE_MARKER = '\u00A0◀︎ ';
 const QUOTE_MARKER_PATTERN = /\u00A0[◀︎◁◂⏴] /;
 
