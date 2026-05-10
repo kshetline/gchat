@@ -606,7 +606,7 @@ app.post('/api/send', async (req, res) => {
   const db = await getDb();
   const now = Now();
   const style = colorToStyle(q.color);
-  const rawComment = (req.body?.comment || q.comment || '');
+  const rawComment = (req.body?.comment || q.comment || '').replace(/[\n\r]+/g, ' ');
   let comment = rawComment.replace(URL_MATCHER, '[url=$1]$1[/url]');
   const hash = messageHash(name, q.tripCode, now);
   const framed = toBoolean(q.framed);

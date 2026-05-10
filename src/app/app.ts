@@ -475,6 +475,7 @@ export class App implements OnInit {
       return;
 
     this.sending.set(true);
+    comment = comment.replace(/[\n\r]+/g, ' ');
 
     const dm = this.selectedChat() === 0 ? 0 : this.dms()[this.selectedChat() - 1].id;
 
