@@ -256,12 +256,18 @@ async function participantCheck(req: express.Request, forceInChat = false): Prom
   const inChat = session?.inChat || forceInChat;
   const q = req.query as any;
   const name = cleanName(q.name);
+  const token = getToken(req);
+  const ip = getIp(req);
 
   if (!name)
     return;
 
-  if (session && !session.inChat && inChat)
-    session.inChat = true;
+  if (session) {
+    session.ip = ip;
+
+    if (!session.inChat && inChat)
+      session.inChat = true;
+  }
 
   const db = await getDb();
   const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', name);
@@ -269,10 +275,14 @@ async function participantCheck(req: express.Request, forceInChat = false): Prom
   if (!participant) {
     await db.run('DELETE FROM participants WHERE name = ?', name);
     await db.run('INSERT INTO participants (name, trip, email, ip, session_id, remote, proxied, last_active, last_post) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      name, q.tripCode, q.email, session?.ip, getToken(req), 0, +(!toBoolean(q.framed)), Now(), 0);
+      name, q.tripCode, q.email, session?.ip, token, 0, +(!toBoolean(q.framed)), Now(), 0);
   }
-  else
+  else {
     await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', name);
+
+    if (participant.ip !== ip || participant.trip !== q.tripCode || participant.session_id !== token)
+      await db.run('UPDATE participants SET ip = ?, trip = ?, last_active = ?, session_id = ? WHERE name = ? AND remote = 0', ip, q.tripCode, Now(), token, name);
+  }
 }
 
 app.get('/api/messages', async (req, res) => {

@@ -1,13 +1,15 @@
 import { Component, ElementRef, input, OnInit, output, signal } from '@angular/core';
 import { kaomoji, Message } from '../../server/src/shared-types';
 import { colorFromStyle, getLuminance, getTextBackground, notify } from '../main';
-import { debounce, htmlUnescape } from '@tubular/util';
+import { debounce, htmlUnescape, isString } from '@tubular/util';
 import { MessageEntry } from '../message-entry/message-entry';
 import { HttpClient } from '@angular/common/http';
+import { SafeHtmlPipe } from '../safe-html-pipe/safe-html-pipe';
 
 const matchEmoji = /(((\uD83C[\uD000-\uDFFF]|\uD83D[\uD000-\uDFFF]|\uD83E[\uD000-\uDFFF])[\uFE00-\uFE0F]*?(\u200D.)?)+)/g;
 const QUOTE_MARKER = '\u00A0◀︎ ';
 const QUOTE_MARKER_PATTERN = /\u00A0[◀︎◁◂⏴] /;
+const QUOTE_NAME_PATTERN = /<u>([^>]+)<\/u>:/;
 
 export interface DeleteEvent {
   chatIndex: number;
@@ -24,7 +26,7 @@ export interface EditEvent {
 
 @Component({
   selector: 'chat-message-list',
-  imports: [],
+  imports: [SafeHtmlPipe],
   templateUrl: './message-list.html',
   styleUrl: './message-list.scss',
 })
@@ -88,18 +90,41 @@ export class MessageList implements OnInit {
       this.toolTimer = setTimeout(() => this.toolHash.set(''), 2000);
   }
 
-  protected adjustMarkup(text: string): string {
+  protected adjustMarkup(text: string, currentColor: string): string {
     let start = '';
     let qm = '';
     let end = text;
-    let match = text.match(QUOTE_MARKER_PATTERN);
+    const match = text.match(QUOTE_MARKER_PATTERN);
 
     if (match) {
       start = text.substring(0, match.index);
       qm = QUOTE_MARKER;
+
+      const nameMatch = start.match(QUOTE_NAME_PATTERN);
+      let startWrapped = false;
+
+      if (nameMatch) {
+        const mostRecentMessage = this.messages().findLast(msg => msg.name === nameMatch[1] && msg.style?.length > 2);
+        const bgColor = this.getBackground(mostRecentMessage);
+        const color = this.getColor(mostRecentMessage);
+
+        if (color && color !== currentColor) {
+          start = `<span style="background-color: ${bgColor}; color: ${color}; padding: 1px 2px">${start}</span>`;
+          startWrapped = true;
+        }
+      }
+
+      if (!startWrapped) {
+        let bg = this.getBackground(currentColor);
+
+        bg = bg === '#333' ? '#444' : (bg === '#CCC' ? '#BBB' : bg);
+        start = `<span style="background-color: ${bg}; padding: 1px 2px">${start}</span>`;
+      }
+
       end = text.substring(match.index + match[0].length);
     }
 
+    start = start.replace(matchEmoji, '<span class="straight-emoji">$1</span>');
     end = end.replace(matchEmoji, '<span class="big-emoji">$1</span>');
     text = start + qm + end;
 
@@ -115,9 +140,11 @@ export class MessageList implements OnInit {
       return new Date(time * 1000).toISOString().substring(0, 19).replace('T', ' ');
   }
 
-  protected getBackground(message: Message): string {
+  protected getBackground(message: Message | string): string {
     if (document.body.classList.contains('theme-li1999'))
       return 'transparent';
+    else if (isString(message))
+      return getTextBackground(message, this.darkMode());
     else
       return getTextBackground(this.getColor(message), this.darkMode());
   }

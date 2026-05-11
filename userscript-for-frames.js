@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comchat-Mods
-// @namespace    https://chatproxy.chat/
-// @version      v2026.05.06
+// @namespace    %%ORIGINAL_SITE_URL%%
+// @version      v2026.05.10
 // @description  Enhance Comchat functionality
 // @author       Anonymous
 // @license      MIT
@@ -165,6 +165,7 @@
     }
 
     setTimeout(() => formFrame.src = enterFormSrc, 500);
+    setTimeout(() => hiddenFrame.src = 'about:blank', 2000);
     documentCheck(formFrame, 'leaveChatRoom', 'input[name="name"]');
   }
 

@@ -26,9 +26,10 @@
         <div class="bubble-wrap" [class.me]="message.isMe"
              (mouseenter)="focusMessage(message, true)" (mouseleave)="focusMessage(message, false)"
              (click)="focusMessage(message, true)" [class.show-tools]="isFocused(message)">
+          @let color = getColor(message);
           <div class="bubble" [class.local-light]="isLight(message)" [class.local-dark]="!isLight(message)"
-               [style.color]="getColor(message)" [style.background-color]="getBackground(message)">
-            <span [innerHTML]="adjustMarkup(message.html)"></span>
+               [style.color]="color" [style.background-color]="getBackground(message)">
+            <span [innerHTML]="adjustMarkup(message.html, color) | safeHtml"></span>
             <span class="trailing-time"> ({{ formatTime(message.time) + (message.flagged ? '°' : '') }})</span>
           </div>
           @if (inChat()) {
