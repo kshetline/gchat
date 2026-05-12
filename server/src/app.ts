@@ -72,6 +72,7 @@ const MAX_DM_AGE = 7200; // 2 hours
 const MAX_HISTORY = 5000; // number of chat messages to keep in DB
 const MAX_HISTORY_TOLERANCE = 500; // Overflow before deleting messages
 const MAX_CLIENT_MESSAGES = 2000;
+const NAME_REUSE_INTERVAL = 900; // 15 minutes
 
 let proxyStarted = false;
 let nextToLastContentUpdate = 0;
@@ -258,6 +259,7 @@ async function participantCheck(req: express.Request, forceInChat = false): Prom
   const name = cleanName(q.name);
   const token = getToken(req);
   const ip = getIp(req);
+  const proxied = +(!toBoolean(q.framed));
 
   if (!name)
     return;
@@ -275,13 +277,13 @@ async function participantCheck(req: express.Request, forceInChat = false): Prom
   if (!participant) {
     await db.run('DELETE FROM participants WHERE name = ?', name);
     await db.run('INSERT INTO participants (name, trip, email, ip, session_id, remote, proxied, last_active, last_post) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      name, q.tripCode, q.email, session?.ip, token, 0, +(!toBoolean(q.framed)), Now(), 0);
+      name, q.tripCode, q.email, session?.ip, token, 0, proxied, Now(), 0);
   }
   else {
     await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', name);
 
-    if (participant.ip !== ip || participant.trip !== q.tripCode || participant.session_id !== token)
-      await db.run('UPDATE participants SET ip = ?, trip = ?, last_active = ?, session_id = ? WHERE name = ? AND remote = 0', ip, q.tripCode, Now(), token, name);
+    if (participant.ip !== ip || participant.trip !== q.tripCode || participant.session_id !== token || participant.proxied !== proxied)
+      await db.run('UPDATE participants SET ip = ?, trip = ?, last_active = ?, session_id = ?, proxied = ? WHERE name = ? AND remote = 0', ip, q.tripCode, Now(), token, proxied, name);
   }
 }
 
@@ -326,10 +328,10 @@ app.get('/api/messages', async (req, res) => {
   const force = toBoolean(req.query.force);
   let participant = await getNamedParticipantRecord(name);
 
-  if (participant) {
+  if (participant && active) {
     await db.run('UPDATE participants SET allow_dm = ? WHERE id = ?', +toBoolean(q.allowDMs), participant.id);
 
-    if (active && session?.inChat)
+    if (session?.inChat)
       await db.run('UPDATE participants SET last_active = ?, remote = 0 WHERE id = ?', now, participant.id);
   }
 
@@ -467,19 +469,30 @@ app.post('/api/enter', async (req, res) => {
         name, q.tripCode, q.email, session.ip, token, 0, +(!framed), now, 0);
       session.inChat = true;
     }
-    else if (q.tripCode === participant.trip || !participant.ip || session.ip === participant.ip ||
-             !participant.session_id || token === participant.session_id) {
-      await db.run('UPDATE participants SET trip = ?, email = ?, ip = ?, session_id = ?, remote = ?, proxied = ?, last_active = ? WHERE id = ?',
-        q.tripCode, q.email, session.ip, token, 0, +(!framed), now, participant.id);
-      session.inChat = true;
-      await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', name);
-    }
     else {
-      res.status(400).json({
-        error: `Chat name '${name}' is already in use by another user.`
-      });
+      const timeInactive = now - participant.last_active;
 
-      return;
+      if (timeInactive > NAME_REUSE_INTERVAL ||
+            (!participant.trip && q.tripCode) || q.tripCode === participant.trip ||
+            !participant.ip || session.ip === participant.ip ||
+            !participant.session_id || token === participant.session_id) {
+        await db.run('UPDATE participants SET trip = ?, email = ?, ip = ?, session_id = ?, remote = ?, proxied = ?, last_active = ? WHERE id = ?',
+          q.tripCode, q.email, session.ip, token, 0, +(!framed), now, participant.id);
+        session.inChat = true;
+        await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', name);
+      }
+      else {
+        const remaining = Math.ceil((NAME_REUSE_INTERVAL - timeInactive) / 60);
+
+        res.status(400).json({
+          error: `Chat name '${name}' is already in use by another user.\n\n` +
+            `The name will be available again in ${remaining} minute${remaining === 1 ? '' : 's'} if the current user remains inactive for that time.` +
+            (participant.trip ? '\n\nReuse the same tripcode previously used along with this name for immediate access.' +
+              ' You can use the format "name#tripcode" in the name field to enter the room with your tripcode already set.' : '')
+        });
+
+        return;
+      }
     }
   }
   else {

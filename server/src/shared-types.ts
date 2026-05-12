@@ -66,6 +66,7 @@ export interface DbParticipant {
   last_active: number;
   last_post: number;
   name: string;
+  proxied: number;
   remote: number;
   trip: string;
   session_id: string;

@@ -271,6 +271,10 @@ main {
     min-width: 60px;
   }
 
+  .notification-message {
+    white-space: pre-line;
+  }
+
   .confirm-buttons {
     align-items: center;
     align-self: center;

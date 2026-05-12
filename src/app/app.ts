@@ -322,6 +322,7 @@ export class App implements OnInit {
           active: wasActive,
           allowDMs: this.allowDMs(),
           force: this.messages().length < 1,
+          framed: this.framed,
           inChat: this.inChat(),
           name: this.name(),
           tripCode: this.tripCode()
@@ -545,7 +546,7 @@ export class App implements OnInit {
     params.name = this.name();
     params.tripCode = this.tripCode();
 
-    this.httpClient.put('/api/update', { bbCode }, { params }).subscribe({
+    this.httpClient.put('/api/update', { bbCode, framed: this.framed }, { params }).subscribe({
       next: (): void => {
         evt.callback && evt.callback(true);
         setTimeout(() => this.getMessages(true), 500);
@@ -564,7 +565,7 @@ export class App implements OnInit {
     this.showConfirmation.set(true);
     this.confirmCallback = (approved: boolean): void => {
       if (approved) {
-        const params = { chatIndex: evt.chatIndex, msgId: evt.msgId, name: this.name(), tripCode: this.tripCode() };
+        const params = { chatIndex: evt.chatIndex, framed: this.framed, msgId: evt.msgId, name: this.name(), tripCode: this.tripCode() };
 
         this.httpClient.delete('/api/delete', { params }).subscribe({
           next: (): void => {
@@ -655,7 +656,7 @@ export class App implements OnInit {
     if (dm?.id && ((!dm.viewed && !dm.closed) || dm.leftMainChat)) {
       dm.viewed = true;
       dm.leftMainChat = false;
-      this.httpClient.post('/api/start-chat', {}, { params: {
+      this.httpClient.post('/api/start-chat', { framed: this.framed }, { params: {
           id: dm.id,
           self: this.name(),
           tripCode: this.tripCode(),
@@ -780,7 +781,7 @@ export class App implements OnInit {
       if (!approved)
         return;
 
-      this.httpClient.post<{ id: number }>('/api/start-chat', {}, {
+      this.httpClient.post<{ id: number }>('/api/start-chat', { framed: this.framed }, {
           params: {
             self: this.name(),
             tripCode: this.tripCode(),
@@ -816,7 +817,7 @@ export class App implements OnInit {
     dms.splice(tabIndex, 1);
     this.dms.set(dms);
     this.dmsJustClosed.set(id, processMillis());
-    this.httpClient.post('/api/leave-chat', {}, { params: { self: this.name(), id, viewed } })
+    this.httpClient.post('/api/leave-chat', {}, { params: { framed: this.framed, self: this.name(), id, viewed } })
       .subscribe({ next: () => this.changeRef.detectChanges(), error: () => this.changeRef.detectChanges() });
   }
 
