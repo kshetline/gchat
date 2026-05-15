@@ -518,7 +518,7 @@ app.post('/api/enter', async (req, res) => {
   }
 
   if (!framed && !proxyStarted) {
-    await enterLegacyChat(proxyName, null, 0);
+    await enterLegacyChat(session?.ip, proxyName, null, 0);
     proxyStarted = true;
   }
 
@@ -672,11 +672,11 @@ app.post('/api/send', async (req, res) => {
 
   if (!dm && !framed && !comment.includes('##cpc-only##')) {
     if (!proxyStarted) {
-      await enterLegacyChat(proxyName, null, 0);
+      await enterLegacyChat(session?.ip, proxyName, null, 0);
       proxyStarted = true;
     }
 
-    await legacySendMessage(name, null, rawComment, q.color, q.tripCode);
+    await legacySendMessage(session?.ip, name, q.email, rawComment, q.color, q.tripCode);
   }
 
   res.json(null);

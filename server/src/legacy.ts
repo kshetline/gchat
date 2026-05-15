@@ -363,17 +363,35 @@ async function legacyBrowserSetup(): Promise<void> {
 }
 
 async function loadEnterForm(page: puppeteer.Page): Promise<void> {
-  await page.goto(`https://${domain}/comchat.cgi?mode=form&nam=&eml=&col=&retime=40&line=20`);
+  await page.goto(`https://${domain}/comchat.cgi?mode=form&name=&email=&color=&retime=30&lines=30`);
   await page.waitForSelector('form');
   await page.$eval('form', form => form.setAttribute('target', '_self'));
+
+  await page.evaluate(trip => {
+    // @ts-ignore
+    let input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'xip';
+    input.value = '';
+    // @ts-ignore
+    document.querySelector('form').appendChild(input);
+    // @ts-ignore
+    input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'password';
+    input.value = trip || '';
+    // @ts-ignore
+    document.querySelector('form').appendChild(input);
+  }, proxyTrip);
 }
 
-export async function enterLegacyChat(name: string, email: string, color: number): Promise<void> {
+export async function enterLegacyChat(ip: string, name: string, email: string, color: number): Promise<void> {
   messagePage = messagePage || await browser.newPage();
 
   await messagePage.waitForSelector('input[name="name"]');
   await messagePage.$eval('input[name="name"]', (input, name) => input.value = name, name);
   await messagePage.$eval('input[name="email"]', (input, email) => input.value = email || '', email);
+  await messagePage.$eval('input[name="xip"]', (input, ip) => input.value = ip || '', ip);
 
   try {
     await messagePage.$eval(`input[type="radio"][value="${color}"]`, btn => btn.click());
@@ -401,9 +419,9 @@ export async function leaveLegacyChat(): Promise<void> {
   inChat = false;
 }
 
-export async function legacySendMessage(name: string, _email: string, comment: string, color: number, tripCode: string): Promise<void> {
+export async function legacySendMessage(ip: string, name: string, email: string, comment: string, color: number, tripCode: string): Promise<void> {
   if (!inChat)
-    await enterLegacyChat(proxyName, null, 0);
+    await enterLegacyChat(ip, proxyName, null, 0);
 
   messagePage = messagePage || await browser.newPage();
   comment = `《${name}${tripCode ? '◆' + tripcode(tripCode) : ''}》${comment}`;
@@ -430,7 +448,25 @@ export async function legacySendMessage(name: string, _email: string, comment: s
   await messagePage.$eval('#face', (sel, face) => sel.value = face, face);
   await messagePage.$eval('input[name="comment"]', (input, comment) => input.value = comment, comment || '\u00A0');
   await messagePage.$eval('input[name="password"]', (input, tripCode) => input.value = tripCode, proxyTrip || '');
+  await messagePage.$eval('input[name="email"]', (input, email) => input.value = email, email || '');
   await messagePage.focus('input[name="comment"]');
+
+  await messagePage.evaluate(ip => {
+    // @ts-ignore
+    let input = document.querySelector('form input[name="xip"]');
+
+    if (!input) {
+      // @ts-ignore
+      input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'xip';
+      // @ts-ignore
+      document.querySelector('form').appendChild(input);
+    }
+
+    input.value = ip || '';
+  }, ip);
+
   await messagePage.keyboard.press('Enter');
 }
 

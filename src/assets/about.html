@@ -56,10 +56,6 @@
 <body><div>
 <h1 style="text-align: center;">%%THIS_SITE%%</h1>
 <h3 style="text-align: center;">And why you might want to use it</h3>
-<blockquote style="background-color: #444; padding: 0.25em 0.5em;">
-  <p>%%THIS_SITE%% is hosted at <a href="%%ORIGINAL_SITE_URL%%" target="_blank">%%ORIGINAL_SITE_URL%%</a>.</p>
-  <p>Better integration<a href="#better-int">*</a> of %%THIS_SITE%% with the original %%ORIGINAL_SITE%% requires <a href="https://www.tampermonkey.net/" target="_blank">Tampermonkey</a> and this script: <a href="%%USERSCRIPT_URL%%" target="_blank">%%USERSCRIPT_URL%%</a></p>
-</blockquote><br>
 <p>%%THIS_SITE%% isn’t a separate chat room from %%ORIGINAL_SITE%%. It mirrors all the comments that are posted there, and comments you post on %%THIS_SITE%% are posted back to the original chat room too. You’re in the same conversation here or there.</p>
 <p>This chat facility exists to provide improved chat features, and, for those who care (and agree), a more pleasing look and feel.</p>
 <h4>What are some of the extra features? Starting with image and file sharing:</h4>
@@ -70,7 +66,7 @@
 </ul>
 <div>Where do these files that you post go? By default they get sent to the <a href="%%ORIGINAL_SITE_UPLOADER_URL%%" target="_blank">%%ORIGINAL_SITE_UPLOADER%%</a> page. And that’s still where you’d go if you decide you want to delete something after you send it. (Don’t forget to use a tripcode if you want to be able to delete files from the uploader page yourself.)</div>
 <div>&nbsp;</div>
-<div>You also can optionally send images to <a href="%%EXTERNAL_UPLOAD_SITE_URL%%" target="_blank">%%EXTERNAL_UPLOAD_SITE%%</a>. You might want to do this for off-topic content that %%ORIGINAL_SITE%% would rather not host, or for private sharing when using the %%THIS_SITE%%’s Direct Messaging feature. %%EXTERNAL_UPLOAD_SITE%% also provides the advantage of percentage-done feedback when uploading large files. <b>One big warning, however:</b> %%EXTERNAL_UPLOAD_SITE%% is convenient and useful, but it does not excel at reliability. Don't be too surprised if uploads fail, or later attempts to use the links to your uploads fail. %%EXTERNAL_UPLOAD_EXTRA_INFO%%</div>
+<div>You also can optionally send images to <a href="%%EXTERNAL_UPLOAD_SITE_URL%%" target="_blank">%%EXTERNAL_UPLOAD_SITE%%</a>%%EXTERNAL_UPLOAD_SITE_UI_COMMENT%%. You might want to do this for off-topic content that %%ORIGINAL_SITE%% would rather not host, or for private sharing when using the %%THIS_SITE%%’s Direct Messaging feature. %%EXTERNAL_UPLOAD_SITE%% also provides the advantage of percentage-done feedback when uploading large files. <b>One big warning, however:</b> %%EXTERNAL_UPLOAD_SITE%% is convenient and useful, but it does not excel at reliability. Don't be too surprised if uploads fail, or later attempts to use the links to your uploads fail. %%EXTERNAL_UPLOAD_EXTRA_INFO%%</div>
 <h4>Other features?</h4>
 <ul>
   <li>As just mentioned, Direct Messaging. By default people can’t bother you by sending you DMs that you might not want. You have to check the “Allow DMs” option to receive DMs. You can only send or receive DMs from people using %%THIS_SITE%% who have also enabled DMs.</li>
@@ -85,10 +81,6 @@
 </ul>
 <h4>More on Direct Messaging</h4>
 <div>For privacy, DMs are encrypted so they can’t easily be read from the database where they are briefly kept. They also have a life span of two hours, after which they are permanently deleted.</div>
-<h4 id="better-int">What do I mean by “better integration”?</h4>
-<div>If you use %%THIS_SITE%% simply by going to <a href="%%ORIGINAL_SITE_URL%%" target="_blank">%%ORIGINAL_SITE_URL%%</a> all of the extra features work fine, but your messages back at %%ORIGINAL_SITE_LONG%% will look a bit odd. Instead of seeing a message from you looking like, say, “ringo◆sko5SeEpMc &gt; What you said.”, what will be seen is “CHAT②◆uwC.eL5B4M &gt; 《ringo◆sko5SeEpMc》What you said.”.</div>
-<div>&nbsp;</div>
-<div>If you use the <a href="%%USERSCRIPT_URL%%" target="_blank">Tampermonkey userscript</a>, however, you’ll get to be your own person back at %%ORIGINAL_SITE_LONG%%, rather than just one of many being chaperoned in the conversation by CHAT②.</div>
 %%FOOTER%%
 </div></body>
 </html>
