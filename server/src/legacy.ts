@@ -220,7 +220,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
         pendingDuplicates.splice(i, 1);
     }
 
-    for (let i = messages.messages?.length - 1; i >= 0; --i) {
+    for (let i = messages.messages?.length - 1; i >= 0 && pendingDuplicates.length > 0; --i) {
       const message = messages.messages[i];
       const dupIndex = pendingDuplicates.findIndex(d => d.name === message.name && d.comment === message.bbCode &&
         Math.abs(d.time - message.time) < 60);

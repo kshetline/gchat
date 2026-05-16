@@ -55,6 +55,7 @@ const port = toInt(process.env.PORT) || 3000;
 const __dirname = process.cwd();
 const devMode = process.argv.includes('-d');
 const sessions = new Map<string, SessionInfo>();
+const proxyHidden = toBoolean(process.env.CHAT_PROXY_HIDDEN);
 const proxyName = process.env.CHAT_PROXY || 'CHAT②';
 const config: Config = {
   backgroundColor: process.env.CHAT_BACKGROUND || '#DDD',
@@ -657,7 +658,7 @@ app.post('/api/send', async (req, res) => {
   const result = await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     dm, now, now, name, q.tripCode, q.email, 0, session?.ip, token, style, comment, hash);
 
-  if (!dm && framed)
+  if (!dm && (framed || proxyHidden))
     addPendingDuplicate(result.lastID, now, name, comment);
 
   await db.run('UPDATE participants SET last_post = ?1, last_active = ?1 WHERE name = ?2 AND remote = 0', now, name);
