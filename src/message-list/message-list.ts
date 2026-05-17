@@ -6,7 +6,7 @@ import { MessageEntry } from '../message-entry/message-entry';
 import { HttpClient } from '@angular/common/http';
 import { SafeHtmlPipe } from '../safe-html-pipe/safe-html-pipe';
 
-const matchEmoji = /(((\uD83C[\uD000-\uDFFF]|\uD83D[\uD000-\uDFFF]|\uD83E[\uD000-\uDFFF])[\uFE00-\uFE0F]*?(\u200D.)?)+)/g;
+const matchEmoji = /(([\u25A0-\u27BF]|\p{Emoji})(\u200D.)?)+/gu; // Also matches geometric shapes, misc symbols and dingbats
 const QUOTE_MARKER = '\u00A0◀︎ ';
 const QUOTE_MARKER_PATTERN = /\u00A0[◀︎◁◂⏴] /;
 const QUOTE_NAME_PATTERN = /<u>([^>]+)<\/u>:/;
@@ -101,7 +101,7 @@ export class MessageList implements OnInit {
       qm = QUOTE_MARKER;
 
       const nameMatch = start.match(QUOTE_NAME_PATTERN);
-      let startWrapped = false;
+      let startIsWrapped = false;
 
       if (nameMatch) {
         const mostRecentMessage = this.messages().findLast(msg => msg.name === nameMatch[1] && msg.style?.length > 2);
@@ -110,15 +110,17 @@ export class MessageList implements OnInit {
 
         if (color && color !== currentColor) {
           start = `<span style="background-color: ${bgColor}; color: ${color}; padding: 1px 2px">${start}</span>`;
-          startWrapped = true;
+          startIsWrapped = true;
         }
       }
 
-      if (!startWrapped) {
+      if (!startIsWrapped) {
         let bg = this.getBackground(currentColor);
+        let qlass = 'local-light';
 
         bg = bg === '#333' ? '#444' : (bg === '#CCC' ? '#BBB' : bg);
-        start = `<span style="background-color: ${bg}; padding: 1px 2px">${start}</span>`;
+        qlass = (bg.charAt(2) > '8') ? qlass : 'local-dark';
+        start = `<span class="${qlass}" style="background-color: ${bg}; padding: 1px 2px">${start}</span>`;
       }
 
       end = text.substring(match.index + match[0].length);

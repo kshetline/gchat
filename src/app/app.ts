@@ -35,6 +35,8 @@ const CONSIDER_AFK_TIME = 600000; // 10 minutes
 interface DmInfo {
   closed?: boolean;
   id: number;
+  lastEnter?: number;
+  lastLeave?: number;
   leftMainChat?: boolean;
   messages: WritableSignal<Message[]>;
   missed: WritableSignal<number>;
@@ -56,6 +58,8 @@ export class App implements OnInit {
 
   private readonly chime = new Audio('assets/notify.wav');
   private readonly chimeDM = new Audio('assets/notifyDM.wav');
+  private readonly doorClose = new Audio('assets/door-close.mp3');
+  private readonly doorOpen = new Audio('assets/door-open.mp3');
   private readonly messageService = inject(MessageService);
   private readonly prefs: Preferences;
 
@@ -365,6 +369,8 @@ export class App implements OnInit {
               this.messages.set(newMessages);
               this.adjustScrolling(true);
             }
+
+            this.enterLeaveCheck(0, newMessages);
           }
 
           this.participants.set(messages.participants);
@@ -476,7 +482,7 @@ export class App implements OnInit {
       return;
 
     this.sending.set(true);
-    comment = comment.replace(/[\n\r]+/g, ' ');
+    comment = comment.replace(/[\n\r]+/g, ' ').trimEnd();
 
     const dm = this.selectedChat() === 0 ? 0 : this.dms()[this.selectedChat() - 1].id;
 
@@ -822,9 +828,43 @@ export class App implements OnInit {
   }
 
   private countNewMessages(oldMessages: Message[], newMessages: Message[]): number {
-    const latest = oldMessages.reduce((acc, msg) => Math.max(acc, msg.time, 0), 0);
+    const latest = oldMessages.reduce((acc, msg) => Math.max(acc, !msg.style.match(/^[EL]$/) ? msg.time : 0, 0), 0);
 
-    return newMessages.reduce((acc, msg) => acc + (!msg.isMe && msg.time > latest ? 1 : 0), 0);
+    return newMessages.reduce((acc, msg) => acc + (!msg.isMe && !msg.style.match(/^[EL]$/) && msg.time > latest ? 1 : 0), 0);
+  }
+
+  private enterLeaveCheck(dm: number, messages: Message[]): void {
+    let dms = this.dms();
+    let entered = false;
+    let left = false;
+
+    if (!dms[-1]) {
+      dms[-1] = { lastEnter: Date.now(), latestLeave: Date.now() } as any;
+      this.dms.set(dms);
+      dms = this.dms();
+    }
+
+    const latestEnter = messages.reduce((acc, msg) => Math.max(acc, msg.style === 'E' ? msg.time : 0, 0), 0);
+    const latestLeave = messages.reduce((acc, msg) => Math.max(acc, msg.style === 'L' ? msg.time : 0, 0), 0);
+
+    if (!dms[dm - 1].lastEnter || dms[dm - 1].lastEnter < latestEnter) {
+      dms[dm - 1].lastEnter = latestEnter;
+      entered = true;
+    }
+
+    if (!dms[dm - 1].lastLeave || dms[dm - 1].lastLeave < latestLeave) {
+      dms[dm - 1].lastLeave = latestLeave;
+      left = true;
+    }
+
+    if (entered || left)
+      this.dms.set(dms);
+
+    if (left)
+      this.playNotificationSound(0, this.doorClose);
+
+    if (entered)
+      this.playNotificationSound(0, this.doorOpen);
   }
 
   protected receiveDirectMessages(dms: DmSession[]): void {
@@ -834,7 +874,7 @@ export class App implements OnInit {
     let notificationTab = this.selectedChat() || 1;
 
     for (const dm of dms) {
-      const index = currentDMs.findIndex(d => d.id === dm.id);
+      let index = currentDMs.findIndex(d => d.id === dm.id);
 
       if (index >= 0) {
         const currentDM = currentDMs[index];
@@ -857,7 +897,10 @@ export class App implements OnInit {
         totalNewMessages += 1;
         notificationTab = currentDMs.length;
         changed = true;
+        index = currentDMs.length - 1;
       }
+
+      this.enterLeaveCheck(index, currentDMs[index].messages());
     }
 
     const minuteAgo = processMillis() - 60000;
@@ -885,15 +928,14 @@ export class App implements OnInit {
     return this.lastActive < processMillis() - CONSIDER_AFK_TIME;
   }
 
-  private playNotificationSound(chat = 0): void {
+  private playNotificationSound(chat = 0, sound = chat > 0 ? this.chimeDM : this.chime): void {
     const idleOrInactive = this.isIdle() || !this.chatActive;
 
-    this.chime.volume = this.volume() / 100;
-    this.chimeDM.volume = this.volume() / 100;
+    sound.volume = this.volume() / 100;
 
     if (this.notifySound() === 'always' ||
         (this.notifySound() === 'background' && (idleOrInactive || this.selectedChat() !== chat)))
-      (chat > 0 ? this.chimeDM : this.chime).play().catch(() => this.audioFailed());
+      sound.play().catch(() => this.audioFailed());
   }
 
   private audioFailed(): void {
