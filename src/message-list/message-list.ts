@@ -6,7 +6,7 @@ import { MessageEntry } from '../message-entry/message-entry';
 import { HttpClient } from '@angular/common/http';
 import { SafeHtmlPipe } from '../safe-html-pipe/safe-html-pipe';
 
-const matchEmoji = /(([\u25A0-\u27BF]|\p{Emoji})(\u200D.)?)+/gu; // Also matches geometric shapes, misc symbols and dingbats
+const matchEmoji = /([\u25A0-\u27BF\u{1F300}–\u{1FAFF}](\u200D.)?)+/gu; // Also matches geometric shapes, misc symbols and dingbats
 const QUOTE_MARKER = '\u00A0◀︎ ';
 const QUOTE_MARKER_PATTERN = /\u00A0[◀︎◁◂⏴] /;
 const QUOTE_NAME_PATTERN = /<u>([^>]+)<\/u>:/;
@@ -106,10 +106,11 @@ export class MessageList implements OnInit {
       if (nameMatch) {
         const mostRecentMessage = this.messages().findLast(msg => msg.name === nameMatch[1] && msg.style?.length > 2);
         const bgColor = this.getBackground(mostRecentMessage);
+        const qlass = (bgColor.charAt(1) > '8') ? 'local-light' : 'local-dark';
         const color = this.getColor(mostRecentMessage);
 
         if (color && color !== currentColor) {
-          start = `<span style="background-color: ${bgColor}; color: ${color}; padding: 1px 2px">${start}</span>`;
+          start = `<span class="${qlass}" style="background-color: ${bgColor}; color: ${color}; padding: 1px 2px">${start}</span>`;
           startIsWrapped = true;
         }
       }
@@ -119,7 +120,7 @@ export class MessageList implements OnInit {
         let qlass = 'local-light';
 
         bg = bg === '#333' ? '#444' : (bg === '#CCC' ? '#BBB' : bg);
-        qlass = (bg.charAt(2) > '8') ? qlass : 'local-dark';
+        qlass = (bg.charAt(1) > '8') ? qlass : 'local-dark';
         start = `<span class="${qlass}" style="background-color: ${bg}; padding: 1px 2px">${start}</span>`;
       }
 
