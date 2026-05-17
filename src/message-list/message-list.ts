@@ -6,7 +6,7 @@ import { MessageEntry } from '../message-entry/message-entry';
 import { HttpClient } from '@angular/common/http';
 import { SafeHtmlPipe } from '../safe-html-pipe/safe-html-pipe';
 
-const matchEmoji = /([\u25A0-\u27BF\u{1F300}–\u{1FAFF}](\u200D.)?)+/gu; // Also matches geometric shapes, misc symbols and dingbats
+const matchEmoji = /([\u25A0-\u27BF\u{1F300}-\u{1FAFF}](\u200D.)?)+/gu; // Also matches geometric shapes, misc symbols and dingbats
 const QUOTE_MARKER = '\u00A0◀︎ ';
 const QUOTE_MARKER_PATTERN = /\u00A0[◀︎◁◂⏴] /;
 const QUOTE_NAME_PATTERN = /<u>([^>]+)<\/u>:/;

@@ -664,6 +664,7 @@ export class App implements OnInit {
       dm.leftMainChat = false;
       this.httpClient.post('/api/start-chat', { framed: this.framed }, { params: {
           id: dm.id,
+          name: dm.name,
           self: this.name(),
           tripCode: this.tripCode(),
         } }).subscribe({ next: () => { } });
@@ -839,7 +840,7 @@ export class App implements OnInit {
     let left = false;
 
     if (!dms[-1]) {
-      dms[-1] = { lastEnter: Date.now(), latestLeave: Date.now() } as any;
+      dms[-1] = { lastEnter: Date.now() / 1000, lastLeave: Date.now() / 1000 } as any;
       this.dms.set(dms);
       dms = this.dms();
     }
