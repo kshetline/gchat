@@ -72,6 +72,7 @@ export class MessageList implements OnInit {
 
     if (messages) {
       messages.addEventListener('scroll', () => this.scrollCheck());
+      window.addEventListener('focus', () => this.scrollCheck());
       setTimeout(this.scrollCheck, 100);
       new ResizeObserver(() => this.scrollCheck()).observe(messages);
     }

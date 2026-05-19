@@ -332,7 +332,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
     if (existing.size < 1000)
       pollingTimeout = setTimeout(() => pollLegacyMessages(1000), 10_000);
     else
-      pollingTimeout = setTimeout(pollLegacyMessages, 10_000);
+      pollingTimeout = setTimeout(pollLegacyMessages, 5000);
   }
 
   lastLegacyPoll = processMillis();

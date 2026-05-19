@@ -16,7 +16,7 @@ import fs from 'fs';
 import { initExternalUploader, proxyIp } from './external-uploader.js';
 import { isBannedName, intrusionDetector, isBannedIp } from './intrusion-detector.js';
 import { stopLocalSocksProxy } from './socks-proxy.js';
-import { startWebSocketServer, sendToAll, wsPort } from './web-socket.js';
+import { startWebSocketServer, sendToAll, sendToIp, wsPort } from './web-socket.js';
 
 // noinspection ES6ConvertVarToLetConst
 var shuttingDown = false;
@@ -140,10 +140,14 @@ export function reportUploadProgress(req: express.Request, progress: number): vo
     session.progress = Math.round(progress);
 }
 
-async function getDirectMessages(name: string): Promise<DmSession[]> {
+async function getDirectMessages(name: string, tripCode: string): Promise<DmSession[]> {
   const db = await getDb();
   const result: DmSession[] = [];
   const dmSessions = await db.all<DbDmSession>('SELECT * FROM dm_session WHERE name1 = ? or name2 = ?', name, name);
+  const participantTrip = (await getNamedParticipantRecord(name))?.trip || '';
+
+  if (participantTrip !== (tripCode || ''))
+    return [];
 
   for (const dmSession of dmSessions) {
     const whichName = dmSession.name1 === name ? 'name1_present' : 'name2_present';
@@ -445,12 +449,16 @@ app.get('/api/messages', async (req, res) => {
     append: appendAt > 0,
     participants,
     participantsRaw,
-    dms: await getDirectMessages(name),
+    dms: await getDirectMessages(name, q.tripCode),
     lastSuccessfulLegacyPoll: lslp,
     progress: session?.progress,
     proxyIp,
     wsPort
   });
+});
+
+app.get('/api/dms', async (req, res) => {
+  res.json(await getDirectMessages(cleanName(req.query.name), req.query.tripCode as string));
 });
 
 app.post('/api/enter', async (req, res) => {
@@ -522,6 +530,7 @@ app.post('/api/enter', async (req, res) => {
 
       await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         0, now, now, name, q.tripCode, q.email, 0, session.ip, token, 'E', message, messageHash('E:' + name, q.tripCode, now));
+      sendToAll('newMessages');
     }
   }
 
@@ -566,6 +575,8 @@ app.post('/api/leave', async (req, res) => {
       await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         dm, now, now, name, q.tripCode, q.email, 0, session.ip, token, 'L', message, messageHash('L:' + q.name, q.tripCode, now));
     }
+
+    sendToAll('newMessages');
   }
 
   if (!toBoolean(q.framed)) {
@@ -672,8 +683,20 @@ app.post('/api/send', async (req, res) => {
 
   await db.run('UPDATE participants SET last_post = ?1, last_active = ?1 WHERE name = ?2 AND remote = 0', now, name);
 
-  if (dmSession)
+  if (dmSession) {
     await db.run('UPDATE dm_session SET last_post = ? WHERE id = ?', now, dmSession.id);
+
+    const ip1 = (await getNamedParticipantRecord(dmSession.name1))?.ip;
+    const ip2 = (await getNamedParticipantRecord(dmSession.name2))?.ip;
+
+    if (ip1)
+      sendToIp(ip1, 'newDirectMessages');
+
+    if (ip2)
+      sendToIp(ip2, 'newDirectMessages');
+  }
+  else
+    sendToAll('newMessages');
 
   const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', name);
 
@@ -750,6 +773,7 @@ app.put('/api/update', async (req, res) => {
 
     await db.run('UPDATE messages SET edit_count = edit_count + 1, time = ?, message = ?, style = ? WHERE id = ?',
       now, bbCode, colorToStyle(q.color), id);
+    sendToAll('newMessages');
 
     res.json(null);
   }
@@ -763,6 +787,7 @@ app.delete('/api/delete', async (req, res) => {
     const db = await getDb();
 
     await db.run('UPDATE messages SET deleted = 1 WHERE id = ?', id);
+    sendToAll('newMessages');
 
     res.json(null);
   }

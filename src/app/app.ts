@@ -28,7 +28,9 @@ import { MessageService } from 'primeng/api';
 import { isIOS, isSafari } from '@tubular/util';
 import ReconnectingWebSocket from 'reconnecting-websocket';
 
-const REPOLL_RATE = 5000; // 5 seconds
+const REPOLL_RATE = 20000; // 20 seconds
+const REPOLL_RATE_SLACK = 5000; // 5 seconds
+const REPOLL_RATE_QUICK = 5000; // 5 seconds
 const REPOLL_RATE_CHECK_PROGRESS = 2500; // 2.5 seconds
 const REPOLL_RATE_429 = 60000; // 1 minute
 const CONSIDER_AFK_TIME = 600000; // 10 minutes
@@ -244,7 +246,7 @@ export class App implements OnInit {
 
     // Make sure message polling is running
     setInterval(() => {
-      if (processMillis() > this.lastReceiveTime + REPOLL_RATE + 2000)
+      if (processMillis() > this.lastReceiveTime + REPOLL_RATE + REPOLL_RATE_SLACK)
         this.getMessages();
     }, 1000);
   }
@@ -254,7 +256,7 @@ export class App implements OnInit {
       return;
 
     const protocol = (/https/.test(location.protocol) ? 'wss' : 'ws');
-    const port = wsPort ?? location.port;
+    const port = (wsPort ?? location.port) || (protocol === 'wss' ? 443 : 80);
 
     this.webSocket = new ReconnectingWebSocket(`${protocol}://${location.hostname}:${port}`);
     this.webSocket.addEventListener('message', evt => {
@@ -263,12 +265,34 @@ export class App implements OnInit {
       const data = parts.length > 1 ? JSON.parse(parts[1]) : undefined;
 
       switch (message) {
-        case 'message':
+        case 'newDirectMessages':
+          this.getDirectMessages();
+          break;
+        case 'newMessages':
           this.getMessages();
           break;
         case 'typing':
           this.setTypingStatus(data as TypingStatus);
           break;
+      }
+    });
+  }
+
+  private getDirectMessages(): void {
+    this.saveTripCode();
+    this.httpClient.get<DmSession[]>('/api/dms',
+      { params: { name: this.name(), tripCode: this.tripCode() } }).subscribe({
+        next: data => {
+          if (!(data as any).errorMessage) {
+            this.connectionTrouble.set(false);
+            this.receiveDirectMessages(data);
+          }
+          else
+            this.connectionTrouble.set(true);
+      },
+      error: (error): void => {
+        this.connectionTrouble.set(true);
+        this.repollMessages(error.status === 429 ? REPOLL_RATE_429 : REPOLL_RATE_QUICK);
       }
     });
   }
@@ -429,7 +453,7 @@ export class App implements OnInit {
       },
       error: (error): void => {
         this.connectionTrouble.set(true);
-        this.repollMessages(error.status === 429 ? REPOLL_RATE_429 : REPOLL_RATE);
+        this.repollMessages(error.status === 429 ? REPOLL_RATE_429 : REPOLL_RATE_QUICK);
       }
     });
   }
