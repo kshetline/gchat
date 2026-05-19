@@ -252,7 +252,7 @@ export class App implements OnInit {
   }
 
   private connectToWebSocket(wsPort?: number): void {
-    if (this.webSocket)
+    if (wsPort < 0 || this.webSocket)
       return;
 
     const protocol = (/https/.test(location.protocol) ? 'wss' : 'ws');
