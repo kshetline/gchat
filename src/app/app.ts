@@ -2,7 +2,7 @@ import { ChangeDetectorRef, Component, inject, OnInit, signal, ViewChild, Writab
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import {
-  Config, DmSession, NotifySound, Message, Messages, ParticipantInfo, Preferences
+  Config, DmSession, NotifySound, Message, Messages, ParticipantInfo, Preferences, TypingStatus
 } from '../../server/src/shared-types';
 import { clone, forEach, isAndroid, isEqual, processMillis } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
@@ -26,6 +26,7 @@ import { ToggleButtonModule } from 'primeng/togglebutton';
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
 import { isIOS, isSafari } from '@tubular/util';
+import ReconnectingWebSocket from 'reconnecting-websocket';
 
 const REPOLL_RATE = 5000; // 5 seconds
 const REPOLL_RATE_CHECK_PROGRESS = 2500; // 2.5 seconds
@@ -76,8 +77,10 @@ export class App implements OnInit {
   private messageTimerLastDelay = Number.MAX_SAFE_INTEGER;
   private pendingFocus = false;
   private uploader: Uploader;
+  private webSocket: ReconnectingWebSocket;
 
   protected allowDMs = signal(false);
+  protected alwaysChanging = signal(1);
   protected color = signal(0);
   protected connectionTrouble = signal(false);
   protected darkMode = signal(false);
@@ -106,6 +109,7 @@ export class App implements OnInit {
   protected showThemes = signal(false);
   protected title = signal(this.baseTitle);
   protected tripCode = signal('');
+  protected typingStatus = {} as TypingStatus;
   protected unseenMessages = signal(0);
   protected volume = signal(3);
 
@@ -137,6 +141,7 @@ export class App implements OnInit {
     private confirmationService: ConfirmationService
   ) {
     this.uploader = new Uploader(this.httpClient);
+    setInterval(() => this.alwaysChanging.set(1 + Math.random()), 500);
     this.prefs = this.prefService.get();
     forEach(this.prefs as Record<string, any>, (key, value) => (this as any)[key] && (this as any)[key]?.set(value));
 
@@ -168,6 +173,7 @@ export class App implements OnInit {
         this.title.set(config.title);
         this.updateTitle();
         this.navigation.set(config.navigation);
+        this.connectToWebSocket(config.wsPort);
         localStorage.setItem('gchat-config', JSON.stringify(config));
       },
       error: (_error): void => this.connectionTrouble.set(true)
@@ -241,6 +247,45 @@ export class App implements OnInit {
       if (processMillis() > this.lastReceiveTime + REPOLL_RATE + 2000)
         this.getMessages();
     }, 1000);
+  }
+
+  private connectToWebSocket(wsPort?: number): void {
+    if (this.webSocket)
+      return;
+
+    const protocol = (/https/.test(location.protocol) ? 'wss' : 'ws');
+    const port = wsPort ?? location.port;
+
+    this.webSocket = new ReconnectingWebSocket(`${protocol}://${location.hostname}:${port}`);
+    this.webSocket.addEventListener('message', evt => {
+      const parts = evt.data.split('\t');
+      const message = parts[0];
+      const data = parts.length > 1 ? JSON.parse(parts[1]) : undefined;
+
+      switch (message) {
+        case 'message':
+          this.getMessages();
+          break;
+        case 'typing':
+          this.setTypingStatus(data as TypingStatus);
+          break;
+      }
+    });
+  }
+
+  private setTypingStatus(ts: TypingStatus): void {
+    if (!ts) return;
+
+    const now = processMillis();
+
+    Object.keys(ts).forEach(key => ts[key].since = now - ts[key].since);
+    this.typingStatus = ts;
+  }
+
+  protected isTyping = (name: string, dm: number): boolean => {
+    const ts = this.typingStatus;
+
+    return name !== this.name() && ts && ts[name]?.dm === dm && ts[name]?.since > processMillis() - 5000;
   }
 
   private async initToken(): Promise<void> {
@@ -477,6 +522,10 @@ export class App implements OnInit {
     }
   }
 
+  protected getDMId(): number {
+    return this.selectedChat() === 0 ? 0 : this.dms()[this.selectedChat() - 1]?.id ?? -1;
+  }
+
   protected async sendComment(comment: string): Promise<void> {
     if (this.sending() || !comment?.trim() || (this.selectedChat() > 0 && !await this.verifyAllowingDMs()))
       return;
@@ -484,7 +533,7 @@ export class App implements OnInit {
     this.sending.set(true);
     comment = comment.replace(/[\n\r]+/g, ' ').trimEnd();
 
-    const dm = this.selectedChat() === 0 ? 0 : this.dms()[this.selectedChat() - 1].id;
+    const dm = this.getDMId();
 
     if (this.framed && dm === 0) {
       try {
@@ -683,7 +732,9 @@ export class App implements OnInit {
         this.updateTitle();
       }
 
-      this.reenterDm(dm);
+      if (this.inChat())
+        this.reenterDm(dm);
+
       this.dms.set(dms);
     }
 

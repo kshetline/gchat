@@ -1,8 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import { randomUUID, randomBytes, createCipheriv, createDecipheriv } from 'crypto';
-import { colors, Config, DbDmSession, DbMessage, DbParticipant, DmSession, Message, ParticipantInfo } from './shared-types.js';
-import { isEqual, isString, processMillis, toBoolean, toInt } from '@tubular/util';
+import { colors, Config, DbDmSession, DbMessage, DbParticipant, DmSession, Message, ParticipantInfo, TypingStatus } from './shared-types.js';
+import { clone, isEqual, isString, processMillis, throttle, toBoolean, toInt } from '@tubular/util';
 import { uploadSingle } from './uploader.js';
 import { SessionInfo } from './session-info';
 import { addPendingDuplicate, enterLegacyChat, lastSuccessfulLegacyPoll, leaveLegacyChat, legacySendMessage, participantsRaw, stopLegacyPolling } from './legacy.js';
@@ -16,6 +16,7 @@ import fs from 'fs';
 import { initExternalUploader, proxyIp } from './external-uploader.js';
 import { isBannedName, intrusionDetector, isBannedIp } from './intrusion-detector.js';
 import { stopLocalSocksProxy } from './socks-proxy.js';
+import { startWebSocketServer, sendToAll, wsPort } from './web-socket.js';
 
 // noinspection ES6ConvertVarToLetConst
 var shuttingDown = false;
@@ -57,6 +58,7 @@ const devMode = process.argv.includes('-d');
 const sessions = new Map<string, SessionInfo>();
 const proxyHidden = toBoolean(process.env.CHAT_PROXY_HIDDEN);
 const proxyName = process.env.CHAT_PROXY || 'CHAT②';
+const typingStatus = {} as TypingStatus;
 const config: Config = {
   backgroundColor: process.env.CHAT_BACKGROUND || '#DDD',
   externalUploaderName: unescapeUnicode(process.env.EXTERNAL_UPLOADER_NAME || 'External Uploader'),
@@ -66,6 +68,7 @@ const config: Config = {
   navigation: process.env.NAV_LINKS.split(';').map(link => link.split('::'))
     .map(link => ({ name: link[0], url: link[1], target: link[2] || '_blank' })),
   title: process.env.CHAT_TITLE,
+  wsPort
 };
 const URL_MATCHER = /\b(https?:\/\/[-A-Za-z0-9+&@#/%?=~_()|!:,.;]*[-A-Za-z0-9+&@#/%=~_()|])/g;
 const MONITOR_INTERVAL = 60000; // 1 minute
@@ -230,10 +233,11 @@ app.use(async (req, res, next) => {
   next();
 });
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
 });
 
+startWebSocketServer(server);
 app.use(intrusionDetector);
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -404,6 +408,7 @@ app.get('/api/messages', async (req, res) => {
     lastMessages = messages;
     nextToLastContentUpdate = lastContentUpdate;
     lastContentUpdate = processMillis();
+    sendToAll('newMessages');
   }
 
   if (session) {
@@ -442,7 +447,9 @@ app.get('/api/messages', async (req, res) => {
     participantsRaw,
     dms: await getDirectMessages(name),
     lastSuccessfulLegacyPoll: lslp,
-    progress: session?.progress, proxyIp
+    progress: session?.progress,
+    proxyIp,
+    wsPort
   });
 });
 
@@ -637,6 +644,8 @@ app.post('/api/send', async (req, res) => {
   const dm = toInt(q.dm);
   let dmSession: DbDmSession;
 
+  setTypingStatus(name, -1);
+
   if (session)
     session.inChat = true;
 
@@ -729,6 +738,8 @@ app.put('/api/update', async (req, res) => {
     const now = Now();
     let bbCode = (req.body?.bbCode || q.bbCode as string || '').replace(URL_MATCHER, '[url=$1]$1[/url]');
     const dm = (await db.get<any>('SELECT dm FROM messages WHERE id = ?', id))?.dm as number;
+
+    setTypingStatus(cleanName(q.name), -1);
 
     if (dm) {
       const dmSession = await db.get<DbDmSession>('SELECT * FROM dm_session WHERE id = ?', dm);
@@ -858,6 +869,36 @@ app.post('/api/upload', async (req, res) => {
       error: error instanceof Error ? error.message : 'Upload failed'
     });
   }
+});
+
+const updateTypingStatus = throttle(1000, () => {
+  const now = processMillis();
+  const status = clone(typingStatus);
+
+  Object.keys(status).forEach(name => {
+    status[name].since = now - status[name].since;
+
+    if (status[name].since > 5 || status[name].dm === -1) {
+      delete status[name];
+    }
+  });
+
+  sendToAll('typing', status);
+});
+
+function setTypingStatus(name: string, dm: number, since = processMillis()): void {
+  typingStatus[name] = { dm, since };
+  updateTypingStatus();
+}
+
+app.post('/api/typing', async (req, res) => {
+  const dm = toInt(req.body.dm);
+  const name = req.body.name;
+
+  if (name)
+    setTypingStatus(name, dm);
+
+  res.json(null);
 });
 
 app.get('/api/error', (_req, res) => {

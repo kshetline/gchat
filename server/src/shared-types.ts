@@ -1,5 +1,6 @@
 import { regexEscape } from '@tubular/util';
 
+// Trailing space indicates line break in color selection buttons
 export const colors = ['#000000', '#000080', '#4444CC', '#44CC44', '#CC9911', '#CC4444', '#CC6600',
                        '#008040 ', '#33AAAA', '#CC44CC', '#800000', '#FF80C0', '#B87333', '#8CA9D9', '#4682B4'];
 
@@ -21,6 +22,7 @@ export interface Config {
   fileSizeLimitExtInMb: number;
   navigation: { name: string; url: string; target?: string }[];
   title: string;
+  wsPort: number
 }
 
 export interface Message {
@@ -107,6 +109,8 @@ export interface Messages {
   participantsRaw?: string;
   progress?: number;
 }
+
+export type TypingStatus = Record<string, { dm: number, since: number }>;
 
 export type NotifySound = boolean | 'never' | 'background' | 'always'
 

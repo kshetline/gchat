@@ -12,6 +12,7 @@ const externals = {
   'promised-sqlite3': { import: 'promised-sqlite3' },
   'puppeteer': { import: 'puppeteer' },
   'sqlite3': { import: 'sqlite3' },
+  'ws': { import: 'ws' },
 };
 
 const rootPkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));

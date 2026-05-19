@@ -2,7 +2,7 @@ import { Component, ElementRef, input, OnInit, output, signal, WritableSignal } 
 import { FormsModule } from '@angular/forms';
 import Quill from 'quill';
 import { QuillModule  } from 'ngx-quill';
-import { forEach } from '@tubular/util';
+import { forEach, throttle } from '@tubular/util';
 import { colorByIndex, getTextBackground, notify, shouldIgnoreClick, startClickSuppress } from '../main';
 import { PickerComponent } from '@ctrl/ngx-emoji-mart';
 import { Emoji, EmojiData } from '@ctrl/ngx-emoji-mart/ngx-emoji';
@@ -14,6 +14,7 @@ import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
 import { PreferencesService } from '../preferences.service';
 import { ToggleButton } from 'primeng/togglebutton';
+import { HttpClient } from '@angular/common/http';
 
 // I don't want to persist this setting in localStorage -- per session in a better time frame.
 let useExternalUploader = false;
@@ -277,9 +278,10 @@ export class MessageEntry implements OnInit{
   };
 
   darkMode = input(false);
-  dmMode = input(false);
+  dmId = input(0);
   disabled = input(false);
   changeColor = output<number>();
+  name = input('');
   newMessage = output<string>();
   updateMessage = output<MessageUpdateEvent>();
   uploadFile = output<FileUploadEvent>();
@@ -294,6 +296,7 @@ export class MessageEntry implements OnInit{
 
   constructor(private elementRef: ElementRef<HTMLElement>,
               private prefService: PreferencesService,
+              private httpClient: HttpClient,
               private confirmationService: ConfirmationService) {
     document.addEventListener('keydown', (event: KeyboardEvent) => {
       if (event.key === 'Escape' && this.showEmoji()) {
@@ -383,6 +386,8 @@ export class MessageEntry implements OnInit{
     });
 
     quill.on('text-change', () => {
+      this.typing();
+
       if (quill.getLength() > INPUT_LENGTH_LIMIT)
         quill.deleteText(INPUT_LENGTH_LIMIT, quill.getLength());
 
@@ -392,6 +397,11 @@ export class MessageEntry implements OnInit{
         this.lengthWarning.set(-1);
     });
   }
+
+  private typing = throttle(1000, () => {
+    if (this.name())
+      this.httpClient.post('/api/typing', { name: this.name(), dm: this.dmId() }).subscribe();
+  });
 
   private processFiles(files: File[]): void {
     if (!files)
@@ -664,7 +674,7 @@ export class MessageEntry implements OnInit{
   insertQuote(name: string, quote: string): void {
     let index = 0;
 
-    if (!this.dmMode()) {
+    if (!this.dmId()) {
       this.quill.insertText(index, name, { underline: true });
       index += name.length;
       this.quill.insertText(index, QUOTE_NAME_DELIM, { underline: false });

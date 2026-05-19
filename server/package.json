@@ -13,6 +13,7 @@
   "license": "MIT",
   "dependencies": {
     "@tubular/util": "^4.19.0",
+    "@types/ws": "^8.18.1",
     "axios": "1.15.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
@@ -24,7 +25,8 @@
     "promised-sqlite3": "^2.1.0",
     "puppeteer": "^24.39.0",
     "sqlite3": "^6.0.1",
-    "tripcode": "^4.0.0"
+    "tripcode": "^4.0.0",
+    "ws": "^8.20.1"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",

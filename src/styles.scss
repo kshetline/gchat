@@ -196,6 +196,41 @@ a {
   transform: rotate(180deg);
 }
 
+.typing-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  background-color: #333;
+  border-radius: 50%;
+  animation: pulse 1.4s infinite ease-in-out;
+}
+
+.dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes pulse {
+  0%, 80%, 100% {
+    transform: scale(0);
+  }
+  40% {
+    transform: scale(1.0);
+  }
+}
+
+.theme-dark .typing-indicator .dot {
+  background-color: #CCC;
+}
+
 @media (max-width: 900px) {
   input, textarea, select, .ql-editor {
     font-size: 16px;

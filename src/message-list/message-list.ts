@@ -153,7 +153,7 @@ export class MessageList implements OnInit {
   }
 
   protected getColor(message: Message): string {
-    let color = colorFromStyle(message.style);
+    let color = colorFromStyle(message?.style);
 
     if (this.darkMode() && (color === '#000' || color === '#000000' || color === 'black'))
       color = '#DDD';
