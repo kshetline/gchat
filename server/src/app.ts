@@ -632,6 +632,35 @@ export function decryptMessage(encryptedText: string, keyBase64: string): string
   return encryptedText;
 }
 
+async function notifyDmPartners(dmSession: DbDmSession, message?: string): Promise<void>;
+async function notifyDmPartners(name1: string, name2: string, message?: string): Promise<void>;
+// eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
+async function notifyDmPartners(dmSessionOrName: string | DbDmSession, name2orMessage?: string, message?: string): Promise<void> {
+  let name1: string;
+  let name2: string;
+
+  if (isString(dmSessionOrName)) {
+    name1 = dmSessionOrName;
+    name2 = name2orMessage;
+  }
+  else {
+    name1 = dmSessionOrName.name1;
+    name2 = dmSessionOrName.name2;
+    message = name2orMessage;
+  }
+
+  message = message ?? 'newDirectMessages';
+
+  const ip1 = (await getNamedParticipantRecord(name1))?.ip;
+  const ip2 = (await getNamedParticipantRecord(name2))?.ip;
+
+  if (ip1)
+    sendToIp(ip1, message);
+
+  if (ip2 && ip2 !== ip1)
+    sendToIp(ip2, message);
+}
+
 app.post('/api/send', async (req, res) => {
   await participantCheck(req, true);
 
@@ -685,15 +714,7 @@ app.post('/api/send', async (req, res) => {
 
   if (dmSession) {
     await db.run('UPDATE dm_session SET last_post = ? WHERE id = ?', now, dmSession.id);
-
-    const ip1 = (await getNamedParticipantRecord(dmSession.name1))?.ip;
-    const ip2 = (await getNamedParticipantRecord(dmSession.name2))?.ip;
-
-    if (ip1)
-      sendToIp(ip1, 'newDirectMessages');
-
-    if (ip2)
-      sendToIp(ip2, 'newDirectMessages');
+    await notifyDmPartners(dmSession);
   }
   else
     sendToAll('newMessages');
@@ -830,6 +851,7 @@ app.post('/api/start-chat', async (req, res) => {
 
     await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       dmSession.id, now, now, self, q.tripCode, q.email, 0, getIp(req), '', 'E', message, messageHash('E:' + self, q.tripCode, now));
+    await notifyDmPartners(dmSession, 'newMessages');
 
     res.json({ id: dmSession.id });
     return;
@@ -843,6 +865,7 @@ app.post('/api/start-chat', async (req, res) => {
 
   await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     result.lastID, now, now, self, q.tripCode, q.email, 0, getIp(req), '', 'S', message, messageHash('S:' + self, q.tripCode, now));
+  await notifyDmPartners(self, name, 'newMessages');
 
   res.json({ id: result.lastID });
 });
@@ -875,6 +898,8 @@ app.post('/api/leave-chat', async (req, res) => {
     if (message)
       await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         dmSession.id, now, now, self, q.tripCode, q.email, 0, getIp(req), '', 'L', message, '');
+
+    await notifyDmPartners(dmSession);
   }
 
   res.json(null);

@@ -2,8 +2,15 @@
   @if (messages().length === 0) {
     <div class="empty-chat">No messages available</div>
   }
-  @if (closed() && !isAtBottom()) {
-    <div class="closed-chat">This chat session is closed</div>
+  @if (!isAtBottom()) {
+    @if (closed()) {
+      <div class="closed-chat">This chat session is closed</div>
+    }
+    @else if (alwaysChanging() && isTyping(dmName(), dmId())) {
+      <div class="typing-indicator">
+        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      </div>
+    }
   }
   @let msgs = isAtBottom() ? messages() : messages().slice(0).reverse();
   @for (message of msgs; track message.hash) {
@@ -57,8 +64,15 @@
       </div>
     }
   }
-  @if (closed() && isAtBottom()) {
-    <div class="closed-chat">This chat session is closed</div>
+  @if (isAtBottom()) {
+    @if (closed()) {
+      <div class="closed-chat">This chat session is closed</div>
+    }
+    @else if (alwaysChanging() && isTyping(dmName(), dmId())) {
+      <div class="typing-indicator">
+        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      </div>
+    }
   }
 </div>
 <div class="scroll-to-top" (click)="scrollToTop()" [class.show]="showScrollToTop()"

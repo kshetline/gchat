@@ -82,6 +82,12 @@ export function notify(type: NotificationType, message: string): void {
   }
 }
 
+export let isTyping = (_name: string, _dm: number): boolean => false;
+
+export function setIsTypingFunction(fn: (name: string, dm: number) => boolean): void {
+  isTyping = fn;
+}
+
 let acknowledgementFailed = false;
 
 export async function userscriptAction(actionOrMaxWait: string | number, ...args: any[]): Promise<string | null> {

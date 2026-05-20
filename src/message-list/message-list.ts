@@ -1,6 +1,6 @@
 import { Component, ElementRef, input, OnInit, output, signal } from '@angular/core';
 import { kaomoji, Message } from '../../server/src/shared-types';
-import { colorFromStyle, getLuminance, getTextBackground, notify } from '../main';
+import { colorFromStyle, getLuminance, getTextBackground, isTyping, notify } from '../main';
 import { debounce, htmlUnescape, isString } from '@tubular/util';
 import { MessageEntry } from '../message-entry/message-entry';
 import { HttpClient } from '@angular/common/http';
@@ -31,8 +31,11 @@ export interface EditEvent {
   styleUrl: './message-list.scss',
 })
 export class MessageList implements OnInit {
+  isTyping = isTyping;
+
   private lastSelectedText = '';
 
+  protected alwaysChanging = signal(1);
   protected showScrollToBottom = signal(false);
   protected showScrollToTop = signal(false);
   protected toolHash = signal('');
@@ -41,6 +44,8 @@ export class MessageList implements OnInit {
   chatIndex = input<number>(0);
   closed = input<boolean>(false);
   darkMode = input.required<boolean>();
+  dmId = input(0);
+  dmName = input('');
   inChat = input.required<boolean>();
   isAdmin = input.required<boolean>();
   isAtBottom = input.required<boolean>();
@@ -64,6 +69,7 @@ export class MessageList implements OnInit {
   });
 
   constructor(private elemRef: ElementRef, private httpClient: HttpClient) {
+    setInterval(() => this.alwaysChanging.set(1 + Math.random()), 500);
     document.addEventListener('mouseup', () => setTimeout(() => this.lastSelectedText = window.getSelection().toString()));
   }
 

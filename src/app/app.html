@@ -142,7 +142,7 @@
       </p-tabpanel>
       @for (dm of dms(); track dm.name; let i = $index) {
         <p-tabpanel [value]="i + 1">
-          <chat-message-list [chatIndex]="i + 1" [closed]="!!dm.closed"
+          <chat-message-list [chatIndex]="i + 1" [closed]="!!dm.closed" [dmId]="dm.id" [dmName]="dm.name"
               (connectionTrouble)="connectionTrouble.set(true)" [name]="name()" [tripCode]="tripCode()"
               [isAdmin]="isAdmin()" [darkMode]="darkMode()" [inChat]="true" [localTime]="localTime()"
               [isAtBottom]="newOnBottom()" [messages]="dm.messages()" [messageEntry]="messageEntrySignal()"

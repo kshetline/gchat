@@ -61,7 +61,8 @@ export function startWebSocketServer(server?: http.Server): void {
     }
 
     wsServer?.on('connection', (ws, req) => {
-      const ip = req.socket.remoteAddress;
+      const ip = req.headers['x-forwarded-for']?.toString().split(',')[0].trim() ||
+        req.socket?.remoteAddress || (req as any).connection?.remoteAddress;
 
       (ws as any).remoteAddress = loopbacks.has(ip) ? '::1' : ip;
     });

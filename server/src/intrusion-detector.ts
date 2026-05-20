@@ -173,12 +173,12 @@ export async function tallyForLockout(now: number, isGet: boolean, ip: string, t
 }
 
 export const intrusionDetector = async (req: express.Request, res: express.Response, next: express.NextFunction): Promise<void> => {
-  const isGetRequest = req.method === 'GET';
-
-  if (isGetRequest && req.url === '/api/typing') {
+  if (req.method === 'POST' && req.url === '/api/typing') {
     next();
     return;
   }
+
+  const isGetRequest = req.method === 'GET';
 
   const now = Now();
   const q = req.query as Record<string, string> || {};

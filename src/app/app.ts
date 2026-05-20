@@ -9,7 +9,8 @@ import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { FileUploadEvent, MessageEntry, MessageUpdateEvent } from '../message-entry/message-entry';
 import {
-  NotificationHandler, notify, registerNotificationHandler, shouldIgnoreClick, startClickSuppress, userscriptAction
+  NotificationHandler, notify, registerNotificationHandler, setIsTypingFunction, shouldIgnoreClick, startClickSuppress,
+  userscriptAction
 } from '../main';
 import { applyTheme, getThemeMenuStyle, getThemes, resetDefaultThemeBackground } from '../themes';
 import { DeleteEvent, EditEvent, MessageList } from '../message-list/message-list';
@@ -242,6 +243,7 @@ export class App implements OnInit {
 
   ngOnInit(): void {
     registerNotificationHandler(this.notify);
+    setIsTypingFunction(this.isTyping);
     this.initToken().then(() => this.getMessages());
 
     // Make sure message polling is running
@@ -923,12 +925,12 @@ export class App implements OnInit {
     const latestEnter = messages.reduce((acc, msg) => Math.max(acc, msg.style === 'E' ? msg.time : 0, 0), 0);
     const latestLeave = messages.reduce((acc, msg) => Math.max(acc, msg.style === 'L' ? msg.time : 0, 0), 0);
 
-    if (!dms[dm - 1].lastEnter || dms[dm - 1].lastEnter < latestEnter) {
+    if (latestEnter > 0 && (!dms[dm - 1].lastEnter || dms[dm - 1].lastEnter < latestEnter)) {
       dms[dm - 1].lastEnter = latestEnter;
       entered = true;
     }
 
-    if (!dms[dm - 1].lastLeave || dms[dm - 1].lastLeave < latestLeave) {
+    if (latestLeave > 0 && (!dms[dm - 1].lastLeave || dms[dm - 1].lastLeave < latestLeave)) {
       dms[dm - 1].lastLeave = latestLeave;
       left = true;
     }
