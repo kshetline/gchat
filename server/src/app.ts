@@ -31,8 +31,8 @@ if (process.env.LOG_FILE_PATH) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   for (const [method, _stream, prefix] of [
     ['log',   process.stdout, ''],
-    ['info',  process.stdout, ''],
-    ['error', process.stderr, '[ERR] '],
+    ['info',  process.stdout, '[INFO] '],
+    ['error', process.stderr, '[ERR]  '],
     ['warn',  process.stderr, '[WARN] '],
   ] as const) {
     const orig = console[method].bind(console);
@@ -261,11 +261,11 @@ function cleanName(name: any): string {
   return ((name || '') as string).replace(/#.*$/, '').trim();
 }
 
-async function participantCheck(req: express.Request, forceInChat = false): Promise<void> {
+async function participantCheck(req: express.Request, forceInChat = false, nameOverride?: string): Promise<void> {
   const session = sessions.get(getToken(req));
   const inChat = session?.inChat || forceInChat;
   const q = req.query as any;
-  const name = cleanName(q.name);
+  const name = nameOverride ?? cleanName(q.name);
   const token = getToken(req);
   const ip = getIp(req);
   const proxied = +(!toBoolean(q.framed));
@@ -336,12 +336,17 @@ app.get('/api/messages', async (req, res) => {
   const active = toBoolean(req.query.active);
   const force = toBoolean(req.query.force);
   let participant = await getNamedParticipantRecord(name);
+  const oldAllowDM = participant?.allow_dm;
+  const newAllowDM = +toBoolean(q.allowDMs);
 
   if (participant && active) {
-    await db.run('UPDATE participants SET allow_dm = ? WHERE id = ?', +toBoolean(q.allowDMs), participant.id);
+    await db.run('UPDATE participants SET allow_dm = ? WHERE id = ?', newAllowDM, participant.id);
 
     if (session?.inChat)
       await db.run('UPDATE participants SET last_active = ?, remote = 0 WHERE id = ?', now, participant.id);
+
+    if (newAllowDM !== oldAllowDM)
+      sendToAll('newMessages');
   }
 
   const participantNames = (await db.all<any>('SELECT name FROM participants WHERE name != ?',
@@ -815,10 +820,9 @@ app.delete('/api/delete', async (req, res) => {
 });
 
 app.post('/api/start-chat', async (req, res) => {
-  await participantCheck(req, true);
-
   const q = req.query as any;
   const self = cleanName(q.self);
+  await participantCheck(req, true, self);
   const name = ((q.name || '') as string).trim();
 
   if (self === name) {
@@ -851,7 +855,7 @@ app.post('/api/start-chat', async (req, res) => {
 
     await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       dmSession.id, now, now, self, q.tripCode, q.email, 0, getIp(req), '', 'E', message, messageHash('E:' + self, q.tripCode, now));
-    await notifyDmPartners(dmSession, 'newMessages');
+    await notifyDmPartners(dmSession, 'newDirectMessages');
 
     res.json({ id: dmSession.id });
     return;
