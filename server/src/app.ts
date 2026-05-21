@@ -446,7 +446,7 @@ app.get('/api/messages', async (req, res) => {
   let lslp = lastSuccessfulLegacyPoll;
 
   if (lslp <= 0)
-    lslp = messages.findLast(m => m.remote)?.time ?? -1;
+    lslp = messages.findLast(m => m?.remote)?.time ?? -1;
 
   res.json({
     messages,

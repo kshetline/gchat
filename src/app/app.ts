@@ -228,9 +228,11 @@ export class App implements OnInit {
       }
     });
 
+    let blurTime = Number.MAX_SAFE_INTEGER;
+
     document.addEventListener('visibilitychange', () => this.checkChatActive(document.hidden ? undefined : true));
-    window.addEventListener('blur', () => this.checkChatActive());
-    window.addEventListener('focus', () => this.checkChatActive(true));
+    window.addEventListener('blur', () => { blurTime = processMillis(); this.checkChatActive(); });
+    window.addEventListener('focus', () => { this.checkChatActive(true); this.adjustScrolling(processMillis() < blurTime + 15000) });
     window.addEventListener('scroll', () => this.checkChatActive(true));
     window.addEventListener('mousemove', () => (this.activity = true) && (this.lastActive = processMillis()));
     window.addEventListener('beforeunload', () => this.inChat() && this.leaveMainChat());
