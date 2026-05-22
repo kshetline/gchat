@@ -11,6 +11,7 @@ import { isShuttingDown, MAX_IDLE_PARTICIPANT_AGE } from './app.js';
 import { clearLegacyAccessTimes, tallyForLockout, TIME_WINDOW } from './intrusion-detector.js';
 
 const domain = process.env.CHAT_DOMAIN;
+const userEdit = process.env.CHAT_USER_EDIT ? domain + process.env.CHAT_USER_EDIT : null;
 const proxyName = process.env.CHAT_PROXY || 'CHAT②';
 const proxyTrip = process.env.CHAT_PROXY_TRIPCODE;
 const proxyTripEncoded = tripcode(proxyTrip);
@@ -468,6 +469,25 @@ export async function legacySendMessage(ip: string, name: string, email: string,
   }, ip);
 
   await messagePage.keyboard.press('Enter');
+}
+
+export async function legacyEditMessage(name: string, trip: string, date: number, message: string, color?: string): Promise<void> {
+  if (!userEdit)
+    return;
+
+  const params = new URLSearchParams();
+
+  params.append('name', name);
+  params.append('trip', trip);
+  params.append('date', date.toString());
+  params.append('message', message);
+  params.append('color', color || '');
+
+  await axios.post(`https://${userEdit}`, params);
+}
+
+export async function legacyDeleteMessage(name: string, trip: string, date: number): Promise<void> {
+  await legacyEditMessage(name, trip, date, '');
 }
 
 export function stopLegacyPolling(): void {

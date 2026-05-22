@@ -5,7 +5,7 @@ import { colors, Config, DbDmSession, DbMessage, DbParticipant, DmSession, Messa
 import { clone, isEqual, isString, processMillis, throttle, toBoolean, toInt } from '@tubular/util';
 import { uploadSingle } from './uploader.js';
 import { SessionInfo } from './session-info';
-import { addPendingDuplicate, enterLegacyChat, lastSuccessfulLegacyPoll, leaveLegacyChat, legacySendMessage, participantsRaw, stopLegacyPolling } from './legacy.js';
+import { addPendingDuplicate, enterLegacyChat, lastSuccessfulLegacyPoll, leaveLegacyChat, legacyDeleteMessage, legacyEditMessage, legacySendMessage, participantsRaw, stopLegacyPolling } from './legacy.js';
 import { getDb, getNamedParticipantRecord } from './db.js';
 import ip_ from 'ip';
 import axios from 'axios';
@@ -785,10 +785,13 @@ app.put('/api/update', async (req, res) => {
     const id = toInt(q.msgId);
     const db = await getDb();
     const now = Now();
-    let bbCode = (req.body?.bbCode || q.bbCode as string || '').replace(URL_MATCHER, '[url=$1]$1[/url]');
-    const dm = (await db.get<any>('SELECT dm FROM messages WHERE id = ?', id))?.dm as number;
+    const rawBbCode = req.body?.bbCode || q.bbCode as string || '';
+    let bbCode = rawBbCode.replace(URL_MATCHER, '[url=$1]$1[/url]');
+    const oldMessage = await db.get<DbMessage>('SELECT * FROM messages WHERE id = ?', id);
+    const dm = oldMessage.dm;
+    const name = cleanName(q.name);
 
-    setTypingStatus(cleanName(q.name), -1);
+    setTypingStatus(name, -1);
 
     if (dm) {
       const dmSession = await db.get<DbDmSession>('SELECT * FROM dm_session WHERE id = ?', dm);
@@ -801,6 +804,9 @@ app.put('/api/update', async (req, res) => {
       now, bbCode, colorToStyle(q.color), id);
     sendToAll('newMessages');
 
+    if (!dm)
+      legacyEditMessage(oldMessage.name, q.tripCode, oldMessage.synced_time, rawBbCode, colors[q.color].trim()).finally();
+
     res.json(null);
   }
 });
@@ -811,9 +817,13 @@ app.delete('/api/delete', async (req, res) => {
   if (await allowedToEdit(req, res, 'delete')) {
     const id = toInt(req.query.msgId);
     const db = await getDb();
+    const oldMessage = await db.get<DbMessage>('SELECT * FROM messages WHERE id = ?', id);
 
     await db.run('UPDATE messages SET deleted = 1 WHERE id = ?', id);
     sendToAll('newMessages');
+
+    if (!oldMessage.dm)
+      legacyDeleteMessage(oldMessage.name, req.query.tripCode as string, oldMessage.synced_time).finally();
 
     res.json(null);
   }
