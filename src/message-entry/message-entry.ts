@@ -41,7 +41,7 @@ Size.whitelist = Object.keys(sizeMap);
 Quill.register(Size, true);
 
 const tagMap: Record<string, string> = {
-  bold: 'b', code: 'code', italic: 'i', size: '', strike: 's', underline: 'u'
+  bold: 'b', code: 'code', font: 'kao', italic: 'i', size: '', strike: 's', underline: 'u'
 };
 const recognizedAttributes = new Set(Object.keys(tagMap));
 
@@ -123,7 +123,7 @@ export function bbCodeToQuillOps(bbCode: string): QuillOp[] {
   let pos = 0;
 
   function peekTag(): { closing: boolean; tag: string; href?: string; len: number } | null {
-    const match = /^\[(\/?)(b|i|u|s|code|s[1-5]|url(?:=([^\]]*?))?|img)]/.exec(bbCode.slice(pos));
+    const match = /^\[(\/?)(b|i|u|s|code|kao|s[1-5]|url(?:=([^\]]*?))?|img)]/.exec(bbCode.slice(pos));
 
     if (!match)
       return null;
@@ -191,6 +191,7 @@ export function bbCodeToQuillOps(bbCode: string): QuillOp[] {
           case 'u':    newAttrs['underline'] = true; break;
           case 's':    newAttrs['strike'] = true; break;
           case 'code': newAttrs['code'] = true; break;
+          case 'kao':  newAttrs['font'] = 'ms-pgothic'; break;
           default:
             if (/s[1-5]/.test(tag.tag))
               newAttrs['size'] = bbSizeMap[tag.tag]; break; // s1–s5 → em values
@@ -248,11 +249,14 @@ export class MessageEntry implements OnInit{
     clipboard: {
       matchers: [
         [Node.ELEMENT_NODE, (_node: any, delta: any) => {
-          delta.ops.forEach((op: any) => {
+          delta.ops = delta.ops.map((op: any) => {
+            if (!op.attributes) return op;
+            const attributes: Record<string, any> = {};
             forEach(op.attributes, (key, value) => {
-              if ((key === 'font' && value !== 'ms-pgothic') || !formatSet.has(key))
-                delete op.attributes[key];
+              if (!((key === 'font' && value !== 'ms-pgothic') || !formatSet.has(key)))
+                attributes[key] = value;
             });
+            return { ...op, attributes };
           });
           return delta;
         }]
@@ -325,7 +329,7 @@ export class MessageEntry implements OnInit{
 
     // Make sure direct user typing clears the kaomoji font.
     document.addEventListener('keydown', evt => {
-      if ([...(evt.key || '')].length === 1) {
+      if (!evt.ctrlKey && !evt.metaKey && !evt.altKey && [...(evt.key || '')].length === 1) {
         const range = this.quill?.getSelection();
 
         if (range && (this.quill.getFormat(range) || {})['font'])
@@ -735,7 +739,6 @@ export class MessageEntry implements OnInit{
     if (range.length > 0)
       this.quill.deleteText(range.index, range.length);
 
-    text = '\u2000' + text + '\u2000';
     this.quill.insertText(range.index, text, { font: 'ms-pgothic' });
     this.quill.setSelection(range.index + text.length);
     this.quill.format('font', undefined);

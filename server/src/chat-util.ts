@@ -26,8 +26,10 @@ export function messageHash(name: string, trip: string, timestamp: string | numb
 
 export function convertBBCodeToHtml(text: string): string {
   text = text.replace(/</g, '\uFFFDlt;').replace(/>/g, '\uFFFDgt;')
-    .replace(/\[(\/?)(b|code|i|img|s|s1|s2|s3|s4|s5|u|url=.*?|url)]/g, '<$1$2>')
+    .replace(/\[(\/?)(b|code|del|i|img|kao|s|s1|s2|s3|s4|s5|u|url=.*?|url)]/g, '<$1$2>')
+    .replace(/<del>/g, '<s>').replace(/<\/del>/g, '</s>')
     .replace(/<s(\d)>/g, '<span class="fontSize$1">').replace(/<\/s\d>/g, '</span>')
+    .replace(/<kao>/g, '<span class="kaomoji">').replace(/<\/kao>/g, '</span>')
     .replace(/<url=(.*?)>(.*?)<\/url>/g,  (_$0, $1, $2) => `<a href="${$1}" target="_blank">${$2}</a>`)
     .replace(/<img>(.*?)<\/img>/g, '<img src="$1" alt="">')
     .replace(/(^|>)(.*?)(<|$)/g, (_$0, $1, $2, $3) => `${$1}${htmlEscape($2)}${$3}`)
@@ -49,10 +51,14 @@ export function getTextAndMarkupAsBBCode(elems: DomElement[], domain: string): s
 
       if (elem.tag === 'a')
         fromElem = `[url=${inner}]${inner}[/url]`;
+      else if (elem.tag === 'del')
+        fromElem = `[s]${inner}[/s]`;
       else if (elem.tag === 'span') {
         const qlass = elem.valuesLookup['class'];
 
-        if (/^fontSize\d/.test(qlass)) {
+        if (qlass === 'kaomoji')
+          fromElem = `[kao]${inner}[/kao]`;
+        else if (/^fontSize\d/.test(qlass)) {
           const size = qlass.slice(-1);
 
           fromElem = `[s${size}]${inner}[/s${size}]`;

@@ -1,4 +1,4 @@
-import { DbMessage, DbParticipant, kaomojiEndRegex, Message, Messages, ParticipantInfo } from './shared-types.js';
+import { DbMessage, DbParticipant, Message, Messages, ParticipantInfo } from './shared-types.js';
 import { encodeForUri, htmlUnescape, processMillis } from '@tubular/util';
 import axios from 'axios';
 import { HtmlParser } from 'fortissimo-html';
@@ -42,8 +42,7 @@ export function addPendingDuplicate(id: number, time: number, name: string, comm
 }
 
 function extractMessage(messageRow: DomNode): Message {
-  const bbCode = getTextAndMarkupAsBBCode(messageRow.querySelector('.messageComment').children, domain)
-    .replace(kaomojiEndRegex, '\u2000$1\u2000');
+  const bbCode = getTextAndMarkupAsBBCode(messageRow.querySelector('.messageComment').children, domain);
   const html = convertBBCodeToHtml(bbCode);
   const nameElem = messageRow.querySelector('.messageName');
   const style = nameElem?.valuesLookup['style'];
@@ -437,7 +436,7 @@ export async function legacySendMessage(ip: string, name: string, email: string,
   }
 
   let face = '';
-  const $ = /^(.*)(\u2000(.+)\u2000)\s*$/.exec(comment);
+  const $ = /^(.*)(\[kao](.+)\[\/kao])\s*$/.exec(comment);
 
   if ($) {
     comment = $[1];

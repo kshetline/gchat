@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comchat-Mods
 // @namespace    %%ORIGINAL_SITE_URL%%
-// @version      v2026.05.10
+// @version      v2026.05.22
 // @description  Enhance Comchat functionality
 // @author       Anonymous
 // @license      MIT
@@ -192,7 +192,7 @@
     }
 
     let face = '';
-    const $ = /^(.*)(\u2000(.+)\u2000)\s*$/.exec(comment);
+    const $ = /^(.*)(\[kao](.+)\[\/kao])\s*$/.exec(comment);
 
     if ($) {
       comment = $[1];
