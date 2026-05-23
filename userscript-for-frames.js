@@ -192,7 +192,7 @@
     }
 
     let face = '';
-    const $ = /^(.*)(\[kao](.+)\[\/kao])\s*$/.exec(comment);
+    const $ = /^(.+)(\[kao](.+)\[\/kao])\s*$/.exec(comment);
 
     if ($) {
       comment = $[1];
