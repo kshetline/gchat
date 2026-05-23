@@ -1,5 +1,5 @@
 import { Component, ElementRef, input, OnInit, output, signal } from '@angular/core';
-import { kaomoji, Message } from '../../server/src/shared-types';
+import { Message } from '../../server/src/shared-types';
 import { colorFromStyle, getLuminance, getTextBackground, isTyping, notify } from '../main';
 import { debounce, htmlUnescape, isString } from '@tubular/util';
 import { MessageEntry } from '../message-entry/message-entry';
