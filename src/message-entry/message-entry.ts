@@ -734,7 +734,7 @@ export class MessageEntry implements OnInit{
   }
 
   protected formatKaomoji(kao: string): string {
-    return kao.replace(/\uFE68/g, '\\').replace(/\(\*＾＾\*\)/g, '(<mark>*</mark>＾＾<mark>*</mark>)');
+    return kao.replace(/^#/, '').replace(/\uFE68/g, '\\').replace(/\(\*＾＾\*\)/g, '(<mark>*</mark>＾＾<mark>*</mark>)');
   }
 
   protected insertKaomoji(text: string): void {
@@ -743,7 +743,13 @@ export class MessageEntry implements OnInit{
     if (range.length > 0)
       this.quill.deleteText(range.index, range.length);
 
-    this.quill.insertText(range.index, text, { font: 'ms-pgothic' });
+    if (text.startsWith('#')) {
+      text = text.substring(1);
+      this.quill.insertText(range.index, text);
+    }
+    else
+      this.quill.insertText(range.index, text, { font: 'ms-pgothic', color: 'black' });
+
     this.quill.setSelection(range.index + text.length);
     this.quill.format('font', undefined);
     this.showKaomoji.set(false);

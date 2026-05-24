@@ -35,7 +35,8 @@
       <div id="kaomoji-panel" [style.top]="kaomojiPosition().top" [style.left]="kaomojiPosition().left"
            [style.display]="showKaomoji() ? 'grid' : 'none'">
         @for (kaomoji of kaomoji; track kaomoji) {
-          <div class="kaomoji-item kaomoji" (click)="insertKaomoji(kaomoji)" [innerHTML]="formatKaomoji(kaomoji)"></div>
+          <div class="kaomoji-item" [class.kaomoji]="!kaomoji.startsWith('#')" (click)="insertKaomoji(kaomoji)"
+               [innerHTML]="formatKaomoji(kaomoji)"></div>
         }
       </div>
       <div id="upload-panel" [style.top]="filePromptPosition().top" [style.left]="filePromptPosition().left"

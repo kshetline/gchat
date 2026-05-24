@@ -118,6 +118,10 @@
   font-family: "MS PGothic", sans-serif;
 }
 
+.at-bottom, .on-top {
+  z-index: 1;
+}
+
 .at-bottom .ql-toolbar.ql-snow .ql-picker.ql-expanded .ql-picker-options {
   top: -10.3em !important;
 }
