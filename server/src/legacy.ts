@@ -193,6 +193,13 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
   return { messages, participants, participantsRaw };
 }
 
+function similar(s1: string, s2: string): boolean {
+  s1 = s1.trim().replace(/\s+/g, ' ');
+  s2 = s2.trim().replace(/\s+/g, ' ');
+
+  return s1 === s2;
+}
+
 async function pollLegacyMessages(overrideCount?: number): Promise<void> {
   if (isShuttingDown()) return;
 
@@ -222,7 +229,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
 
     for (let i = messages.messages?.length - 1; i >= 0 && pendingDuplicates.length > 0; --i) {
       const message = messages.messages[i];
-      const dupIndex = pendingDuplicates.findIndex(d => d.name === message.name && d.comment === message.bbCode &&
+      const dupIndex = pendingDuplicates.findIndex(d => d.name === message.name && similar(d.comment, message.bbCode) &&
         Math.abs(d.time - message.time) < 60);
 
       if (dupIndex >= 0) {

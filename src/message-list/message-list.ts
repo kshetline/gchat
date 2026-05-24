@@ -138,7 +138,8 @@ export class MessageList implements OnInit {
     end = end.replace(matchEmoji, '<span class="big-emoji">$1</span>');
     text = start + qm + end;
 
-    return text.replace(/>\(\*＾＾\*\)</g, '>(<mark>*</mark>＾＾<mark>*</mark>)<');
+    return text.replace(/>\(\*＾＾\*\)</g, '>(<mark>*</mark>＾＾<mark>*</mark>)<')
+      .replace(/\uFE68/g, '\\\u200D');
   }
 
   protected formatTime(time: number): string {

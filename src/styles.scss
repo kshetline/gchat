@@ -41,11 +41,17 @@ body {
 
 @font-face {
   font-family: 'MS PGothic';
-  /* Load from local system if available */
+  src: local('Courier New');
+  unicode-range: U+002F, U+005C;
+}
+
+@font-face {
+  font-family: 'MS PGothic';
   //noinspection CssUnknownTarget
   src: local('MS PGothic'), local('MS PGothic Regular'), url('assets/MS-PGothic.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
+  unicode-range: U+0000-002E, U+0030-005B, U+005D-10FFFF;
 }
 
 a {

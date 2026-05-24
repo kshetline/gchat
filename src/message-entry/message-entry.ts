@@ -733,6 +733,10 @@ export class MessageEntry implements OnInit{
     })
   }
 
+  protected formatKaomoji(kao: string): string {
+    return kao.replace(/\uFE68/g, '\\').replace(/\(\*＾＾\*\)/g, '(<mark>*</mark>＾＾<mark>*</mark>)');
+  }
+
   protected insertKaomoji(text: string): void {
     const range = this.quill.selection.savedRange;
 
