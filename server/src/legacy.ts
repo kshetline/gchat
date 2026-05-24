@@ -1,4 +1,4 @@
-import { DbMessage, DbParticipant, Message, Messages, ParticipantInfo } from './shared-types.js';
+import { DbMessage, DbParticipant, kaomojiOriginal, Message, Messages, ParticipantInfo } from './shared-types.js';
 import { encodeForUri, htmlUnescape, processMillis } from '@tubular/util';
 import axios from 'axios';
 import { HtmlParser } from 'fortissimo-html';
@@ -445,7 +445,7 @@ export async function legacySendMessage(ip: string, name: string, email: string,
   let face = '';
   const $ = /^(.+)(\[kao](.+)\[\/kao])\s*$/.exec(comment);
 
-  if ($) {
+  if ($ && kaomojiOriginal.indexOf($[3]) >= 0) {
     comment = $[1];
     face = $[3];
   }

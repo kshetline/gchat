@@ -17,10 +17,12 @@ export const kaomoji = [
   // Extra
                                   '¯\uFE68_(ツ)_/¯',
   '(￣▽￣)ノ', 'ヽ( ´O｀)ゞ', '(¬‿¬ )', '<(￣︶￣)>',
-  '٩(◕‿◕｡)۶', 'ヽ(♡‿♡)ノ', '#（˶′◡‵˶）', '#~(⊕⌢⊕)~',
-  '#~(×_×)~', '( ￣＾￣)', '（⊙_⊙）', '(o_O)'
+  '٩(◕‿◕｡)۶', 'ヽ(♡‿♡)ノ', '#（˶′◡‵˶）', '#(⊕⌢⊕)',
+  '#(×_×)', '( ￣＾￣)', '（⊙_⊙）', '(o_O)',
+  '#( ͡° ͜ʖ ͡° )', 'ᕦ(ò_óˇ)ᕤ', '⁀⊙﹏☉⁀', '(｡•́︿•̀｡)'
 ];
 
+export const kaomojiOriginal = kaomoji.slice(0, 30);
 export const kaomojiRegex = new RegExp(`(${kaomoji.filter(k => !k.startsWith('#')).map(regexEscape).join('|')})`, 'g');
 
 export interface Config {
