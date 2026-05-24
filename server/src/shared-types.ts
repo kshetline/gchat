@@ -22,8 +22,9 @@ export const kaomoji = [
   '#( ͡° ͜ʖ ͡° )', 'ᕦ(ò_óˇ)ᕤ', '⁀⊙﹏☉⁀', '(｡•́︿•̀｡)'
 ];
 
-export const kaomojiOriginal = kaomoji.slice(0, 30);
-export const kaomojiRegex = new RegExp(`(${kaomoji.filter(k => !k.startsWith('#')).map(regexEscape).join('|')})`, 'g');
+export const kaomojiOriginal = new Set(kaomoji.slice(0, 30));
+export const kaomojiGothic = new Set(kaomoji.filter(k => !k.startsWith('#')));
+export const kaomojiRegex = new RegExp(`(${kaomoji.map(k => regexEscape(k.replace(/^#/, ''))).join('|')})`, 'g');
 
 export interface Config {
   backgroundColor: string;

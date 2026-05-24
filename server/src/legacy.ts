@@ -445,7 +445,7 @@ export async function legacySendMessage(ip: string, name: string, email: string,
   let face = '';
   const $ = /^(.+)(\[kao](.+)\[\/kao])\s*$/.exec(comment);
 
-  if ($ && kaomojiOriginal.indexOf($[3]) >= 0) {
+  if ($ && kaomojiOriginal.has($[3])) {
     comment = $[1];
     face = $[3];
   }

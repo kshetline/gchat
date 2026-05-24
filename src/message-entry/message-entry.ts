@@ -7,7 +7,7 @@ import { colorByIndex, getTextBackground, notify, shouldIgnoreClick, startClickS
 import { PickerComponent } from '@ctrl/ngx-emoji-mart';
 import { Emoji, EmojiData } from '@ctrl/ngx-emoji-mart/ngx-emoji';
 import { ColorSelector } from '../color-selector/color-selector';
-import { allowedExtensions, Config, kaomoji, kaomojiRegex, MB, sizeMap } from '../../server/src/shared-types';
+import { allowedExtensions, Config, kaomoji, kaomojiGothic, kaomojiRegex, MB, sizeMap } from '../../server/src/shared-types';
 import { EditEvent } from '../message-list/message-list';
 import { toObservable } from '@angular/core/rxjs-interop';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
@@ -693,7 +693,8 @@ export class MessageEntry implements OnInit{
       if (!part)
         continue;
 
-      this.quill.insertText(index, part, i % 2 === 0 ? { italic: true } : { font: 'ms-pgothic' });
+      this.quill.insertText(index, part, i % 2 === 0 ? { italic: true } :
+        (kaomojiGothic.has(part) ? { font: 'ms-pgothic', italic: false } : { italic: false }));
       index += part.length;
     }
 

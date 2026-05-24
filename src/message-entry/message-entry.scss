@@ -117,6 +117,7 @@ chat-color-selector {
 #kaomoji-panel {
   background-color: var(--main-toolbar-background);
   border: 1px solid var(--main-border);
+  font-family: "Trebuchet MS", Tahoma, Verdana, sans-serif;
   display: none;
   grid-template-columns: repeat(4, 1fr);
   gap: 0.25em;
