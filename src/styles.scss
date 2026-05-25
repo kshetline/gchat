@@ -163,6 +163,11 @@ a {
 
 .kaomoji {
   font-family: "MS PGothic", sans-serif !important;
+  white-space: nowrap;
+}
+
+.nobr {
+  white-space: nowrap;
 }
 
 .p-confirmdialog {

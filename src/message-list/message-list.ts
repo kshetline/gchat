@@ -1,12 +1,12 @@
 import { Component, ElementRef, input, OnInit, output, signal } from '@angular/core';
-import { Message } from '../../server/src/shared-types';
+import { kaomojiNonGothicRegex, Message } from '../../server/src/shared-types';
 import { colorFromStyle, getLuminance, getTextBackground, isTyping, notify } from '../main';
 import { debounce, htmlUnescape, isString } from '@tubular/util';
 import { MessageEntry } from '../message-entry/message-entry';
 import { HttpClient } from '@angular/common/http';
 import { SafeHtmlPipe } from '../safe-html-pipe/safe-html-pipe';
 
-const matchEmoji = /([\u25A0-\u27BF\u{1F300}-\u{1FAFF}](\u200D.)?)+/gu; // Also matches geometric shapes, misc symbols and dingbats
+const matchEmoji = /((?:[\u{1F300}-\u{1FAFF}](?:\u200D.)?)+)/gu;
 const QUOTE_MARKER = '\u00A0◀︎ ';
 const QUOTE_MARKER_PATTERN = /\u00A0[◀︎◁◂⏴] /;
 const QUOTE_NAME_PATTERN = /<u>([^>]+)<\/u>:/;
@@ -138,7 +138,16 @@ export class MessageList implements OnInit {
     end = end.replace(matchEmoji, '<span class="big-emoji">$1</span>');
     text = start + qm + end;
 
-    return text.replace(/>\(\*＾＾\*\)</g, '>(<mark>*</mark>＾＾<mark>*</mark>)<')
+    const parts = text.split(kaomojiNonGothicRegex);
+    let text2 = '';
+
+    for (let i = 0; i < parts.length; ++i) {
+      const part = parts[i];
+
+      text2 += (i % 2 === 0 ? part : `<span class="nobr">${part}</span>`);
+    }
+
+    return text2.replace(/>\(\*＾＾\*\)</g, '>(<mark>*</mark>＾＾<mark>*</mark>)<')
       .replace(/\uFE68/g, '\\\u200D');
   }
 

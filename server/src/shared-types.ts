@@ -25,6 +25,7 @@ export const kaomoji = [
 export const kaomojiOriginal = new Set(kaomoji.slice(0, 30));
 export const kaomojiGothic = new Set(kaomoji.filter(k => !k.startsWith('#')));
 export const kaomojiRegex = new RegExp(`(${kaomoji.map(k => regexEscape(k.replace(/^#/, ''))).join('|')})`, 'g');
+export const kaomojiNonGothicRegex = new RegExp(`(${kaomoji.filter(k => k.startsWith('#')).map(k => regexEscape(k.substring(1))).join('|')})`, 'g');
 
 export interface Config {
   backgroundColor: string;
