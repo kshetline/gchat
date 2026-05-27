@@ -1,7 +1,7 @@
 import { Component, ElementRef, input, OnInit, output, signal } from '@angular/core';
 import { kaomojiNonGothicRegex, Message } from '../../server/src/shared-types';
 import { colorFromStyle, getLuminance, getTextBackground, isTyping, notify } from '../main';
-import { debounce, htmlUnescape, isString } from '@tubular/util';
+import { debounce, htmlUnescape, isObject, isString } from '@tubular/util';
 import { MessageEntry } from '../message-entry/message-entry';
 import { HttpClient } from '@angular/common/http';
 import { SafeHtmlPipe } from '../safe-html-pipe/safe-html-pipe';
@@ -151,11 +151,25 @@ export class MessageList implements OnInit {
       .replace(/\uFE68/g, '\\\u200D');
   }
 
-  protected formatTime(time: number): string {
+  protected formatTime(time: number | Message): string {
+    let message: Message;
+
+    if (isObject(time)) {
+      message = time;
+      time = time.time;
+    }
+
+    let formatted: string;
+
     if (this.localTime())
-      return new Date(time * 1000).toLocaleString();
+      formatted = new Date(time * 1000).toLocaleString();
     else
-      return new Date(time * 1000).toISOString().substring(0, 19).replace('T', ' ');
+      formatted = new Date(time * 1000).toISOString().substring(0, 19).replace('T', ' ');
+
+    if (message)
+      formatted += (message.editCount ? '✏️' : '') + (message.flagged ? '°' : '');
+
+    return formatted;
   }
 
   protected getBackground(message: Message | string): string {

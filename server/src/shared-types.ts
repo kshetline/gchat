@@ -40,6 +40,7 @@ export interface Config {
 
 export interface Message {
   bbCode?: string;
+  editCount?: number;
   email?: string;
   flagged?: number;
   hash: string;

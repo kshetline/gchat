@@ -163,6 +163,7 @@ async function getDirectMessages(name: string, tripCode: string): Promise<DmSess
       'SELECT * FROM messages WHERE deleted = 0 AND dm = ? ORDER BY messages.synced_time',
         dmSession.id)).slice(-MAX_CLIENT_MESSAGES);
     const messages = rows.filter(row => !row.deleted).map(row => ({
+      editCount: row.edit_count,
       email: row.email,
       flagged: row.flagged,
       hash: row.hash,
@@ -319,6 +320,7 @@ app.get('/api/messages', async (req, res) => {
   const rows = (await db.all<DbMessage>(
     'SELECT * FROM messages WHERE deleted = 0 AND dm = 0 ORDER BY messages.synced_time')).slice(-MAX_CLIENT_MESSAGES);
   let messages = rows.filter(row => !row.deleted).map(row => ({
+    editCount: row.edit_count,
     email: row.email,
     flagged: row.flagged,
     hash: row.hash,

@@ -750,6 +750,7 @@ export class App implements OnInit {
 
   protected tabChanged(value: number | string): void {
     this.selectedChat.set(value as number);
+    this.checkChatActive(true);
 
     if (value as number > 0) {
       const dms = clone(this.dms(), true);
