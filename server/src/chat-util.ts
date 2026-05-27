@@ -98,6 +98,8 @@ export function simplifyError(err: any): any {
     return 'Chat server reset connection';
   else if (message.includes('ETIMEDOUT'))
     return 'Chat server timed out';
+  else if (message.includes('ER_PARSE_ERROR'))
+    return 'SQL parse error: ' + err.sqlMessage;
 
   return message;
 }

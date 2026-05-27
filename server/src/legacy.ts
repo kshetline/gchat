@@ -166,8 +166,9 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
   const gettingOld = now - MAX_IDLE_PARTICIPANT_AGE + MAX_IDLE_PARTICIPANT_LEEWAY;
   const currentNames = participants.map(p => `'${p.name.replace(/'/g, "''")}'`).join(',');
 
-  await db.run(`UPDATE participants SET last_active = ? WHERE remote = 1 AND name IN (${currentNames}) AND last_active < ?`,
-    gettingOld + MAX_IDLE_PARTICIPANT_LEEWAY, gettingOld);
+  if (currentNames)
+    await db.run(`UPDATE participants SET last_active = ? WHERE remote = 1 AND name IN (${currentNames}) AND last_active < ?`,
+      gettingOld + MAX_IDLE_PARTICIPANT_LEEWAY, gettingOld);
 
   const latestPosts = new Map<string, number>();
 
