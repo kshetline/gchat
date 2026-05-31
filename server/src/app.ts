@@ -530,8 +530,9 @@ app.post('/api/enter', async (req, res) => {
     const lastEnterOrLeave = await db.get<any>(`SELECT id, style FROM messages WHERE synced_time > ? AND dm = 0 AND name = ? AND trip = ? AND
       remote = 0 AND LENGTH(style) = 1 ORDER BY synced_time DESC LIMIT 1`, now - 3600, name, q.tripCode);
 
-    if (lastEnterOrLeave?.style === 'E')
+    if (lastEnterOrLeave?.style === 'E') {
       await db.run('UPDATE messages SET synced_time = ? WHERE id = ?', now, lastEnterOrLeave.id);
+    }
     else {
       const message = 'has joined ' + process.env.CHAT_TITLE;
 
@@ -863,10 +864,19 @@ app.post('/api/start-chat', async (req, res) => {
 
     await db.run(`UPDATE dm_session SET ${whichName} = ? WHERE id = ?`, now, dmSession.id);
 
-    const message = 'has joined this private chat';
+    const lastEnterOrLeave = await db.get<any>(`SELECT id, style FROM messages WHERE synced_time > ? AND dm = ? AND name = ? AND trip = ? AND
+      remote = 0 AND LENGTH(style) = 1 ORDER BY synced_time DESC LIMIT 1`, now - 3600, dmSession.id, name, q.tripCode);
 
-    await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      dmSession.id, now, now, self, q.tripCode, q.email, 0, getIp(req), '', 'E', message, messageHash('E:' + self, q.tripCode, now));
+    if (lastEnterOrLeave?.style === 'E')
+      await db.run('UPDATE messages SET synced_time = ? WHERE id = ?', now, lastEnterOrLeave.id);
+
+    else {
+      const message = 'has joined this private chat';
+
+      await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        dmSession.id, now, now, self, q.tripCode, q.email, 0, getIp(req), '', 'E', message, messageHash('E:' + self, q.tripCode, now));
+    }
+
     await notifyDmPartners(dmSession, 'newDirectMessages');
 
     res.json({ id: dmSession.id });

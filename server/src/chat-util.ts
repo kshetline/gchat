@@ -3,6 +3,7 @@ import { DomElement, DomNode } from 'fortissimo-html/dist/dom.js';
 import express from 'express';
 
 const IP_MATCHER = /(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/;
+const IMAGE_DOMAIN = process.env.CHAT_DOMAIN_FOR_IMAGES;
 
 export function getIp(req: express.Request): string {
   return req.ip || req.socket?.remoteAddress || (req as any).connection?.remoteAddress || (req as any).connection?.socket?.remoteAddress;
@@ -69,10 +70,10 @@ export function getTextAndMarkupAsBBCode(elems: DomElement[], domain: string): s
       else if (elem.tag === 'img') {
         const alt = elem.valuesLookup['alt'];
 
-        if ([...(alt || '')].length === 1)
+        if (alt)
           fromElem = alt;
         else {
-          const src = elem.valuesLookup['src']?.replace(/^\/(.*)$/, `https://${domain}/$1`);
+          const src = elem.valuesLookup['src']?.replace(/^\/(.*)$/, `https://${IMAGE_DOMAIN || domain}/$1`);
 
           fromElem = `[img]${src}[/img]`;
         }

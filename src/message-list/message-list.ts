@@ -1,12 +1,19 @@
 import { Component, ElementRef, input, OnInit, output, signal } from '@angular/core';
 import { kaomojiNonGothicRegex, Message } from '../../server/src/shared-types';
-import { colorFromStyle, getLuminance, getTextBackground, isTyping, notify } from '../main';
-import { debounce, htmlUnescape, isObject, isString } from '@tubular/util';
+import { colorFromStyle, getLuminance, getTextBackground, notify } from '../main';
+import { debounce, htmlUnescape, isObject, isString, regex } from '@tubular/util';
 import { MessageEntry } from '../message-entry/message-entry';
 import { HttpClient } from '@angular/common/http';
 import { SafeHtmlPipe } from '../safe-html-pipe/safe-html-pipe';
 
-const matchEmoji = /((?:[\u{1F300}-\u{1FAFF}](?:\u200D.)?)+)/gu;
+const matchEmoji = regex`(([☀☁☎☝☺♈♉♊♋♌♍♎♏♐♑♒♓♠♣♥♦⚠⛎✂✅✈✌✳✴❌❤➿〽㊗㊙]\uFE0F?| // Various symbols and dingbats
+                           // True emoji plus some emoji-like characters, with possible variations and modifiers
+                           ([\u{1F000}-\u{1FAFF}]\uFE0F?(\u200D.\uFE0F?)*)|
+                           .\uFE0F[\u20D0-\u20EF]? // Any character with an emoji variation selector, plus potential combining symbol
+                          )+
+                         )
+                         ${'gu'}`;
+const matchDarkEmoji = /((?:♠️|♣️|➿|⚫️|⬛️|◾️|◼️|[👣🕶🖤🦾️🦇🌚🌑🎱🕋])+)/gu;
 const QUOTE_MARKER = '\u00A0◀︎ ';
 const QUOTE_MARKER_PATTERN = /\u00A0[◀︎◁◂⏴] /;
 const QUOTE_NAME_PATTERN = /<u>([^>]+)<\/u>:/;
@@ -31,8 +38,6 @@ export interface EditEvent {
   styleUrl: './message-list.scss',
 })
 export class MessageList implements OnInit {
-  isTyping = isTyping;
-
   private lastSelectedText = '';
 
   protected alwaysChanging = signal(1);
@@ -135,7 +140,15 @@ export class MessageList implements OnInit {
     }
 
     start = start.replace(matchEmoji, '<span class="straight-emoji">$1</span>');
-    end = end.replace(matchEmoji, '<span class="big-emoji">$1</span>');
+    end = end.replace(matchEmoji, (_$0, $1) => {
+      const parts = $1.split(matchDarkEmoji);
+      let result = '';
+
+      for (let i = 0; i < parts.length; ++i)
+        result += parts[i] ? `<span class="${i % 2 === 0 ? 'big-emoji' : 'big-dark-emoji'}">${parts[i]}</span>` : '';
+
+      return result;
+    });
     text = start + qm + end;
 
     const parts = text.split(kaomojiNonGothicRegex);
@@ -144,7 +157,7 @@ export class MessageList implements OnInit {
     for (let i = 0; i < parts.length; ++i) {
       const part = parts[i];
 
-      text2 += (i % 2 === 0 ? part : `<span class="nobr">${part}</span>`);
+      text2 += part ? (i % 2 === 0 ? part : `<span class="nobr">${part}</span>`) : '';
     }
 
     return text2.replace(/>\(\*＾＾\*\)</g, '>(<mark>*</mark>＾＾<mark>*</mark>)<')
@@ -166,7 +179,7 @@ export class MessageList implements OnInit {
     else
       formatted = new Date(time * 1000).toISOString().substring(0, 19).replace('T', ' ');
 
-    if (message)
+    if (message && message.style?.length > 2)
       formatted += (message.editCount ? '✏️' : '') + (message.flagged ? '°' : '');
 
     return formatted;

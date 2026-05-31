@@ -121,6 +121,9 @@
       </p-tab>
       @for (dm of dms(); track dm.name; let i = $index) {
         <p-tab [value]="i + 1"><i class="fa-regular fa-comment"></i> {{ dm.name }}
+          <div class="typing-indicator" [style.display]="alwaysChanging() && isTyping(dm.name, dm.id) ? '' : 'none'">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+          </div>
           @if (dm.missed() > 0) {
             <span class="unseen-count"> ({{ dm.missed() }})</span>
           }

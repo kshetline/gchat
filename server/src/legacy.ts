@@ -195,8 +195,8 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
 }
 
 function similar(s1: string, s2: string): boolean {
-  s1 = s1.trim().replace(/\s+/g, ' ');
-  s2 = s2.trim().replace(/\s+/g, ' ');
+  s1 = s1.trim().replace(/\s+/g, ' ').replace(/◇/g, '♦');
+  s2 = s2.trim().replace(/\s+/g, ' ').replace(/◇/g, '♦');
 
   return s1 === s2;
 }
@@ -211,7 +211,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
 
   try {
     const db = await getDb();
-    existing = (await db.all<any>('SELECT hash, synced_time, name, trip, message FROM messages WHERE dm = 0 AND deleted = 0'))
+    existing = (await db.all<any>('SELECT hash, synced_time, name, trip, message FROM messages WHERE dm = 0 AND deleted = 0 AND LENGTH(style) > 2'))
       .reduce((acc, row) => acc.set(row.hash, row.synced_time), new Map<string, number>());
     const messages = await getLegacyMessages('', retrieveCount);
     const remoteExisting = new Set(messages.messages.map(m => m.hash));

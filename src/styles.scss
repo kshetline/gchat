@@ -148,13 +148,17 @@ a {
   gap: 0.25em;
 }
 
-.big-emoji {
+.big-emoji, .big-dark-emoji {
   font-size: 1.5em;
   font-style: normal;
   line-height: 0.5em;
   top: 0.15em;
   overflow: visible;
   position: relative;
+}
+
+.theme-dark .big-dark-emoji {
+  text-shadow: 1px 1px 2px #07F9, 1px -1px 2px #07F9, -1px 1px 2px #07F9, -1px -1px 2px #07F9;
 }
 
 .straight-emoji {

@@ -6,11 +6,6 @@
     @if (closed()) {
       <div class="closed-chat">This chat session is closed</div>
     }
-    @else if (alwaysChanging() && isTyping(dmName(), dmId())) {
-      <div class="typing-indicator">
-        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
-      </div>
-    }
   }
   @let msgs = isAtBottom() ? messages() : messages().slice(0).reverse();
   @for (message of msgs; track message.hash) {
@@ -67,11 +62,6 @@
   @if (isAtBottom()) {
     @if (closed()) {
       <div class="closed-chat">This chat session is closed</div>
-    }
-    @else if (alwaysChanging() && isTyping(dmName(), dmId())) {
-      <div class="typing-indicator">
-        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
-      </div>
     }
   }
 </div>

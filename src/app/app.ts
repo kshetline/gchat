@@ -230,7 +230,15 @@ export class App implements OnInit {
 
     let blurTime = Number.MAX_SAFE_INTEGER;
 
-    document.addEventListener('visibilitychange', () => this.checkChatActive(document.hidden ? undefined : true));
+    document.addEventListener('visibilitychange', () => {
+      this.checkChatActive(document.hidden ? undefined : true);
+
+      if (document.hidden)
+        blurTime = processMillis();
+      else
+        this.adjustScrolling(processMillis() < blurTime + 15000);
+    });
+
     window.addEventListener('blur', () => { blurTime = processMillis(); this.checkChatActive(); });
     window.addEventListener('focus', () => { this.checkChatActive(true); this.adjustScrolling(processMillis() < blurTime + 15000) });
     window.addEventListener('scroll', () => this.checkChatActive(true));
@@ -884,7 +892,7 @@ export class App implements OnInit {
 
           const dms = clone(this.dms(), true);
 
-          dms.push({ id: data.id, name, messages: signal<Message[]>([]), missed: signal(0) });
+          dms.push({ id: data.id, name, viewed: true, messages: signal<Message[]>([]), missed: signal(0) });
           this.dms.set(dms);
           this.selectedChat.set(dms.length);
         },
@@ -909,9 +917,9 @@ export class App implements OnInit {
   }
 
   private countNewMessages(oldMessages: Message[], newMessages: Message[]): number {
-    const latest = oldMessages.reduce((acc, msg) => Math.max(acc, !msg.style.match(/^[EL]$/) ? msg.time : 0, 0), 0);
+    const latest = oldMessages.reduce((acc, msg) => Math.max(acc, !msg.style.match(/^[EL]$/) ? msg.msgId : 0, 0), 0);
 
-    return newMessages.reduce((acc, msg) => acc + (!msg.isMe && !msg.style.match(/^[EL]$/) && msg.time > latest ? 1 : 0), 0);
+    return newMessages.reduce((acc, msg) => acc + (!msg.isMe && !msg.style.match(/^[EL]$/) && msg.msgId > latest ? 1 : 0), 0);
   }
 
   private enterLeaveCheck(dm: number, messages: Message[]): void {
@@ -952,7 +960,7 @@ export class App implements OnInit {
     const currentDMs = clone(this.dms(), true);
     let changed = false;
     let totalNewMessages = 0;
-    let notificationTab = this.selectedChat() || 1;
+    let notificationTab = this.selectedChat() || -1;
 
     for (const dm of dms) {
       let index = currentDMs.findIndex(d => d.id === dm.id);
@@ -968,7 +976,10 @@ export class App implements OnInit {
             notificationTab = index + 1;
 
           totalNewMessages += newMessages;
-          currentDM.missed.set(currentDM.missed() + newMessages);
+
+          if (notificationTab !== this.selectedChat())
+            currentDM.missed.set(currentDM.missed() + newMessages);
+
           currentDM.messages.set(dm.messages);
           changed = true;
         }
@@ -1009,7 +1020,7 @@ export class App implements OnInit {
     return this.lastActive < processMillis() - CONSIDER_AFK_TIME;
   }
 
-  private playNotificationSound(chat = 0, sound = chat > 0 ? this.chimeDM : this.chime): void {
+  private playNotificationSound(chat = 0, sound = chat !== 0 ? this.chimeDM : this.chime): void {
     const idleOrInactive = this.isIdle() || !this.chatActive;
 
     sound.volume = this.volume() / 100;
