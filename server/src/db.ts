@@ -45,8 +45,9 @@ export async function getDb(): Promise<AsyncDatabase> {
       .replace(/\bUNIQUE PRIMARY KEY AUTOINCREMENT\b/g, 'AUTO_INCREMENT PRIMARY KEY')
       .replace(/\bUNIQUE PRIMARY KEY\b/g, '')
       .replace(/\b(value TEXT NOT NULL)\b/, '$1,\n    PRIMARY KEY (key0(255))')
-      .replace(/\b(last_content_update INTEGER NOT NULL)\b/, '$1,\n    PRIMARY KEY (token(255))')
+      .replace(/\b(last_content_update INTEGER NOT NULL DEFAULT 0)\b/, '$1,\n    PRIMARY KEY (token(255))')
       .replace(/\b(note TEXT)\b/, '$1,\n    PRIMARY KEY (ip(255))')
+      .replace(/\s+,/g, ',')
       + ' CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci' :
     (sql: string) => sql;
 
@@ -118,9 +119,9 @@ export async function getDb(): Promise<AsyncDatabase> {
       ip TEXT,
       allow_dm INTEGER,
       in_chat INTEGER,
-      last_active INTEGER NOT NULL,
-      last_alive INTEGER NOT NULL,
-      last_content_update INTEGER NOT NULL
+      last_active INTEGER NOT NULL DEFAULT 0,
+      last_alive INTEGER NOT NULL DEFAULT 0,
+      last_content_update INTEGER NOT NULL DEFAULT 0
   )`));
 
   inInit = false;

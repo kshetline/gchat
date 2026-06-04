@@ -162,7 +162,7 @@ async function updateDbSession(token: string): Promise<void> {
     await db.run(`INSERT OR REPLACE INTO sessions
       (token, name, ip, allow_dm, in_chat, last_active, last_alive, last_content_update) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       token, session.name, session.ip, session.allowDm == null ? null : +session.allowDm,
-      session.inChat == null ? null : +session.inChat, session.lastActive, session.lastAlive, session.lastContentUpdate);
+      session.inChat == null ? null : +session.inChat, session.lastActive || 0, session.lastAlive || 0, session.lastContentUpdate || 0);
 
     if (!oldSession)
       console.info(`Created session ${token} for ${session.name}, ${session.ip}`);
