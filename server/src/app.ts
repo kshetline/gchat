@@ -138,6 +138,7 @@ async function getLastSessions(): Promise<void> {
         allowDm: !!session.allow_dm,
         ip: session.ip,
         inChat: !!session.in_chat,
+        lastActive: session.last_active,
         lastAlive: session.last_alive,
         lastContentUpdate: session.last_content_update,
         name: session.name
@@ -159,9 +160,9 @@ async function updateDbSession(token: string): Promise<void> {
     const oldSession = await db.get<DbSessionInfo>('SELECT * FROM sessions WHERE token = ?', token);
 
     await db.run(`INSERT OR REPLACE INTO sessions
-      (token, name, ip, allow_dm, in_chat, last_alive, last_content_update) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      (token, name, ip, allow_dm, in_chat, last_active, last_alive, last_content_update) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       token, session.name, session.ip, session.allowDm == null ? null : +session.allowDm,
-      session.inChat == null ? null : +session.inChat, session.lastAlive, session.lastContentUpdate);
+      session.inChat == null ? null : +session.inChat, session.lastActive, session.lastAlive, session.lastContentUpdate);
 
     if (!oldSession)
       console.info(`Created session ${token} for ${session.name}, ${session.ip}`);
@@ -290,9 +291,11 @@ async function participantCheck(req: express.Request, forceInChat = false, nameO
     if ((changes || 0) > 0)
       console.info(`Deleted ${changes} participant record${changes > 1 ? 's' : ''} for ${name}`);
 
-    await db.run('INSERT INTO participants (name, trip, email, ip, session_id, remote, proxied, last_active, last_post) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      name, q.tripCode, q.email, session?.ip, token, 0, proxied, Now(), 0);
-    console.info(`Created participant record for ${name}${q.tripCode ? '◆' + tripcode(q.tripCode) : ''}`);
+    if (session?.inChat) {
+      await db.run('INSERT INTO participants (name, trip, email, ip, session_id, remote, proxied, last_active, last_post) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        name, q.tripCode, q.email, session?.ip, token, 0, proxied, Now(), 0);
+      console.info(`Created participant record for ${name}${q.tripCode ? '◆' + tripcode(q.tripCode) : ''}`);
+    }
   }
   else {
     const changes = (await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', name))?.changes;
@@ -517,9 +520,13 @@ async function allowedToEdit(req: express.Request, res: express.Response, action
     const session = sessions.get(token);
     const tripCode = tripcode(q.tripCode);
     const name = cleanName(q.name);
+    const active = toBoolean(req.query.active);
     const now = Now();
 
     if (session) {
+      if (active)
+        session.lastActive = now;
+
       session.lastAlive = now;
       session.name = name;
 
@@ -548,7 +555,6 @@ async function allowedToEdit(req: express.Request, res: express.Response, action
       trip: row.remote ? row.trip : tripcode(row.trip)
     } as Message));
 
-    const active = toBoolean(req.query.active);
     const force = toBoolean(req.query.force);
     let participant = await getNamedParticipantRecord(name);
     const oldAllowDM = participant?.allow_dm;
@@ -584,6 +590,10 @@ async function allowedToEdit(req: express.Request, res: express.Response, action
         if (session2 && !session2.inChat) {
           participants.splice(i, 1);
           continue;
+        }
+        else if (session2) {
+          participant.remote = 0;
+          participant.last_active = Math.max(participant.last_active, session2.lastActive);
         }
         // last_post should only be greater than last_active for the same screen name posting as a remote participant
         else if (participant.last_post > participant.last_active) {

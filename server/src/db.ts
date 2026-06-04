@@ -117,7 +117,8 @@ export async function getDb(): Promise<AsyncDatabase> {
       name TEXT,
       ip TEXT,
       allow_dm INTEGER,
-      in_chat INTEGER ,
+      in_chat INTEGER,
+      last_active INTEGER NOT NULL,
       last_alive INTEGER NOT NULL,
       last_content_update INTEGER NOT NULL
   )`));
