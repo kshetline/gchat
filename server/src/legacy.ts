@@ -307,9 +307,11 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
 
       row = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 1 LIMIT 1', participant);
 
-      if (!row)
+      if (!row) {
         await db.run('INSERT INTO participants (name, remote, last_active, last_post) VALUES (?, ?, ?, ?)',
           participant, 1, clockNow, 0);
+        console.info(`Created remote participant record for ${participant}`);
+      }
     }
 
     firstParticipantPoll = false;
@@ -317,8 +319,9 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
     const rows = await db.all<DbParticipant>('SELECT * FROM participants where remote = 1');
 
     for (const row of rows) {
-      if (messages.participants?.findIndex(p => p.name === row.name) < 0)
-        await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', row.name);
+      if (messages.participants?.findIndex(p => p.name === row.name) < 0 &&
+          ((await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', row.name))?.changes || 0) > 0)
+        console.info(`Deleted remote participant record for ${row.name}`);
     }
 
     const latestPosts = new Map<string, number>();
@@ -493,8 +496,9 @@ export async function legacyEditMessage(name: string, trip: string, date: number
 
     await axios.post(`https://${userEdit}`, params);
   }
-  catch (err) {
-    console.error(`Failed to edit legacy message for ${name} at ${new Date(date * 1000).toISOString().slice(0, 19)}:`, err);
+  catch (err: any) {
+    console.error(`Failed to edit legacy message for ${name} at ${new Date(date * 1000).toISOString().slice(0, 19)}:`,
+      err.message || String(err));
   }
 }
 

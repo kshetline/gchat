@@ -126,17 +126,26 @@ async function monitor(): Promise<void> {
 async function getLastSessions(): Promise<void> {
   const db = await getDb();
   const dbSessions = await db.all<DbSessionInfo>('SELECT * FROM sessions');
+  const now = Now();
+  let count = 0;
 
   for (const session of dbSessions) {
-    sessions.set(session.token, {
-      allowDm: !!session.allow_dm,
-      ip: session.ip,
-      inChat: !!session.in_chat,
-      lastAlive: session.last_alive,
-      lastContentUpdate: session.last_content_update,
-      name: session.name
-    });
+    if (session.last_alive < now - MAX_IDLE_SESSION_AGE)
+      await db.run('DELETE FROM sessions WHERE token = ?', session.token);
+    else {
+      ++count;
+      sessions.set(session.token, {
+        allowDm: !!session.allow_dm,
+        ip: session.ip,
+        inChat: !!session.in_chat,
+        lastAlive: session.last_alive,
+        lastContentUpdate: session.last_content_update,
+        name: session.name
+      });
+    }
   }
+
+  console.info(`Restored ${count} old session${count !== 1 ? 's' : ''}`);
 }
 
 async function updateDbSession(token: string): Promise<void> {
@@ -146,19 +155,23 @@ async function updateDbSession(token: string): Promise<void> {
     return;
 
   try {
-    await (await getDb()).run(`INSERT OR REPLACE INTO sessions
+    const db = await getDb();
+    const oldSession = await db.get<DbSessionInfo>('SELECT * FROM sessions WHERE token = ?', token);
+
+    await db.run(`INSERT OR REPLACE INTO sessions
       (token, name, ip, allow_dm, in_chat, last_alive, last_content_update) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       token, session.name, session.ip, session.allowDm == null ? null : +session.allowDm,
       session.inChat == null ? null : +session.inChat, session.lastAlive, session.lastContentUpdate);
+
+    if (!oldSession)
+      console.info(`Created session ${token} for ${session.name}, ${session.ip}`);
+    else if (session.name && oldSession.name !== session.name)
+      console.info(`Updated session ${token} with name "${session.name}", ip: ${session.ip}`);
   }
   catch (err: any) {
     console.error(`Failed to update session in database: ${err.message}`);
   }
 }
-
-getLastSessions().finally();
-monitor().finally();
-initExternalUploader().catch().finally();
 
 async function sessionsCheck(): Promise<void> {
   const now = Now();
@@ -169,9 +182,9 @@ async function sessionsCheck(): Promise<void> {
     if (session?.name && session.lastAlive < now - MAX_IDLE_SESSION_AGE) {
       const db = await getDb();
 
-      const result = await db.run('DELETE FROM participants WHERE name = ? AND remote = 0', session.name);
+      const changes = (await db.run('DELETE FROM participants WHERE name = ? AND remote = 0', session.name))?.changes;
 
-      if (result.changes > 0)
+      if ((changes || 0) > 0)
         console.info(`Deleted participant record for ${session.name}`);
 
       sessions.delete(sessionId);
@@ -235,98 +248,6 @@ async function getDirectMessages(name: string, tripCode: string): Promise<DmSess
   return result;
 }
 
-app.set('trust proxy', 1);
-app.use(express.json());
-app.use(cors({
-  origin: process.env.CHAT_DOMAIN ? `https://${process.env.CHAT_DOMAIN}` : '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Authorization', 'Content-Type'],
-  credentials: true,
-}));
-
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  reportUploadProgress(req, 0);
-  console.error('Global error:', err); // For immediate server visibility
-
-  const errorDetails = {
-    message: err.message,
-    stack: err.stack,
-    route: req.originalUrl,
-    method: req.method,
-    time: new Date().toISOString(),
-  };
-
-  console.log('Global error:', JSON.stringify(errorDetails, null, 2));
-
-  // Check if headers have already been sent to avoid "Can't set headers after they are sent" errors
-  if (res.headersSent)
-    return next(err); // Pass to default Express error handler if response already started
-
-  // Determine the appropriate status code and message for the client
-  const statusCode = err.statusCode || 500; // Custom errors might have a statusCode property
-  const message = err.message || 'Internal Server Error';
-
-  // Send a generic, user-friendly error response to the client
-  res.status(statusCode).json({ success: false, message });
-});
-
-app.use(async (req, res, next) => {
-  if (shuttingDown) {
-    res.status(503).json({ error: 'Server is shutting down.' });
-    return;
-  }
-
-  const token = getToken(req);
-  let session: SessionInfo = token && sessions.get(token);
-
-  if (token && !session) {
-    const ip = getIp(req);
-    session = {
-      allowDm: req.query?.allowDm != null ? toBoolean(req.query?.allowDm) : null,
-      inChat: req.query?.inChat != null ? toBoolean(req.query?.inChat) : false,
-      ip: ip_.isPrivate(ip) ? await getServerIp() : ip,
-      lastAlive: Now(),
-      lastContentUpdate: 0,
-      name: req.query?.name != null ? cleanName(req.query?.name) : null
-    };
-    sessions.set(token, session);
-    await updateDbSession(token);
-  }
-
-  next();
-});
-
-const server = app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
-});
-
-startWebSocketServer(server);
-app.use(intrusionDetector);
-app.use(express.static(path.join(__dirname, 'public')));
-
-app.get('/api/token', async (req, res) => {
-  const token = randomUUID();
-  const ip = getIp(req);
-  const session = {
-    ip: ip_.isPrivate(ip) ? await getServerIp() : ip,
-    allowDm: req.query?.allowDm != null ? toBoolean(req.query?.allowDm) : null,
-    inChat: req.query?.inChat != null ? toBoolean(req.query?.inChat) : false,
-    lastAlive: Now(),
-    lastContentUpdate: 0,
-    name: req.query?.name != null ? cleanName(req.query?.name) : null
-  };
-
-  sessions.set(token, session);
-  await updateDbSession(token);
-  console.info(`Created session ${token} for ${session.name}, ${session.ip}`);
-
-  res.json({ token });
-});
-
-app.get('/api/config', (_req, res) => {
-  res.json(config);
-});
-
 function cleanName(name: any): string {
   return ((name || '') as string).replace(/#.*$/, '').trim();
 }
@@ -364,327 +285,30 @@ async function participantCheck(req: express.Request, forceInChat = false, nameO
   const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', name);
 
   if (!participant) {
-    await db.run('DELETE FROM participants WHERE name = ?', name);
+    const changes = (await db.run('DELETE FROM participants WHERE name = ?', name))?.changes;
+
+    if ((changes || 0) > 0)
+      console.info(`Deleted ${changes} participant record${changes > 1 ? 's' : ''} for ${name}`);
+
     await db.run('INSERT INTO participants (name, trip, email, ip, session_id, remote, proxied, last_active, last_post) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       name, q.tripCode, q.email, session?.ip, token, 0, proxied, Now(), 0);
+    console.info(`Created participant record for ${name}${q.tripCode ? '◆' + tripcode(q.tripCode) : ''}`);
   }
   else {
-    await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', name);
+    const changes = (await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', name))?.changes;
 
-    if (participant.ip !== ip || participant.trip !== q.tripCode || participant.session_id !== token || participant.proxied !== proxied)
-      await db.run('UPDATE participants SET ip = ?, trip = ?, last_active = ?, session_id = ?, proxied = ? WHERE name = ? AND remote = 0', ip, q.tripCode, Now(), token, proxied, name);
+    if ((changes || 0) > 0)
+      console.info(`Deleted ${changes} remote participant record${changes > 1 ? 's' : ''} for ${name}`);
+
+    if (participant.ip !== ip || participant.trip !== q.tripCode || participant.session_id !== token || participant.proxied !== proxied) {
+      await db.run('UPDATE participants SET ip = ?, trip = ?, last_active = ?, session_id = ?, proxied = ? WHERE name = ? AND remote = 0',
+        ip, q.tripCode, Now(), token, proxied, name);
+
+      if (participant.trip !== q.tripCode)
+        console.info(`Updated participant record for ${name} with ${q.tripCode ? 'trip code ' + tripcode(q.tripCode) : 'empty trip code'}`);
+    }
   }
 }
-
-app.get('/api/messages', async (req, res) => {
-  const q = req.query as any;
-
-  if (toBoolean(q.inChat))
-    await participantCheck(req);
-
-  const token = getToken(req);
-  const session = sessions.get(token);
-  const tripCode = tripcode(q.tripCode);
-  const name = cleanName(q.name);
-  const now = Now();
-
-  if (session) {
-    session.lastAlive = now;
-    session.name = name;
-
-    if (q.inChat != null)
-      session.inChat = toBoolean(q.inChat);
-
-    await updateDbSession(token);
-  }
-
-  const db = await getDb();
-  const rows = (await db.all<DbMessage>(
-    'SELECT * FROM messages WHERE deleted = 0 AND dm = 0 ORDER BY messages.synced_time')).slice(-MAX_CLIENT_MESSAGES);
-  let messages = rows.filter(row => !row.deleted).map(row => ({
-    editCount: row.edit_count,
-    email: row.email,
-    flagged: row.flagged,
-    hash: row.hash,
-    html: convertBBCodeToHtml(row.message),
-    isMe: row.name === name && (row.session_id === getToken(req) || row.ip === session?.ip ||
-      (row.trip && (row.trip === q.tripCode || row.trip === tripCode))),
-    msgId: row.id,
-    name: row.name,
-    remote: !!row.remote,
-    style: row.style,
-    time: row.synced_time,
-    trip: row.remote ? row.trip : tripcode(row.trip)
-  } as Message));
-
-  const active = toBoolean(req.query.active);
-  const force = toBoolean(req.query.force);
-  let participant = await getNamedParticipantRecord(name);
-  const oldAllowDM = participant?.allow_dm;
-  const newAllowDM = +toBoolean(q.allowDMs);
-
-  if (participant && active) {
-    await db.run('UPDATE participants SET allow_dm = ? WHERE id = ?', newAllowDM, participant.id);
-
-    if (session?.inChat)
-      await db.run('UPDATE participants SET last_active = ?, remote = 0 WHERE id = ?', now, participant.id);
-
-    if (newAllowDM !== oldAllowDM)
-      sendToAll('newMessages');
-  }
-
-  const participantNames = (await db.all<any>('SELECT name FROM participants WHERE name != ?',
-    proxyName)).map(r => r.name);
-  const participants = [...new Set(participantNames)].sort().map(p => ({ name: p } as ParticipantInfo));
-
-  for (let i = participants.length - 1; i >= 0; --i) {
-    const participantInfo = participants[i];
-    const participant = await getNamedParticipantRecord(participantInfo.name);
-
-    if (participant && !participant.remote) {
-      let session2 = sessions.get(participant.session_id);
-
-      if (!session2 && participant.name === name) {
-        session2 = session;
-        await db.run('UPDATE participants SET session_id = ? WHERE id = ?', getToken(req), participant.id);
-      }
-
-      if (session2 && !session2.inChat) {
-        participants.splice(i, 1);
-        continue;
-      }
-      // last_post should only be greater than last_active for the same screen name posting as a remote participant
-      else if (participant.last_post > participant.last_active) {
-        participant.remote = 1;
-        participant.last_active = participant.last_post;
-      }
-    }
-
-    if (participant) {
-      participantInfo.allowsDms = !!participant.allow_dm && !participant.remote;
-      participantInfo.idle = now - participant.last_active > (participant.remote ? 1800 : 600) ? 1 : 0;
-      participantInfo.remote = !!participant.remote;
-    }
-  }
-
-  participants.sort((a, b) => (a.remote !== b.remote) ? (a.remote ? 1 : -1) : a.name.localeCompare(b.name));
-
-  // Some duplicate messages are still slipping through, so one more check is needed
-  for (let i = messages.length - 1; i > messages.length - 25 && i >= 0; --i) {
-    const message = messages[i];
-
-    for (let j = i - 1; j > i - 5 && j >= 0; --j) {
-      const message2 = messages[j];
-
-      if (message2.name === message.name && Math.abs(message2.time - message.time) < 10 && message2.html === message.html) {
-        messages.splice(j, 1);
-        await db.run('UPDATE messages SET deleted = 1 WHERE id = ?', message2.msgId);
-        --i;
-      }
-    }
-  }
-
-  let deleteCount = 0;
-  let appendAt = 0;
-  let oldMessages: Message[];
-
-  if (!isEqual(lastMessages, messages, { keysToIgnore: ['isMe'] })) {
-    if (lastMessages?.length > 50 && messages?.length > 50) {
-      deleteCount = Math.max(lastMessages.findIndex(m => m.hash === messages[0].hash), 0);
-      appendAt = messages.findIndex(m => m.hash === lastMessages.at(-1).hash);
-      oldMessages = lastMessages.slice(deleteCount);
-
-      if (appendAt < 0)
-        appendAt = messages.length;
-    }
-
-    lastMessages = messages;
-    nextToLastContentUpdate = lastContentUpdate;
-    lastContentUpdate = now;
-    sendToAll('newMessages');
-  }
-
-  if (session) {
-    if (!force) {
-      if (session.lastContentUpdate === nextToLastContentUpdate && appendAt > 0) {
-        const overlappingMessages = messages.slice(0, appendAt + 1);
-
-        if (isEqual(oldMessages, overlappingMessages, { keysToIgnore: ['isMe'] }))
-          messages = messages.slice(appendAt + 1);
-        else
-          deleteCount = appendAt = 0;
-      }
-      else if (session.lastContentUpdate === lastContentUpdate)
-        messages = [null];
-    }
-    else
-      deleteCount = appendAt = 0;
-
-    session.lastContentUpdate = lastContentUpdate;
-    await updateDbSession(token);
-  }
-  else
-    deleteCount = appendAt = 0;
-
-  await sessionsCheck();
-
-  let lslp = lastSuccessfulLegacyPoll;
-
-  if (lslp <= 0)
-    lslp = messages.findLast(m => m?.remote)?.time ?? -1;
-
-  res.json({
-    messages,
-    deleteCount,
-    append: appendAt > 0,
-    participants,
-    participantsRaw,
-    dms: await getDirectMessages(name, q.tripCode),
-    lastSuccessfulLegacyPoll: lslp,
-    progress: session?.progress,
-    proxyIp,
-    wsPort
-  });
-});
-
-app.get('/api/dms', async (req, res) => {
-  res.json(await getDirectMessages(cleanName(req.query.name), req.query.tripCode as string));
-});
-
-app.post('/api/enter', async (req, res) => {
-  const q = req.query as any;
-  const name = cleanName(q.name);
-
-  if (await isBannedName(name, tripcode(q.tripCode)) || await isBannedIp(getIp(req))) {
-    res.status(400).json({ error: 'Entry into chat room failed' });
-    return;
-  }
-
-  const framed = toBoolean(q.framed);
-  const token = getToken(req);
-  const session = sessions.get(token) ?? { temp: true } as unknown as SessionInfo;
-  const db = await getDb();
-  const now = Now();
-  const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', name);
-  const wasInChat = session.inChat;
-
-  if (name) {
-    if (!participant) {
-      await db.run('DELETE FROM participants WHERE name = ?', name);
-      await db.run('INSERT INTO participants (name, trip, email, ip, session_id, remote, proxied, last_active, last_post) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        name, q.tripCode, q.email, session.ip, token, 0, +(!framed), now, 0);
-      session.inChat = true;
-    }
-    else {
-      const timeInactive = now - participant.last_active;
-
-      if (timeInactive > NAME_REUSE_INTERVAL ||
-            (!participant.trip && q.tripCode) || q.tripCode === participant.trip ||
-            !participant.ip || session.ip === participant.ip ||
-            !participant.session_id || token === participant.session_id) {
-        await db.run('UPDATE participants SET trip = ?, email = ?, ip = ?, session_id = ?, remote = ?, proxied = ?, last_active = ? WHERE id = ?',
-          q.tripCode, q.email, session.ip, token, 0, +(!framed), now, participant.id);
-        session.inChat = true;
-        await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', name);
-      }
-      else {
-        const remaining = Math.ceil((NAME_REUSE_INTERVAL - timeInactive) / 60);
-
-        res.status(400).json({
-          error: `Chat name '${name}' is already in use by another user.\n\n` +
-            `The name will be available again in ${remaining} minute${remaining === 1 ? '' : 's'} if the current user remains inactive for that time.` +
-            (participant.trip ? '\n\nReuse the same tripcode previously used along with this name for immediate access.' +
-              ' You can use the format "name#tripcode" in the name field to enter the room with your tripcode already set.' : '')
-        });
-
-        return;
-      }
-    }
-  }
-  else {
-    res.status(400).json({
-      error: 'Blank chat name not allowed.'
-    });
-
-    return;
-  }
-
-  if (session.inChat && !wasInChat) {
-    const lastEnterOrLeave = await db.get<any>(`SELECT id, style FROM messages WHERE synced_time > ? AND dm = 0 AND name = ? AND trip = ? AND
-      remote = 0 AND LENGTH(style) = 1 ORDER BY synced_time DESC LIMIT 1`, now - 3600, name, q.tripCode);
-
-    if (lastEnterOrLeave?.style === 'E') {
-      await db.run('UPDATE messages SET synced_time = ? WHERE id = ?', now, lastEnterOrLeave.id);
-    }
-    else {
-      const message = 'has joined ' + process.env.CHAT_TITLE;
-
-      await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        0, now, now, name, q.tripCode, q.email, 0, session.ip, token, 'E', message, messageHash('E:' + name, q.tripCode, now));
-      sendToAll('newMessages');
-    }
-  }
-
-  if (!framed && !proxyStarted) {
-    await enterLegacyChat(session?.ip, proxyName, null, 0);
-    proxyStarted = true;
-  }
-
-  if (!(session as any).temp)
-    await updateDbSession(token);
-
-  res.json(null);
-});
-
-app.post('/api/leave', async (req, res) => {
-  const q = req.query as any;
-  const name = cleanName(q.name);
-  const token = getToken(req);
-  const session = sessions.get(token);
-  const wasInChat = session?.inChat;
-
-  if (!session?.inChat) {
-    res.json(null);
-    return;
-  }
-
-  const db = await getDb();
-  const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', name);
-
-  if (participant && (q.tripCode === participant.trip || session.ip === participant.ip || token === participant.session_id)) {
-    await db.run('DELETE FROM participants WHERE id = ?', participant.id);
-    session.inChat = false;
-    await updateDbSession(token);
-  }
-
-  if (!session.inChat && wasInChat) {
-    const now = Now();
-    const message = 'has left ' + process.env.CHAT_TITLE;
-    const dms = [0];
-    const dmSessions = await db.all<DbDmSession>(
-      'SELECT * FROM dm_session WHERE (name1 = ? AND name1_present > 0) or (name2 = ? AND name2_present > 0)', name, name);
-
-    dmSessions.forEach(dm => dms.push(dm.id));
-
-    for (const dm of dms) {
-      await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        dm, now, now, name, q.tripCode, q.email, 0, session.ip, token, 'L', message, messageHash('L:' + q.name, q.tripCode, now));
-    }
-
-    sendToAll('newMessages');
-  }
-
-  if (!toBoolean(q.framed)) {
-    const proxiedCount = (await db.get<any>('SELECT COUNT(*) as count FROM participants WHERE proxied = 1'))?.count || 0;
-
-    if (!proxiedCount) {
-      await leaveLegacyChat();
-      proxyStarted = false;
-    }
-  }
-
-  res.json(null);
-});
 
 function colorToStyle(color: number): string {
   return `color:${colors[color].trim()}`;
@@ -756,83 +380,6 @@ async function notifyDmPartners(dmSessionOrName: string | DbDmSession, name2orMe
     sendToIp(ip2, message);
 }
 
-app.post('/api/send', async (req, res) => {
-  await participantCheck(req, true);
-
-  const q = req.query as any;
-  const name = cleanName(q.name);
-
-  if (await isBannedName(name, tripcode(q.tripCode)) || await isBannedIp(getIp(req))) {
-    res.status(400).json({ error: 'Send message failed' });
-    return;
-  }
-
-  const token = getToken(req);
-  const session = sessions.get(token);
-  const db = await getDb();
-  const now = Now();
-  const style = colorToStyle(q.color);
-  const rawComment = (req.body?.comment || q.comment || '').replace(/[\n\r]+/g, ' ');
-  let comment = rawComment.replace(URL_MATCHER, '[url=$1]$1[/url]');
-  const hash = messageHash(name, q.tripCode, now);
-  const framed = toBoolean(q.framed);
-  const dm = toInt(q.dm);
-  let dmSession: DbDmSession;
-
-  setTypingStatus(name, -1);
-
-  if (session && !session.inChat) {
-    session.inChat = true;
-    await updateDbSession(token);
-  }
-
-  if (dm) {
-    dmSession = await db.get<DbDmSession>('SELECT * FROM dm_session WHERE id = ?', dm);
-
-    if (!dmSession) {
-      res.status(400).json({ error: 'This chat session is closed.', closed: true });
-      return;
-    }
-    else if (!name) {
-      res.status(400).json({ error: 'You must use a non-blank chat name to send DMs.', closed: true });
-      return;
-    }
-    else
-      comment = encryptMessage(comment, dmSession.ekey);
-  }
-
-  const result = await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    dm, now, now, name, q.tripCode, q.email, 0, session?.ip, token, style, comment, hash);
-
-  if (!dm && (framed || proxyHidden))
-    addPendingDuplicate(result.lastID, now, name, comment);
-
-  await db.run('UPDATE participants SET last_post = ?1, last_active = ?1 WHERE name = ?2 AND remote = 0', now, name);
-
-  if (dmSession) {
-    await db.run('UPDATE dm_session SET last_post = ? WHERE id = ?', now, dmSession.id);
-    await notifyDmPartners(dmSession);
-  }
-  else
-    sendToAll('newMessages');
-
-  const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', name);
-
-  if (participant)
-    await db.run('UPDATE participants SET last_post = ?1, last_active = ?1 WHERE id = ?2', now, participant.id);
-
-  if (!dm && !framed && !comment.includes('##cpc-only##')) {
-    if (!proxyStarted) {
-      await enterLegacyChat(session?.ip, proxyName, null, 0);
-      proxyStarted = true;
-    }
-
-    await legacySendMessage(session?.ip, name, q.email, rawComment, q.color, q.tripCode);
-  }
-
-  res.json(null);
-});
-
 async function allowedToEdit(req: express.Request, res: express.Response, action = 'edit'): Promise<DbMessage> {
   const q = req.query as any;
   const name = cleanName(q.name);
@@ -844,8 +391,8 @@ async function allowedToEdit(req: express.Request, res: express.Response, action
     const message = await db.get<DbMessage>('SELECT * FROM messages WHERE id = ? LIMIT 1', id);
 
     if (message && message.name === name &&
-        ((message.trip && (message.trip === q.tripCode || message.trip === tripCode)) ||
-          message.session_id !== getToken(req))) {
+      ((message.trip && (message.trip === q.tripCode || message.trip === tripCode)) ||
+        message.session_id !== getToken(req))) {
       if (message.dm) {
         const dmSession = await db.get<DbDmSession>('SELECT * FROM dm_session WHERE id = ?', message.dm);
 
@@ -862,230 +409,732 @@ async function allowedToEdit(req: express.Request, res: express.Response, action
   return null;
 }
 
-app.get('/api/can-edit', async (req, res) => {
-  const message = await allowedToEdit(req, res);
+(async () => {
+  await getLastSessions();
+  monitor().finally();
+  initExternalUploader().catch().finally();
 
-  if (message)
-    res.send({ bbCode: message.message, color: styleToColor(message.style) });
-});
+  app.set('trust proxy', 1);
+  app.use(express.json());
+  app.use(cors({
+    origin: process.env.CHAT_DOMAIN ? `https://${process.env.CHAT_DOMAIN}` : '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Authorization', 'Content-Type'],
+    credentials: true,
+  }));
 
-app.put('/api/update', async (req, res) => {
-  await participantCheck(req, true);
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    reportUploadProgress(req, 0);
+    console.error('Global error:', err); // For immediate server visibility
 
-  if (await allowedToEdit(req, res)) {
+    const errorDetails = {
+      message: err.message,
+      stack: err.stack,
+      route: req.originalUrl,
+      method: req.method,
+      time: new Date().toISOString(),
+    };
+
+    console.log('Global error:', JSON.stringify(errorDetails, null, 2));
+
+    // Check if headers have already been sent to avoid "Can't set headers after they are sent" errors
+    if (res.headersSent)
+      return next(err); // Pass to default Express error handler if response already started
+
+    // Determine the appropriate status code and message for the client
+    const statusCode = err.statusCode || 500; // Custom errors might have a statusCode property
+    const message = err.message || 'Internal Server Error';
+
+    // Send a generic, user-friendly error response to the client
+    res.status(statusCode).json({ success: false, message });
+  });
+
+  app.use(async (req, res, next) => {
+    if (shuttingDown) {
+      res.status(503).json({ error: 'Server is shutting down.' });
+      return;
+    }
+
+    const token = getToken(req);
+    let session: SessionInfo = token && sessions.get(token);
+
+    if (token && !session) {
+      const ip = getIp(req);
+      session = {
+        allowDm: req.query?.allowDm != null ? toBoolean(req.query?.allowDm) : null,
+        inChat: req.query?.inChat != null ? toBoolean(req.query?.inChat) : false,
+        ip: ip_.isPrivate(ip) ? await getServerIp() : ip,
+        lastAlive: Now(),
+        lastContentUpdate: 0,
+        name: req.query?.name != null ? cleanName(req.query?.name) : null
+      };
+      sessions.set(token, session);
+      await updateDbSession(token);
+    }
+
+    next();
+  });
+
+  const server = app.listen(port, () => {
+    console.log(`Server running on http://localhost:${port}`);
+  });
+
+  startWebSocketServer(server);
+
+  app.use(intrusionDetector);
+  app.use(express.static(path.join(__dirname, 'public')));
+
+  app.get('/api/token', async (req, res) => {
+    const token = randomUUID();
+    const ip = getIp(req);
+    const session = {
+      ip: ip_.isPrivate(ip) ? await getServerIp() : ip,
+      allowDm: req.query?.allowDm != null ? toBoolean(req.query?.allowDm) : null,
+      inChat: req.query?.inChat != null ? toBoolean(req.query?.inChat) : false,
+      lastAlive: Now(),
+      lastContentUpdate: 0,
+      name: req.query?.name != null ? cleanName(req.query?.name) : null
+    };
+
+    sessions.set(token, session);
+    await updateDbSession(token);
+    console.info(`Created session ${token} for ${session.name}, ${session.ip}`);
+
+    res.json({ token });
+  });
+
+  app.get('/api/config', (_req, res) => {
+    res.json(config);
+  });
+
+  app.get('/api/messages', async (req, res) => {
     const q = req.query as any;
-    const id = toInt(q.msgId);
+
+    if (toBoolean(q.inChat))
+      await participantCheck(req);
+
+    const token = getToken(req);
+    const session = sessions.get(token);
+    const tripCode = tripcode(q.tripCode);
+    const name = cleanName(q.name);
+    const now = Now();
+
+    if (session) {
+      session.lastAlive = now;
+      session.name = name;
+
+      if (q.inChat != null)
+        session.inChat = toBoolean(q.inChat);
+
+      await updateDbSession(token);
+    }
+
+    const db = await getDb();
+    const rows = (await db.all<DbMessage>(
+      'SELECT * FROM messages WHERE deleted = 0 AND dm = 0 ORDER BY messages.synced_time')).slice(-MAX_CLIENT_MESSAGES);
+    let messages = rows.filter(row => !row.deleted).map(row => ({
+      editCount: row.edit_count,
+      email: row.email,
+      flagged: row.flagged,
+      hash: row.hash,
+      html: convertBBCodeToHtml(row.message),
+      isMe: row.name === name && (row.session_id === getToken(req) || row.ip === session?.ip ||
+        (row.trip && (row.trip === q.tripCode || row.trip === tripCode))),
+      msgId: row.id,
+      name: row.name,
+      remote: !!row.remote,
+      style: row.style,
+      time: row.synced_time,
+      trip: row.remote ? row.trip : tripcode(row.trip)
+    } as Message));
+
+    const active = toBoolean(req.query.active);
+    const force = toBoolean(req.query.force);
+    let participant = await getNamedParticipantRecord(name);
+    const oldAllowDM = participant?.allow_dm;
+    const newAllowDM = +toBoolean(q.allowDMs);
+
+    if (participant && active) {
+      await db.run('UPDATE participants SET allow_dm = ? WHERE id = ?', newAllowDM, participant.id);
+
+      if (session?.inChat)
+        await db.run('UPDATE participants SET last_active = ?, remote = 0 WHERE id = ?', now, participant.id);
+
+      if (newAllowDM !== oldAllowDM)
+        sendToAll('newMessages');
+    }
+
+    const participantNames = (await db.all<any>('SELECT name FROM participants WHERE name != ?',
+      proxyName)).map(r => r.name);
+    const participants = [...new Set(participantNames)].sort().map(p => ({ name: p } as ParticipantInfo));
+
+    for (let i = participants.length - 1; i >= 0; --i) {
+      const participantInfo = participants[i];
+      const participant = await getNamedParticipantRecord(participantInfo.name);
+
+      if (participant && !participant.remote) {
+        let session2 = sessions.get(participant.session_id);
+
+        if (!session2 && participant.name === name) {
+          session2 = session;
+          await db.run('UPDATE participants SET session_id = ? WHERE id = ?', getToken(req), participant.id);
+          console.info(`Updated session ID for participant ${participantInfo.name}`);
+        }
+
+        if (session2 && !session2.inChat) {
+          participants.splice(i, 1);
+          continue;
+        }
+        // last_post should only be greater than last_active for the same screen name posting as a remote participant
+        else if (participant.last_post > participant.last_active) {
+          participant.remote = 1;
+          participant.last_active = participant.last_post;
+        }
+      }
+
+      if (participant) {
+        participantInfo.allowsDms = !!participant.allow_dm && !participant.remote;
+        participantInfo.idle = now - participant.last_active > (participant.remote ? 1800 : 600) ? 1 : 0;
+        participantInfo.remote = !!participant.remote;
+      }
+    }
+
+    participants.sort((a, b) => (a.remote !== b.remote) ? (a.remote ? 1 : -1) : a.name.localeCompare(b.name));
+
+    // Some duplicate messages are still slipping through, so one more check is needed
+    for (let i = messages.length - 1; i > messages.length - 25 && i >= 0; --i) {
+      const message = messages[i];
+
+      for (let j = i - 1; j > i - 5 && j >= 0; --j) {
+        const message2 = messages[j];
+
+        if (message2.name === message.name && Math.abs(message2.time - message.time) < 10 && message2.html === message.html) {
+          messages.splice(j, 1);
+          await db.run('UPDATE messages SET deleted = 1 WHERE id = ?', message2.msgId);
+          --i;
+        }
+      }
+    }
+
+    let deleteCount = 0;
+    let appendAt = 0;
+    let oldMessages: Message[];
+
+    if (!isEqual(lastMessages, messages, { keysToIgnore: ['isMe'] })) {
+      if (lastMessages?.length > 50 && messages?.length > 50) {
+        deleteCount = Math.max(lastMessages.findIndex(m => m.hash === messages[0].hash), 0);
+        appendAt = messages.findIndex(m => m.hash === lastMessages.at(-1).hash);
+        oldMessages = lastMessages.slice(deleteCount);
+
+        if (appendAt < 0)
+          appendAt = messages.length;
+      }
+
+      lastMessages = messages;
+      nextToLastContentUpdate = lastContentUpdate;
+      lastContentUpdate = now;
+      sendToAll('newMessages');
+    }
+
+    if (session) {
+      if (!force) {
+        if (session.lastContentUpdate === nextToLastContentUpdate && appendAt > 0) {
+          const overlappingMessages = messages.slice(0, appendAt + 1);
+
+          if (isEqual(oldMessages, overlappingMessages, { keysToIgnore: ['isMe'] }))
+            messages = messages.slice(appendAt + 1);
+          else
+            deleteCount = appendAt = 0;
+        }
+        else if (session.lastContentUpdate === lastContentUpdate)
+          messages = [null];
+      }
+      else
+        deleteCount = appendAt = 0;
+
+      session.lastContentUpdate = lastContentUpdate;
+      await updateDbSession(token);
+    }
+    else
+      deleteCount = appendAt = 0;
+
+    await sessionsCheck();
+
+    let lslp = lastSuccessfulLegacyPoll;
+
+    if (lslp <= 0)
+      lslp = messages.findLast(m => m?.remote)?.time ?? -1;
+
+    res.json({
+      messages,
+      deleteCount,
+      append: appendAt > 0,
+      participants,
+      participantsRaw,
+      dms: await getDirectMessages(name, q.tripCode),
+      lastSuccessfulLegacyPoll: lslp,
+      progress: session?.progress,
+      proxyIp,
+      wsPort
+    });
+  });
+
+  app.get('/api/dms', async (req, res) => {
+    res.json(await getDirectMessages(cleanName(req.query.name), req.query.tripCode as string));
+  });
+
+  app.post('/api/enter', async (req, res) => {
+    const q = req.query as any;
+    const name = cleanName(q.name);
+
+    if (await isBannedName(name, tripcode(q.tripCode)) || await isBannedIp(getIp(req))) {
+      res.status(400).json({ error: 'Entry into chat room failed' });
+      return;
+    }
+
+    const framed = toBoolean(q.framed);
+    const token = getToken(req);
+    const session = sessions.get(token) ?? { temp: true } as unknown as SessionInfo;
     const db = await getDb();
     const now = Now();
-    const rawBbCode = req.body?.bbCode || q.bbCode as string || '';
-    let bbCode = rawBbCode.replace(URL_MATCHER, '[url=$1]$1[/url]');
-    const oldMessage = await db.get<DbMessage>('SELECT * FROM messages WHERE id = ?', id);
-    const dm = oldMessage.dm;
+    const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', name);
+    const wasInChat = session.inChat;
+
+    if (name) {
+      if (!participant) {
+        const changes = (await db.run('DELETE FROM participants WHERE name = ?', name))?.changes;
+
+        if ((changes || 0) > 0)
+          console.info(`Deleted ${changes} participant record${changes > 1 ? 's' : ''} for ${name}`);
+
+        await db.run('INSERT INTO participants (name, trip, email, ip, session_id, remote, proxied, last_active, last_post) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          name, q.tripCode, q.email, session.ip, token, 0, +(!framed), now, 0);
+        session.inChat = true;
+        console.info(`Created participant record for ${name}${q.tripCode ? '◆' + tripcode(q.tripCode) : ''}`);
+      }
+      else {
+        const timeInactive = now - participant.last_active;
+
+        if (timeInactive > NAME_REUSE_INTERVAL ||
+              (!participant.trip && q.tripCode) || q.tripCode === participant.trip ||
+              !participant.ip || session.ip === participant.ip ||
+              !participant.session_id || token === participant.session_id) {
+          await db.run('UPDATE participants SET trip = ?, email = ?, ip = ?, session_id = ?, remote = ?, proxied = ?, last_active = ? WHERE id = ?',
+            q.tripCode, q.email, session.ip, token, 0, +(!framed), now, participant.id);
+          session.inChat = true;
+          await updateDbSession(token);
+          console.info(`Updated participant record for ${name}${q.tripCode ? '◆' + tripcode(q.tripCode) : ''}`);
+
+          const changes = (await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', name))?.changes;
+
+          if ((changes || 0) > 0)
+            console.info(`Deleted ${changes} remote participant record${changes > 1 ? 's' : ''} for ${name}`);
+        }
+        else {
+          const remaining = Math.ceil((NAME_REUSE_INTERVAL - timeInactive) / 60);
+
+          res.status(400).json({
+            error: `Chat name '${name}' is already in use by another user.\n\n` +
+              `The name will be available again in ${remaining} minute${remaining === 1 ? '' : 's'} if the current user remains inactive for that time.` +
+              (participant.trip ? '\n\nReuse the same tripcode previously used along with this name for immediate access.' +
+                ' You can use the format "name#tripcode" in the name field to enter the room with your tripcode already set.' : '')
+          });
+
+          return;
+        }
+      }
+    }
+    else {
+      res.status(400).json({
+        error: 'Blank chat name not allowed.'
+      });
+
+      return;
+    }
+
+    if (session.inChat && !wasInChat) {
+      const lastEnterOrLeave = await db.get<any>(`SELECT id, style FROM messages WHERE synced_time > ? AND dm = 0 AND name = ? AND trip = ? AND
+        remote = 0 AND LENGTH(style) = 1 ORDER BY synced_time DESC LIMIT 1`, now - 3600, name, q.tripCode);
+
+      if (lastEnterOrLeave?.style === 'E') {
+        await db.run('UPDATE messages SET synced_time = ? WHERE id = ?', now, lastEnterOrLeave.id);
+      }
+      else {
+        const message = 'has joined ' + process.env.CHAT_TITLE;
+
+        await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          0, now, now, name, q.tripCode, q.email, 0, session.ip, token, 'E', message, messageHash('E:' + name, q.tripCode, now));
+        sendToAll('newMessages');
+      }
+    }
+
+    if (!framed && !proxyStarted) {
+      await enterLegacyChat(session?.ip, proxyName, null, 0);
+      proxyStarted = true;
+    }
+
+    if (!(session as any).temp)
+      await updateDbSession(token);
+
+    res.json(null);
+  });
+
+  app.post('/api/leave', async (req, res) => {
+    const q = req.query as any;
     const name = cleanName(q.name);
+    const token = getToken(req);
+    const session = sessions.get(token);
+    const wasInChat = session?.inChat;
+
+    if (!session?.inChat) {
+      res.json(null);
+      return;
+    }
+
+    const db = await getDb();
+    const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', name);
+
+    if (participant && (q.tripCode === participant.trip || session.ip === participant.ip || token === participant.session_id)) {
+      const changes = (await db.run('DELETE FROM participants WHERE id = ?', participant.id))?.changes;
+
+      if ((changes || 0) > 0)
+        console.info(`Deleted ${changes} participant record${changes > 1 ? 's' : ''} for ${name}`);
+
+      session.inChat = false;
+      await updateDbSession(token);
+    }
+
+    if (!session.inChat && wasInChat) {
+      const now = Now();
+      const message = 'has left ' + process.env.CHAT_TITLE;
+      const dms = [0];
+      const dmSessions = await db.all<DbDmSession>(
+        'SELECT * FROM dm_session WHERE (name1 = ? AND name1_present > 0) or (name2 = ? AND name2_present > 0)', name, name);
+
+      dmSessions.forEach(dm => dms.push(dm.id));
+
+      for (const dm of dms) {
+        await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          dm, now, now, name, q.tripCode, q.email, 0, session.ip, token, 'L', message, messageHash('L:' + q.name, q.tripCode, now));
+      }
+
+      sendToAll('newMessages');
+    }
+
+    if (!toBoolean(q.framed)) {
+      const proxiedCount = (await db.get<any>('SELECT COUNT(*) as count FROM participants WHERE proxied = 1'))?.count || 0;
+
+      if (!proxiedCount) {
+        await leaveLegacyChat();
+        proxyStarted = false;
+      }
+    }
+
+    res.json(null);
+  });
+
+  app.post('/api/send', async (req, res) => {
+    await participantCheck(req, true);
+
+    const q = req.query as any;
+    const name = cleanName(q.name);
+
+    if (await isBannedName(name, tripcode(q.tripCode)) || await isBannedIp(getIp(req))) {
+      res.status(400).json({ error: 'Send message failed' });
+      return;
+    }
+
+    const token = getToken(req);
+    const session = sessions.get(token);
+    const db = await getDb();
+    const now = Now();
+    const style = colorToStyle(q.color);
+    const rawComment = (req.body?.comment || q.comment || '').replace(/[\n\r]+/g, ' ');
+    let comment = rawComment.replace(URL_MATCHER, '[url=$1]$1[/url]');
+    const hash = messageHash(name, q.tripCode, now);
+    const framed = toBoolean(q.framed);
+    const dm = toInt(q.dm);
+    let dmSession: DbDmSession;
 
     setTypingStatus(name, -1);
 
+    if (session && !session.inChat) {
+      session.inChat = true;
+      await updateDbSession(token);
+    }
+
     if (dm) {
-      const dmSession = await db.get<DbDmSession>('SELECT * FROM dm_session WHERE id = ?', dm);
+      dmSession = await db.get<DbDmSession>('SELECT * FROM dm_session WHERE id = ?', dm);
 
-      if (dmSession)
-        bbCode = encryptMessage(bbCode, dmSession.ekey);
-    }
-
-    await db.run('UPDATE messages SET edit_count = edit_count + 1, time = ?, message = ?, style = ? WHERE id = ?',
-      now, bbCode, colorToStyle(q.color), id);
-    sendToAll('newMessages');
-
-    if (!dm)
-      legacyEditMessage(oldMessage.name, q.tripCode, oldMessage.synced_time, rawBbCode, colors[q.color].trim()).finally();
-
-    res.json(null);
-  }
-});
-
-app.delete('/api/delete', async (req, res) => {
-  await participantCheck(req, true);
-
-  if (await allowedToEdit(req, res, 'delete')) {
-    const id = toInt(req.query.msgId);
-    const db = await getDb();
-    const oldMessage = await db.get<DbMessage>('SELECT * FROM messages WHERE id = ?', id);
-
-    await db.run('UPDATE messages SET deleted = 1 WHERE id = ?', id);
-    sendToAll('newMessages');
-
-    if (!oldMessage.dm)
-      legacyDeleteMessage(oldMessage.name, req.query.tripCode as string, oldMessage.synced_time).finally();
-
-    res.json(null);
-  }
-});
-
-app.post('/api/start-chat', async (req, res) => {
-  const q = req.query as any;
-  const self = cleanName(q.self);
-  await participantCheck(req, true, self);
-  const name = ((q.name || '') as string).trim();
-
-  if (self === name) {
-    res.status(400).json({ error: 'Cannot start a chat with yourself (not this way, at least).' });
-    return;
-  }
-  else if (!self) {
-    res.status(400).json({ error: 'You must use a non-blank chat name to send DMs.' });
-    return;
-  }
-
-  const participant = await getNamedParticipantRecord(name);
-
-  if (!participant || !participant.allow_dm || !sessions.get(participant.session_id)?.inChat) {
-    res.status(400).json({ error: `${name} is not available for direct messaging.` });
-    return;
-  }
-
-  const now = Now();
-  const db = await getDb();
-  const dmSession = await db.get<DbDmSession>(`SELECT * FROM dm_session WHERE (name1 = ?1 AND name2 = ?2) OR
-                                                 (name1 = ?2 AND name2 = ?1)`, name, self);
-
-  if (dmSession) {
-    const whichName = dmSession.name1 === self ? 'name1_present' : 'name2_present';
-
-    await db.run(`UPDATE dm_session SET ${whichName} = ? WHERE id = ?`, now, dmSession.id);
-
-    const lastEnterOrLeave = await db.get<any>(`SELECT id, style FROM messages WHERE synced_time > ? AND dm = ? AND name = ? AND trip = ? AND
-      remote = 0 AND LENGTH(style) = 1 ORDER BY synced_time DESC LIMIT 1`, now - 3600, dmSession.id, name, q.tripCode);
-
-    if (lastEnterOrLeave?.style === 'E')
-      await db.run('UPDATE messages SET synced_time = ? WHERE id = ?', now, lastEnterOrLeave.id);
-
-    else {
-      const message = 'has joined this private chat';
-
-      await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        dmSession.id, now, now, self, q.tripCode, q.email, 0, getIp(req), '', 'E', message, messageHash('E:' + self, q.tripCode, now));
-    }
-
-    await notifyDmPartners(dmSession, 'newDirectMessages');
-
-    res.json({ id: dmSession.id });
-    return;
-  }
-
-  const encryptionKey = randomBytes(32).toString('base64');
-  const result = await db.run('INSERT INTO dm_session (name1, name2, name1_present, ekey, start_time) VALUES (?, ?, 1, ?, ?)',
-    self, name, encryptionKey, now);
-
-  const message = 'has started this private chat';
-
-  await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    result.lastID, now, now, self, q.tripCode, q.email, 0, getIp(req), '', 'S', message, messageHash('S:' + self, q.tripCode, now));
-  await notifyDmPartners(self, name, 'newMessages');
-
-  res.json({ id: result.lastID });
-});
-
-app.post('/api/leave-chat', async (req, res) => {
-  const q = req.query as any;
-  const self = cleanName(q.self);
-  const id = toInt(q.id);
-  const db = await getDb();
-  const dmSession = await db.get<DbDmSession>(`SELECT * FROM dm_session WHERE id = ?`, id);
-
-  if (dmSession) {
-    const now = Now();
-    let message: string;
-
-    if (!toBoolean(q.viewed))
-      await db.run('DELETE FROM dm_session WHERE id = ?', id);
-    else {
-      const whichName = dmSession.name1 === self ? 'name1_present' : 'name2_present';
-
-      dmSession[whichName] = -Now();
-      await db.run(`UPDATE dm_session SET ${whichName} = ? WHERE id = ?`, -Now(), id);
-
-      if (dmSession.name1_present < 0 && dmSession.name2_present < 0)
-        await db.run('DELETE FROM dm_session WHERE id = ?', id);
+      if (!dmSession) {
+        res.status(400).json({ error: 'This chat session is closed.', closed: true });
+        return;
+      }
+      else if (!name) {
+        res.status(400).json({ error: 'You must use a non-blank chat name to send DMs.', closed: true });
+        return;
+      }
       else
-        message = 'has left this private chat';
+        comment = encryptMessage(comment, dmSession.ekey);
     }
+
+    const result = await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      dm, now, now, name, q.tripCode, q.email, 0, session?.ip, token, style, comment, hash);
+
+    if (!dm && (framed || proxyHidden))
+      addPendingDuplicate(result.lastID, now, name, comment);
+
+    await db.run('UPDATE participants SET last_post = ?1, last_active = ?1 WHERE name = ?2 AND remote = 0', now, name);
+
+    if (dmSession) {
+      await db.run('UPDATE dm_session SET last_post = ? WHERE id = ?', now, dmSession.id);
+      await notifyDmPartners(dmSession);
+    }
+    else
+      sendToAll('newMessages');
+
+    const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', name);
+
+    if (participant)
+      await db.run('UPDATE participants SET last_post = ?1, last_active = ?1 WHERE id = ?2', now, participant.id);
+
+    if (!dm && !framed && !comment.includes('##cpc-only##')) {
+      if (!proxyStarted) {
+        await enterLegacyChat(session?.ip, proxyName, null, 0);
+        proxyStarted = true;
+      }
+
+      await legacySendMessage(session?.ip, name, q.email, rawComment, q.color, q.tripCode);
+    }
+
+    res.json(null);
+  });
+
+  app.get('/api/can-edit', async (req, res) => {
+    const message = await allowedToEdit(req, res);
 
     if (message)
-      await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        dmSession.id, now, now, self, q.tripCode, q.email, 0, getIp(req), '', 'L', message, '');
+      res.send({ bbCode: message.message, color: styleToColor(message.style) });
+  });
 
-    await notifyDmPartners(dmSession);
-  }
+  app.put('/api/update', async (req, res) => {
+    await participantCheck(req, true);
 
-  res.json(null);
-});
+    if (await allowedToEdit(req, res)) {
+      const q = req.query as any;
+      const id = toInt(q.msgId);
+      const db = await getDb();
+      const now = Now();
+      const rawBbCode = req.body?.bbCode || q.bbCode as string || '';
+      let bbCode = rawBbCode.replace(URL_MATCHER, '[url=$1]$1[/url]');
+      const oldMessage = await db.get<DbMessage>('SELECT * FROM messages WHERE id = ?', id);
+      const dm = oldMessage.dm;
+      const name = cleanName(q.name);
 
-app.post('/api/upload', async (req, res) => {
-  await participantCheck(req);
+      setTypingStatus(name, -1);
 
-  try {
-    const url = await uploadSingle(req, res);
+      if (dm) {
+        const dmSession = await db.get<DbDmSession>('SELECT * FROM dm_session WHERE id = ?', dm);
 
-    res.json({ url });
-  }
-  catch (error) {
-    console.error('Upload error:', error);
-    res.status(400).json({
-      error: error instanceof Error ? error.message : 'Upload failed'
-    });
-  }
-});
+        if (dmSession)
+          bbCode = encryptMessage(bbCode, dmSession.ekey);
+      }
 
-const updateTypingStatus = throttle(1000, () => {
-  const now = processMillis();
-  const status = clone(typingStatus);
+      await db.run('UPDATE messages SET edit_count = edit_count + 1, time = ?, message = ?, style = ? WHERE id = ?',
+        now, bbCode, colorToStyle(q.color), id);
+      sendToAll('newMessages');
 
-  Object.keys(status).forEach(name => {
-    status[name].since = now - status[name].since;
+      if (!dm)
+        legacyEditMessage(oldMessage.name, q.tripCode, oldMessage.synced_time, rawBbCode, colors[q.color].trim()).finally();
 
-    if (status[name].since > 5 || status[name].dm === -1) {
-      delete status[name];
+      res.json(null);
     }
   });
 
-  sendToAll('typing', status);
-});
+  app.delete('/api/delete', async (req, res) => {
+    await participantCheck(req, true);
 
-function setTypingStatus(name: string, dm: number, since = processMillis()): void {
-  typingStatus[name] = { dm, since };
-  updateTypingStatus();
-}
+    if (await allowedToEdit(req, res, 'delete')) {
+      const id = toInt(req.query.msgId);
+      const db = await getDb();
+      const oldMessage = await db.get<DbMessage>('SELECT * FROM messages WHERE id = ?', id);
 
-app.post('/api/typing', async (req, res) => {
-  const dm = toInt(req.body.dm);
-  const name = req.body.name;
+      await db.run('UPDATE messages SET deleted = 1 WHERE id = ?', id);
+      sendToAll('newMessages');
 
-  if (name)
-    setTypingStatus(name, dm);
+      if (!oldMessage.dm)
+        legacyDeleteMessage(oldMessage.name, req.query.tripCode as string, oldMessage.synced_time).finally();
 
-  res.json(null);
-});
+      res.json(null);
+    }
+  });
 
-app.get('/api/error', (_req, res) => {
-  res.status(500).json({ error: 'Internal server error' });
-});
+  app.post('/api/start-chat', async (req, res) => {
+    const q = req.query as any;
+    const self = cleanName(q.self);
+    await participantCheck(req, true, self);
+    const name = ((q.name || '') as string).trim();
 
-app.get('/', (_req, res) => {
-  res.send('Static home file not found');
-});
+    if (self === name) {
+      res.status(400).json({ error: 'Cannot start a chat with yourself (not this way, at least).' });
+      return;
+    }
+    else if (!self) {
+      res.status(400).json({ error: 'You must use a non-blank chat name to send DMs.' });
+      return;
+    }
 
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
-process.on('SIGUSR2', shutdown);
-process.on('unhandledRejection', err => console.error(`${timeStamp()} -- Unhandled rejection:`, err));
+    const participant = await getNamedParticipantRecord(name);
 
-function shutdown(signal?: string): void {
-  if (devMode && signal === 'SIGTERM') return;
+    if (!participant || !participant.allow_dm || !sessions.get(participant.session_id)?.inChat) {
+      res.status(400).json({ error: `${name} is not available for direct messaging.` });
+      return;
+    }
 
-  shuttingDown = true;
-  console.log(`${timeStamp()} -- Shutting down...`);
-  stopLocalSocksProxy().then(() => getDb().then(db => db.close().then(() => {
-    clearTimeout(monitorTimeout);
-    stopLegacyPolling();
-  })));
-}
+    const now = Now();
+    const db = await getDb();
+    const dmSession = await db.get<DbDmSession>(`SELECT * FROM dm_session WHERE (name1 = ?1 AND name2 = ?2) OR
+                                                   (name1 = ?2 AND name2 = ?1)`, name, self);
+
+    if (dmSession) {
+      const whichName = dmSession.name1 === self ? 'name1_present' : 'name2_present';
+
+      await db.run(`UPDATE dm_session SET ${whichName} = ? WHERE id = ?`, now, dmSession.id);
+
+      const lastEnterOrLeave = await db.get<any>(`SELECT id, style FROM messages WHERE synced_time > ? AND dm = ? AND name = ? AND trip = ? AND
+        remote = 0 AND LENGTH(style) = 1 ORDER BY synced_time DESC LIMIT 1`, now - 3600, dmSession.id, name, q.tripCode);
+
+      if (lastEnterOrLeave?.style === 'E')
+        await db.run('UPDATE messages SET synced_time = ? WHERE id = ?', now, lastEnterOrLeave.id);
+
+      else {
+        const message = 'has joined this private chat';
+
+        await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          dmSession.id, now, now, self, q.tripCode, q.email, 0, getIp(req), '', 'E', message, messageHash('E:' + self, q.tripCode, now));
+      }
+
+      await notifyDmPartners(dmSession, 'newDirectMessages');
+
+      res.json({ id: dmSession.id });
+      return;
+    }
+
+    const encryptionKey = randomBytes(32).toString('base64');
+    const result = await db.run('INSERT INTO dm_session (name1, name2, name1_present, ekey, start_time) VALUES (?, ?, 1, ?, ?)',
+      self, name, encryptionKey, now);
+
+    const message = 'has started this private chat';
+
+    await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      result.lastID, now, now, self, q.tripCode, q.email, 0, getIp(req), '', 'S', message, messageHash('S:' + self, q.tripCode, now));
+    await notifyDmPartners(self, name, 'newMessages');
+
+    res.json({ id: result.lastID });
+  });
+
+  app.post('/api/leave-chat', async (req, res) => {
+    const q = req.query as any;
+    const self = cleanName(q.self);
+    const id = toInt(q.id);
+    const db = await getDb();
+    const dmSession = await db.get<DbDmSession>(`SELECT * FROM dm_session WHERE id = ?`, id);
+
+    if (dmSession) {
+      const now = Now();
+      let message: string;
+
+      if (!toBoolean(q.viewed))
+        await db.run('DELETE FROM dm_session WHERE id = ?', id);
+      else {
+        const whichName = dmSession.name1 === self ? 'name1_present' : 'name2_present';
+
+        dmSession[whichName] = -Now();
+        await db.run(`UPDATE dm_session SET ${whichName} = ? WHERE id = ?`, -Now(), id);
+
+        if (dmSession.name1_present < 0 && dmSession.name2_present < 0)
+          await db.run('DELETE FROM dm_session WHERE id = ?', id);
+        else
+          message = 'has left this private chat';
+      }
+
+      if (message)
+        await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          dmSession.id, now, now, self, q.tripCode, q.email, 0, getIp(req), '', 'L', message, '');
+
+      await notifyDmPartners(dmSession);
+    }
+
+    res.json(null);
+  });
+
+  app.post('/api/upload', async (req, res) => {
+    await participantCheck(req);
+
+    try {
+      const url = await uploadSingle(req, res);
+
+      res.json({ url });
+    }
+    catch (error) {
+      console.error('Upload error:', error);
+      res.status(400).json({
+        error: error instanceof Error ? error.message : 'Upload failed'
+      });
+    }
+  });
+
+  const updateTypingStatus = throttle(1000, () => {
+    const now = processMillis();
+    const status = clone(typingStatus);
+
+    Object.keys(status).forEach(name => {
+      status[name].since = now - status[name].since;
+
+      if (status[name].since > 5 || status[name].dm === -1) {
+        delete status[name];
+      }
+    });
+
+    sendToAll('typing', status);
+  });
+
+  function setTypingStatus(name: string, dm: number, since = processMillis()): void {
+    typingStatus[name] = { dm, since };
+    updateTypingStatus();
+  }
+
+  app.post('/api/typing', async (req, res) => {
+    const dm = toInt(req.body.dm);
+    const name = req.body.name;
+
+    if (name)
+      setTypingStatus(name, dm);
+
+    res.json(null);
+  });
+
+  app.get('/api/error', (_req, res) => {
+    res.status(500).json({ error: 'Internal server error' });
+  });
+
+  app.get('/', (_req, res) => {
+    res.send('Static home file not found');
+  });
+
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+  process.on('SIGUSR2', shutdown);
+  process.on('unhandledRejection', err => console.error(`${timeStamp()} -- Unhandled rejection:`, err));
+
+  function shutdown(signal?: string): void {
+    if (devMode && signal === 'SIGTERM') return;
+
+    shuttingDown = true;
+    console.log(`${timeStamp()} -- Shutting down...`);
+    stopLocalSocksProxy().then(() => getDb().then(db => db.close().then(() => {
+      clearTimeout(monitorTimeout);
+      stopLegacyPolling();
+    })));
+  }
+})();
