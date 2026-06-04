@@ -482,15 +482,20 @@ export async function legacyEditMessage(name: string, trip: string, date: number
   if (!userEdit)
     return;
 
-  const params = new URLSearchParams();
+  try {
+    const params = new URLSearchParams();
 
-  params.append('name', name);
-  params.append('trip', trip);
-  params.append('date', date.toString());
-  params.append('message', message);
-  params.append('color', color || '');
+    params.append('name', name);
+    params.append('trip', trip);
+    params.append('date', date.toString());
+    params.append('message', message);
+    params.append('color', color || '');
 
-  await axios.post(`https://${userEdit}`, params);
+    await axios.post(`https://${userEdit}`, params);
+  }
+  catch (err) {
+    console.error(`Failed to edit legacy message for ${name} at ${new Date(date * 1000).toISOString().slice(0, 19)}:`, err);
+  }
 }
 
 export async function legacyDeleteMessage(name: string, trip: string, date: number): Promise<void> {

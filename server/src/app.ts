@@ -4,7 +4,7 @@ import { randomUUID, randomBytes, createCipheriv, createDecipheriv } from 'crypt
 import { colors, Config, DbDmSession, DbMessage, DbParticipant, DmSession, Message, ParticipantInfo, TypingStatus } from './shared-types.js';
 import { clone, isEqual, isString, processMillis, throttle, toBoolean, toInt } from '@tubular/util';
 import { uploadSingle } from './uploader.js';
-import { SessionInfo } from './session-info';
+import { DbSessionInfo, SessionInfo } from './session-info';
 import { addPendingDuplicate, enterLegacyChat, lastSuccessfulLegacyPoll, leaveLegacyChat, legacyDeleteMessage, legacyEditMessage, legacySendMessage, participantsRaw, stopLegacyPolling } from './legacy.js';
 import { getDb, getNamedParticipantRecord } from './db.js';
 import ip_ from 'ip';
@@ -50,6 +50,7 @@ if (process.env.LOG_FILE_PATH) {
 }
 
 export const MAX_IDLE_PARTICIPANT_AGE = 172800; // 2 days
+export const MAX_IDLE_SESSION_AGE = 7200; // 2 hours
 
 const app = express();
 const port = toInt(process.env.PORT) || 3000;
@@ -101,7 +102,14 @@ async function monitor(): Promise<void> {
 
   await db.run('DELETE FROM messages WHERE dm > 0 AND synced_time < ?', now - MAX_DM_AGE);
   await db.run('DELETE FROM dm_session WHERE name1_present <= 1 AND name2_present <= 1 AND start_time < ?1 AND last_post < ?1', now - MAX_DM_AGE);
+
+  for (const participant of await db.all<DbParticipant>('DELETE FROM participants WHERE last_active < ?', now - MAX_IDLE_PARTICIPANT_AGE))
+    console.info(`Deleted participant record for ${participant.name}`);
   await db.run('DELETE FROM participants WHERE last_active < ?', now - MAX_IDLE_PARTICIPANT_AGE);
+
+  for (const session of await db.all<DbSessionInfo>('SELECT * FROM sessions WHERE last_alive < ?', now - MAX_IDLE_SESSION_AGE))
+    console.info(`Deleted session ${session.token} for ${session.name}, ${session.ip}`);
+  await db.run('DELETE FROM sessions WHERE last_alive < ?', now - MAX_IDLE_SESSION_AGE);
 
   const messageCount = (await db.get<any>('SELECT COUNT(*) as count FROM messages WHERE dm = 0'))?.count || 0;
 
@@ -115,6 +123,40 @@ async function monitor(): Promise<void> {
   monitorTimeout = setTimeout(monitor, MONITOR_INTERVAL);
 }
 
+async function getLastSessions(): Promise<void> {
+  const db = await getDb();
+  const dbSessions = await db.all<DbSessionInfo>('SELECT * FROM sessions');
+
+  for (const session of dbSessions) {
+    sessions.set(session.token, {
+      allowDm: !!session.allow_dm,
+      ip: session.ip,
+      inChat: !!session.in_chat,
+      lastAlive: session.last_alive,
+      lastContentUpdate: session.last_content_update,
+      name: session.name
+    });
+  }
+}
+
+async function updateDbSession(token: string): Promise<void> {
+  const session = token && sessions.get(token);
+
+  if (!session)
+    return;
+
+  try {
+    await (await getDb()).run(`INSERT OR REPLACE INTO sessions
+      (token, name, ip, allow_dm, in_chat, last_alive, last_content_update) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      token, session.name, session.ip, session.allowDm == null ? null : +session.allowDm,
+      session.inChat == null ? null : +session.inChat, session.lastAlive, session.lastContentUpdate);
+  }
+  catch (err: any) {
+    console.error(`Failed to update session in database: ${err.message}`);
+  }
+}
+
+getLastSessions().finally();
 monitor().finally();
 initExternalUploader().catch().finally();
 
@@ -124,11 +166,17 @@ async function sessionsCheck(): Promise<void> {
   for (const sessionId of sessions.keys()) {
     const session = sessions.get(sessionId);
 
-    if (session?.name && session.lastAlive < now - 1800) {
+    if (session?.name && session.lastAlive < now - MAX_IDLE_SESSION_AGE) {
       const db = await getDb();
 
-      await db.run('DELETE FROM participants WHERE name = ? AND remote = 0', session.name);
+      const result = await db.run('DELETE FROM participants WHERE name = ? AND remote = 0', session.name);
+
+      if (result.changes > 0)
+        console.info(`Deleted participant record for ${session.name}`);
+
       sessions.delete(sessionId);
+      await db.run('DELETE FROM sessions WHERE token = ? ', sessionId);
+      console.info(`Deleted session ${sessionId} for ${session.name}, ${session.ip}`);
     }
   }
 }
@@ -229,10 +277,20 @@ app.use(async (req, res, next) => {
   }
 
   const token = getToken(req);
+  let session: SessionInfo = token && sessions.get(token);
 
-  if (token && !sessions.has(token)) {
+  if (token && !session) {
     const ip = getIp(req);
-    sessions.set(token, { ip: ip_.isPrivate(ip) ? await getServerIp() : ip, inChat: false } as SessionInfo);
+    session = {
+      allowDm: req.query?.allowDm != null ? toBoolean(req.query?.allowDm) : null,
+      inChat: req.query?.inChat != null ? toBoolean(req.query?.inChat) : false,
+      ip: ip_.isPrivate(ip) ? await getServerIp() : ip,
+      lastAlive: Now(),
+      lastContentUpdate: 0,
+      name: req.query?.name != null ? cleanName(req.query?.name) : null
+    };
+    sessions.set(token, session);
+    await updateDbSession(token);
   }
 
   next();
@@ -249,8 +307,19 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/api/token', async (req, res) => {
   const token = randomUUID();
   const ip = getIp(req);
+  const session = {
+    ip: ip_.isPrivate(ip) ? await getServerIp() : ip,
+    allowDm: req.query?.allowDm != null ? toBoolean(req.query?.allowDm) : null,
+    inChat: req.query?.inChat != null ? toBoolean(req.query?.inChat) : false,
+    lastAlive: Now(),
+    lastContentUpdate: 0,
+    name: req.query?.name != null ? cleanName(req.query?.name) : null
+  };
 
-  sessions.set(token, { ip: ip_.isPrivate(ip) ? await getServerIp() : ip, inChat: false } as SessionInfo);
+  sessions.set(token, session);
+  await updateDbSession(token);
+  console.info(`Created session ${token} for ${session.name}, ${session.ip}`);
+
   res.json({ token });
 });
 
@@ -275,10 +344,20 @@ async function participantCheck(req: express.Request, forceInChat = false, nameO
     return;
 
   if (session) {
-    session.ip = ip;
+    let changed = false;
 
-    if (!session.inChat && inChat)
+    if (session.ip !== ip) {
+      session.ip = ip;
+      changed = true;
+    }
+
+    if (!session.inChat && inChat) {
       session.inChat = true;
+      changed = true;
+    }
+
+    if (changed)
+      await updateDbSession(token);
   }
 
   const db = await getDb();
@@ -303,7 +382,8 @@ app.get('/api/messages', async (req, res) => {
   if (toBoolean(q.inChat))
     await participantCheck(req);
 
-  const session = sessions.get(getToken(req));
+  const token = getToken(req);
+  const session = sessions.get(token);
   const tripCode = tripcode(q.tripCode);
   const name = cleanName(q.name);
   const now = Now();
@@ -314,6 +394,8 @@ app.get('/api/messages', async (req, res) => {
 
     if (q.inChat != null)
       session.inChat = toBoolean(q.inChat);
+
+    await updateDbSession(token);
   }
 
   const db = await getDb();
@@ -325,7 +407,7 @@ app.get('/api/messages', async (req, res) => {
     flagged: row.flagged,
     hash: row.hash,
     html: convertBBCodeToHtml(row.message),
-    isMe: row.name === name && (row.session_id === getToken(req) || row.ip === session.ip ||
+    isMe: row.name === name && (row.session_id === getToken(req) || row.ip === session?.ip ||
       (row.trip && (row.trip === q.tripCode || row.trip === tripCode))),
     msgId: row.id,
     name: row.name,
@@ -418,7 +500,7 @@ app.get('/api/messages', async (req, res) => {
 
     lastMessages = messages;
     nextToLastContentUpdate = lastContentUpdate;
-    lastContentUpdate = processMillis();
+    lastContentUpdate = now;
     sendToAll('newMessages');
   }
 
@@ -439,6 +521,7 @@ app.get('/api/messages', async (req, res) => {
       deleteCount = appendAt = 0;
 
     session.lastContentUpdate = lastContentUpdate;
+    await updateDbSession(token);
   }
   else
     deleteCount = appendAt = 0;
@@ -479,7 +562,7 @@ app.post('/api/enter', async (req, res) => {
 
   const framed = toBoolean(q.framed);
   const token = getToken(req);
-  const session = sessions.get(token) ?? {} as SessionInfo;
+  const session = sessions.get(token) ?? { temp: true } as unknown as SessionInfo;
   const db = await getDb();
   const now = Now();
   const participant = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', name);
@@ -547,6 +630,9 @@ app.post('/api/enter', async (req, res) => {
     proxyStarted = true;
   }
 
+  if (!(session as any).temp)
+    await updateDbSession(token);
+
   res.json(null);
 });
 
@@ -568,6 +654,7 @@ app.post('/api/leave', async (req, res) => {
   if (participant && (q.tripCode === participant.trip || session.ip === participant.ip || token === participant.session_id)) {
     await db.run('DELETE FROM participants WHERE id = ?', participant.id);
     session.inChat = false;
+    await updateDbSession(token);
   }
 
   if (!session.inChat && wasInChat) {
@@ -694,8 +781,10 @@ app.post('/api/send', async (req, res) => {
 
   setTypingStatus(name, -1);
 
-  if (session)
+  if (session && !session.inChat) {
     session.inChat = true;
+    await updateDbSession(token);
+  }
 
   if (dm) {
     dmSession = await db.get<DbDmSession>('SELECT * FROM dm_session WHERE id = ?', dm);

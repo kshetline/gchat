@@ -45,6 +45,7 @@ export async function getDb(): Promise<AsyncDatabase> {
       .replace(/\bUNIQUE PRIMARY KEY AUTOINCREMENT\b/g, 'AUTO_INCREMENT PRIMARY KEY')
       .replace(/\bUNIQUE PRIMARY KEY\b/g, '')
       .replace(/\b(value TEXT NOT NULL)\b/, '$1,\n    PRIMARY KEY (key0(255))')
+      .replace(/\b(last_content_update INTEGER NOT NULL)\b/, '$1,\n    PRIMARY KEY (token(255))')
       .replace(/\b(note TEXT)\b/, '$1,\n    PRIMARY KEY (ip(255))')
       + ' CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci' :
     (sql: string) => sql;
@@ -108,6 +109,17 @@ export async function getDb(): Promise<AsyncDatabase> {
     `CREATE TABLE IF NOT EXISTS key_value (
       key0 TEXT NOT NULL UNIQUE PRIMARY KEY,
       value TEXT NOT NULL
+  )`));
+
+  await db.exec(modifyIfNeeded(
+    `CREATE TABLE IF NOT EXISTS sessions (
+      token TEXT NOT NULL UNIQUE PRIMARY KEY,
+      name TEXT,
+      ip TEXT,
+      allow_dm INTEGER,
+      in_chat INTEGER ,
+      last_alive INTEGER NOT NULL,
+      last_content_update INTEGER NOT NULL
   )`));
 
   inInit = false;

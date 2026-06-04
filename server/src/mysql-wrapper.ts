@@ -23,6 +23,8 @@ export class AsyncDatabaseWrapperForMySQL extends AsyncDatabase {
   private static adaptParamsAndSyntax(sql: string, params: unknown[]): [string, unknown[]] {
     params.forEach((v, i) => v === undefined && (params[i] = null));
 
+    sql = sql.replace(/\bINSERT\s+OR\s+REPLACE\s+INTO\b/im, 'REPLACE INTO');
+
     let result = '';
     let i = 0;
     let highestIndex = 0;
