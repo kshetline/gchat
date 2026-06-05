@@ -202,8 +202,9 @@ export function reportUploadProgress(req: express.Request, progress: number): vo
     session.progress = Math.round(progress);
 }
 
-async function getDirectMessages(name: string, tripCode: string): Promise<DmSession[]> {
+async function getDirectMessages(name: string, tripCode: string, openDmString: string): Promise<DmSession[]> {
   const db = await getDb();
+  const openDms = (openDmString || '').split('_').map(d => toInt(d)).filter(d => d > 0);
   const result: DmSession[] = [];
   const dmSessions = await db.all<DbDmSession>('SELECT * FROM dm_session WHERE name1 = ? or name2 = ?', name, name);
   const participantTrip = (await getNamedParticipantRecord(name))?.trip || '';
@@ -218,8 +219,17 @@ async function getDirectMessages(name: string, tripCode: string): Promise<DmSess
     // Have there been any new messages since this person left the chat? If so, don't broadcast the chat session until
     // there's something new to show.
 
-    if (present < 0 && dmSession.last_post < -present)
+    if (present < 0 && !openDms.includes(dmSession.id))
       continue;
+
+    const sessionName = ((dmSession.name1 === name ? dmSession.name2 : dmSession.name1) || '').trim();
+
+    if (dmSession.last_post < -present) {
+      if (sessionName)
+        result.push({ id: dmSession.id, messages: [null], name: sessionName });
+
+      continue;
+    }
 
     const rows = (await db.all<DbMessage>(
       'SELECT * FROM messages WHERE deleted = 0 AND dm = ? ORDER BY messages.synced_time',
@@ -240,9 +250,7 @@ async function getDirectMessages(name: string, tripCode: string): Promise<DmSess
       trip: tripcode(row.trip ?? '')
     } as Message));
 
-    const sessionName = dmSession.name1 === name ? dmSession.name2 : dmSession.name1;
-
-    if (sessionName?.trim())
+    if (sessionName)
       result.push({ id: dmSession.id, messages, name: sessionName });
   }
 
@@ -377,10 +385,10 @@ async function notifyDmPartners(dmSessionOrName: string | DbDmSession, name2orMe
   const ip2 = (await getNamedParticipantRecord(name2))?.ip;
 
   if (ip1)
-    sendToIp(ip1, message);
+    sendToIp(ip1, message, undefined, name1, sessions);
 
   if (ip2 && ip2 !== ip1)
-    sendToIp(ip2, message);
+    sendToIp(ip2, message, undefined, name2, sessions);
 }
 
 async function allowedToEdit(req: express.Request, res: express.Response, action = 'edit'): Promise<DbMessage> {
@@ -558,7 +566,19 @@ async function allowedToEdit(req: express.Request, res: express.Response, action
     const force = toBoolean(req.query.force);
     let participant = await getNamedParticipantRecord(name);
     const oldAllowDM = participant?.allow_dm;
-    const newAllowDM = +toBoolean(q.allowDMs);
+    let newAllowDM = +toBoolean(q.allowDMs);
+
+    if (session && session.allowDm !== !!newAllowDM) {
+      session.allowDm = !!newAllowDM;
+      await updateDbSession(token);
+    }
+
+    newAllowDM = 0;
+
+    for (const session2 of sessions.values()) {
+      if (session2.name === name)
+        newAllowDM = newAllowDM || +session2.allowDm;
+    }
 
     if (participant && active) {
       await db.run('UPDATE participants SET allow_dm = ? WHERE id = ?', newAllowDM, participant.id);
@@ -681,7 +701,7 @@ async function allowedToEdit(req: express.Request, res: express.Response, action
       append: appendAt > 0,
       participants,
       participantsRaw,
-      dms: await getDirectMessages(name, q.tripCode),
+      dms: await getDirectMessages(name, q.tripCode, q.openDms),
       lastSuccessfulLegacyPoll: lslp,
       progress: session?.progress,
       proxyIp,
@@ -690,7 +710,7 @@ async function allowedToEdit(req: express.Request, res: express.Response, action
   });
 
   app.get('/api/dms', async (req, res) => {
-    res.json(await getDirectMessages(cleanName(req.query.name), req.query.tripCode as string));
+    res.json(await getDirectMessages(cleanName(req.query.name), req.query.tripCode as string, req.query.openDms as string));
   });
 
   app.post('/api/enter', async (req, res) => {
@@ -1016,8 +1036,7 @@ async function allowedToEdit(req: express.Request, res: express.Response, action
 
       if (lastEnterOrLeave?.style === 'E')
         await db.run('UPDATE messages SET synced_time = ? WHERE id = ?', now, lastEnterOrLeave.id);
-
-      else {
+      else if (dmSession[whichName] <= 0) {
         const message = 'has joined this private chat';
 
         await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -1052,9 +1071,10 @@ async function allowedToEdit(req: express.Request, res: express.Response, action
 
     if (dmSession) {
       const now = Now();
+      const whichName = dmSession.name1 === self ? 'name1_present' : 'name2_present';
       let message: string;
 
-      if (!toBoolean(q.viewed))
+      if (!toBoolean(q.viewed) && dmSession[whichName] <= 0)
         await db.run('DELETE FROM dm_session WHERE id = ?', id);
       else {
         const whichName = dmSession.name1 === self ? 'name1_present' : 'name2_present';

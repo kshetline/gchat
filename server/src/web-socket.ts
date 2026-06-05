@@ -1,6 +1,7 @@
 import * as http from 'http';
 import { AddressInfo, WebSocketServer } from 'ws';
 import { toInt } from '@tubular/util';
+import { SessionInfo } from './session-info';
 
 const httpPort = toInt(process.env.PORT) || 3000;
 export const wsPort = toInt(process.env.CHAT_WEB_SOCKET_PORT);
@@ -81,9 +82,18 @@ export function sendToAll(message: string, data?: any): void {
     wsServer.clients.forEach(client => client.send(message + (data ? `\t${JSON.stringify(data)}` : '')));
 }
 
-export function sendToIp(ip: string, message: string, data?: any): void {
-  if (wsServer)
-    for (const client of wsServer.clients)
-      if ((client as any).remoteAddress === ip)
-        client.send(message + (data ? `\t${JSON.stringify(data)}` : ''));
+export function sendToIp(ip: string, message: string, data?: any, name?: string, sessions?: Map<string, SessionInfo>): void {
+  if (!wsServer)
+    return;
+
+  for (const client of wsServer.clients)
+    if ((client as any).remoteAddress === ip)
+      client.send(message + (data ? `\t${JSON.stringify(data)}` : ''));
+
+  const session = name && sessions && [...sessions.values()].find(s => s.ip === ip && s.name === name);
+
+  if (!session)
+    return;
+
+  sessions.forEach(sess => sess.name === session.name && sess.ip !== ip && sendToIp(sess.ip, message, data));
 }

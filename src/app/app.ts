@@ -293,7 +293,7 @@ export class App implements OnInit {
   private getDirectMessages(): void {
     this.saveTripCode();
     this.httpClient.get<DmSession[]>('/api/dms',
-      { params: { name: this.name(), tripCode: this.tripCode() } }).subscribe({
+      { params: { name: this.name(), tripCode: this.tripCode(), openDms: this.openDmList() } }).subscribe({
         next: data => {
           if (!(data as any).errorMessage) {
             this.connectionTrouble.set(false);
@@ -307,6 +307,10 @@ export class App implements OnInit {
         this.repollMessages(error.status === 429 ? REPOLL_RATE_429 : REPOLL_RATE_QUICK);
       }
     });
+  }
+
+  private openDmList(): string {
+    return this.dms().map(dm => dm.id).join('_');
   }
 
   private setTypingStatus(ts: TypingStatus): void {
@@ -410,6 +414,7 @@ export class App implements OnInit {
           framed: this.framed,
           inChat: this.inChat(),
           name: this.name(),
+          openDms: this.openDmList(),
           tripCode: this.tripCode()
         }
       }).subscribe({
@@ -965,7 +970,9 @@ export class App implements OnInit {
     for (const dm of dms) {
       let index = currentDMs.findIndex(d => d.id === dm.id);
 
-      if (index >= 0) {
+      if (isEqual(dm.messages, [null]))
+        continue
+      else if (index >= 0) {
         const currentDM = currentDMs[index];
         const oldMessages = currentDM.messages();
 
@@ -992,7 +999,7 @@ export class App implements OnInit {
         index = currentDMs.length - 1;
       }
 
-      this.enterLeaveCheck(index, currentDMs[index].messages());
+      this.enterLeaveCheck(index, currentDMs[index].messages && currentDMs[index].messages());
     }
 
     const minuteAgo = processMillis() - 60000;
