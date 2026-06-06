@@ -5,7 +5,7 @@ import { colors, Config, DbDmSession, DbMessage, DbParticipant, DmSession, Messa
 import { clone, isEqual, isString, processMillis, throttle, toBoolean, toInt } from '@tubular/util';
 import { uploadSingle } from './uploader.js';
 import { DbSessionInfo, SessionInfo } from './session-info';
-import { addPendingDuplicate, enterLegacyChat, lastSuccessfulLegacyPoll, leaveLegacyChat, legacyDeleteMessage, legacyEditMessage, legacySendMessage, participantsRaw, stopLegacyPolling } from './legacy.js';
+import { addPendingDuplicate, announceDeparture, enterLegacyChat, lastSuccessfulLegacyPoll, leaveLegacyChat, legacyDeleteMessage, legacyEditMessage, legacySendMessage, participantsRaw, stopLegacyPolling } from './legacy.js';
 import { getDb, getNamedParticipantRecord } from './db.js';
 import ip_ from 'ip';
 import axios from 'axios';
@@ -166,11 +166,11 @@ async function updateDbSession(token: string): Promise<void> {
 
     if (!oldSession)
       console.info(`Created session ${token} for ${session.name}, ${session.ip}`);
-    else if (session.name && oldSession.name !== session.name)
+    else if (session.name && (oldSession.name !== session.name || oldSession.ip !== session.ip))
       console.info(`Updated session ${token} with name "${session.name}", ip: ${session.ip}`);
   }
   catch (err: any) {
-    console.error(`Failed to update session in database: ${err.message}`);
+    console.error(`Failed to update session ${token} in database: ${err.message}`);
   }
 }
 
@@ -848,6 +848,7 @@ async function allowedToEdit(req: express.Request, res: express.Response, action
           dm, now, now, name, q.tripCode, q.email, 0, session.ip, token, 'L', message, messageHash('L:' + q.name, q.tripCode, now));
       }
 
+      announceDeparture(name);
       sendToAll('newMessages');
     }
 
@@ -1030,6 +1031,7 @@ async function allowedToEdit(req: express.Request, res: express.Response, action
       const whichName = dmSession.name1 === self ? 'name1_present' : 'name2_present';
 
       await db.run(`UPDATE dm_session SET ${whichName} = ? WHERE id = ?`, now, dmSession.id);
+      console.info(`DM session ${dmSession.id} for ${dmSession.name1} & ${dmSession.name2} joined by ${self}`);
 
       const lastEnterOrLeave = await db.get<any>(`SELECT id, style FROM messages WHERE synced_time > ? AND dm = ? AND name = ? AND trip = ? AND
         remote = 0 AND LENGTH(style) = 1 ORDER BY synced_time DESC LIMIT 1`, now - 3600, dmSession.id, name, q.tripCode);
@@ -1058,6 +1060,7 @@ async function allowedToEdit(req: express.Request, res: express.Response, action
     await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       result.lastID, now, now, self, q.tripCode, q.email, 0, getIp(req), '', 'S', message, messageHash('S:' + self, q.tripCode, now));
     await notifyDmPartners(self, name, 'newMessages');
+    console.info(`Created DM session for ${self} & ${name}`);
 
     res.json({ id: result.lastID });
   });
@@ -1074,8 +1077,10 @@ async function allowedToEdit(req: express.Request, res: express.Response, action
       const whichName = dmSession.name1 === self ? 'name1_present' : 'name2_present';
       let message: string;
 
-      if (!toBoolean(q.viewed) && dmSession[whichName] <= 0)
+      if (!toBoolean(q.viewed) && dmSession[whichName] <= 0) {
         await db.run('DELETE FROM dm_session WHERE id = ?', id);
+        console.info(`Deleted DM session for ${dmSession.name1} & ${dmSession.name2}`);
+      }
       else {
         const whichName = dmSession.name1 === self ? 'name1_present' : 'name2_present';
 

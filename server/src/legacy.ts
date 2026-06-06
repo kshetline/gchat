@@ -17,6 +17,7 @@ const proxyTrip = process.env.CHAT_PROXY_TRIPCODE;
 const proxyTripEncoded = tripcode(proxyTrip);
 const parser = new HtmlParser();
 export const MAX_IDLE_PARTICIPANT_LEEWAY = 600; // 10 minutes
+const DEPARTURE_SUSTAIN = 660; // 11 minutes
 
 export let browser: puppeteer.Browser;
 export let participantsRaw: string;
@@ -35,10 +36,15 @@ interface PendingDuplicate {
   comment: string;
 }
 
-export const pendingDuplicates: PendingDuplicate[] = [];
+const pendingDuplicates: PendingDuplicate[] = [];
+const departureTimes = new Map<string, number>();
 
 export function addPendingDuplicate(id: number, time: number, name: string, comment: string): void {
   pendingDuplicates.push({ id, time, name, comment });
+}
+
+export function announceDeparture(name: string): void {
+  departureTimes.set(name, Now());
 }
 
 function extractMessage(messageRow: DomNode): Message {
@@ -221,6 +227,11 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
     const latestInDb = row?.time;
     const clockNow = Now();
 
+    departureTimes.forEach((time, name) => {
+      if (clockNow - time > DEPARTURE_SUSTAIN)
+        departureTimes.delete(name);
+    });
+
     for (let i = pendingDuplicates.length - 1; i >= 0; --i) {
       const time = pendingDuplicates[i].time;
 
@@ -292,6 +303,11 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
     if (retrieveCount < 1000 && latestInDb && earliest > latestInDb)
       return pollLegacyMessages(1000);
 
+    const latestPosts = new Map<string, number>();
+
+    for (const message of messages.messages || [])
+      latestPosts.set(message.name, message.time);
+
     for (const participant of (messages.participants || []).map(p => p.name)) {
       if (!participant || participant === proxyName)
         continue;
@@ -307,9 +323,12 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
 
       row = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 1 LIMIT 1', participant);
 
-      if (!row) {
+      const lastActive = latestPosts.has(participant) ? latestPosts.get(participant) : clockNow;
+      const lastPost = latestPosts.has(participant) ? latestPosts.get(participant) : 0;
+
+      if (!row && (!departureTimes.has(participant) || lastPost > departureTimes.get(participant) + 60)) {
         await db.run('INSERT INTO participants (name, remote, last_active, last_post) VALUES (?, ?, ?, ?)',
-          participant, 1, clockNow, 0);
+          participant, 1, lastActive, lastPost);
         console.info(`Created remote participant record for ${participant}`);
       }
     }
@@ -323,11 +342,6 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
           ((await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', row.name))?.changes || 0) > 0)
         console.info(`Deleted remote participant record for ${row.name}`);
     }
-
-    const latestPosts = new Map<string, number>();
-
-    for (const message of messages.messages || [])
-      latestPosts.set(message.name, message.time);
 
     for (const participant of Array.from(latestPosts.keys())) {
       if (latestPosts.get(participant))
