@@ -110,7 +110,7 @@ export function unescapeUnicode(text: string): string {
 }
 
 export function timeStamp(): string {
-  return '[' + new Date().toISOString() + ']';
+  return '[' + new Date().toISOString().slice(0, 19) + 'Z]';
 }
 
 export function Now(): number { return Math.floor(Date.now() / 1000); }

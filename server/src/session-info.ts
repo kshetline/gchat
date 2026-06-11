@@ -2,10 +2,12 @@ export interface SessionInfo {
   allowDm: boolean;
   ip?: string;
   inChat?: boolean;
+  inChatLock?: boolean;
   lastActive?: number;
   lastAlive?: number;
   lastContentUpdate?: number;
   name?: string;
+  openDms?: Set<number>;
   progress?: number;
 }
 

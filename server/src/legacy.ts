@@ -47,6 +47,10 @@ export function announceDeparture(name: string): void {
   departureTimes.set(name, Now());
 }
 
+export function clearDeparture(name: string): void {
+  departureTimes.delete(name);
+}
+
 function extractMessage(messageRow: DomNode): Message {
   const bbCode = getTextAndMarkupAsBBCode(messageRow.querySelector('.messageComment').children, domain);
   const html = convertBBCodeToHtml(bbCode);
@@ -329,6 +333,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
       if (!row && (!departureTimes.has(participant) || lastPost > departureTimes.get(participant) + 60)) {
         await db.run('INSERT INTO participants (name, remote, last_active, last_post) VALUES (?, ?, ?, ?)',
           participant, 1, lastActive, lastPost);
+        departureTimes.delete(participant);
         console.info(`Created remote participant record for ${participant}`);
       }
     }
