@@ -5,7 +5,7 @@
     "ng": "ng",
     "start": "ng serve --proxy-config proxy.conf.json",
     "build": "ng build --source-map",
-    "build-all": "rimraf dist && cd server && npm run build && cd .. && npm run build && mv dist/chat/browser dist/public && rimraf dist/chat && cp server/dist/app.js* server/dist/package.json dist/ && [ -f ./userscript-updater.sh ] && ./userscript-updater.sh && cp local_dist/chat-mods.user.js dist/public/chat-mods.user.js && cp -f local_dist/about.html dist/public/assets/about.html",
+    "build-all": "rimraf dist && cd server && npm run build && cd .. && npm run build && mv dist/chat/browser dist/public && rimraf dist/chat && cp server/dist/app.js* server/dist/package.json dist/ && [ -f ./userscript-updater.sh ] && ./userscript-updater.sh && cp local_dist/chat-mods.user.js dist/public/chat-mods.user.js && cp -f local_dist/about.html dist/public/assets/about.html && rm dist/public/assets/about_enhanced.html",
     "lint": "eslint --ignore-pattern '.angular/' --ignore-pattern '**/tsc-out/' --ignore-pattern '**/dist/'",
     "watch": "ng build --watch --configuration development"
   },
