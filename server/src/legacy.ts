@@ -500,9 +500,28 @@ export async function legacySendMessage(ip: string, name: string, email: string,
   await messagePage.keyboard.press('Enter');
 }
 
-export async function legacyEditMessage(name: string, trip: string, date: number, message: string, color?: string): Promise<void> {
+const pendingRetries = new Map<string, any>();
+const MAX_EDIT_TRIES = 4;
+const EDIT_RETRY_DELAY = 10000;
+
+export async function legacyEditMessage(name: string, trip: string, date: number, message: string, color?: string, tries = 1): Promise<void> {
   if (!userEdit)
     return;
+
+  const db = await getDb();
+  const dbMessage = await db.get<DbMessage>('SELECT * FROM messages WHERE name = ? AND trip = ? AND time = ? AND synced_time != ?',
+    name, trip, date, date);
+
+  if (dbMessage)
+    date = dbMessage.synced_time;
+
+  const key = `${name}\t${trip}\t${date}`;
+  const pendingRetry = pendingRetries.get(key);
+
+  if (pendingRetry) { // Forget pending retries if a fresh new edit is attempted
+    clearTimeout(pendingRetry);
+    pendingRetries.delete(key);
+  }
 
   try {
     const params = new URLSearchParams();
@@ -513,7 +532,19 @@ export async function legacyEditMessage(name: string, trip: string, date: number
     params.append('message', message);
     params.append('color', color || '');
 
-    await axios.post(`https://${userEdit}`, params);
+    const response = await axios.post(`https://${userEdit}`, params);
+
+    // Attempt to edit a message might occur before the remote chat has obtained the original message.
+    if (tries < MAX_EDIT_TRIES && response.data.startsWith('not ')) {
+      pendingRetries.set(key, setTimeout(() => {
+        pendingRetries.delete(key);
+        legacyEditMessage(name, trip, date, message, color, tries + 1);
+      }, EDIT_RETRY_DELAY));
+    }
+
+    pendingRetries.set(key, setTimeout(() => {
+      legacyEditMessage(name, trip, date, message, color, tries + 1);
+    }, 1000));
   }
   catch (err: any) {
     console.error(`Failed to edit legacy message for ${name} at ${new Date(date * 1000).toISOString().slice(0, 19)}:`,
