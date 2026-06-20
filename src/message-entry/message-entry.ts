@@ -67,6 +67,19 @@ function quillOpsToBBCode(ops: any[]): string {
   for (const op of ops) {
     const attrs = new Set<string>();
 
+    recognizedAttributes.forEach(attr => {
+      const stack = stacks.get(attr);
+
+      if (stack.length > 0 && !attrs.has(attr)) {
+        if (attr === 'size')
+          result += `[/${sizeMap[stack.at(-1)]}]`;
+        else
+          result += `[/${tagMap[attr]}]`;
+
+        stack.pop();
+      }
+    });
+
     forEach(op.attributes, (key, value) => {
       if (recognizedAttributes.has(key)) {
         const stack = stacks.get(key);
@@ -87,19 +100,6 @@ function quillOpsToBBCode(ops: any[]): string {
 
           stack.push(value);
         }
-      }
-    });
-
-    recognizedAttributes.forEach(attr => {
-      const stack = stacks.get(attr);
-
-      if (stack.length > 0 && !attrs.has(attr)) {
-        if (attr === 'size')
-          result += `[/${sizeMap[stack.at(-1)]}]`;
-        else
-          result += `[/${tagMap[attr]}]`;
-
-        stack.pop();
       }
     });
 

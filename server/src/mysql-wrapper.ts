@@ -1,6 +1,7 @@
 import { RunResult } from 'sqlite3';
 import { AsyncDatabase, AsyncStatement } from 'promised-sqlite3';
 import { Connection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
+import { isArray } from '@tubular/util';
 
 export class AsyncDatabaseWrapperForMySQL extends AsyncDatabase {
   constructor(private connection: Connection) {
@@ -148,7 +149,11 @@ export class AsyncDatabaseWrapperForMySQL extends AsyncDatabase {
   override async all<T>(sql: string, ...params: unknown[]): Promise<T[]> {
     const [adaptedSql, adaptedParams] = AsyncDatabaseWrapperForMySQL.adaptParamsAndSyntax(sql, params);
     const [rows] = await this.connection.execute<RowDataPacket[]>(adaptedSql, adaptedParams as any);
-    return rows as T[];
+
+    if (isArray(rows))
+      return rows as T[];
+    else
+      return [];
   }
 
   override async each<T>(sql: string, params: any, callback: (row: T) => void): Promise<number> {

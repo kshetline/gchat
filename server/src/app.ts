@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { randomUUID, randomBytes, createCipheriv, createDecipheriv } from 'crypto';
 import { colors, Config, DbDmSession, DbMessage, DbParticipant, DmSession, Message, ParticipantInfo, TypingStatus } from './shared-types.js';
-import { clone, isEqual, isString, processMillis, throttle, toBoolean, toInt } from '@tubular/util';
+import { clone, isEqual, isObject, isString, processMillis, throttle, toBoolean, toInt } from '@tubular/util';
 import { uploadSingle } from './uploader.js';
 import { DbSessionInfo, SessionInfo } from './session-info';
 import { addPendingDuplicate, announceDeparture, clearDeparture, enterLegacyChat, lastSuccessfulLegacyPoll, leaveLegacyChat, legacyDeleteMessage, legacyEditMessage, legacySendMessage, participantsRaw, stopLegacyPolling } from './legacy.js';
@@ -44,7 +44,14 @@ if (process.env.LOG_FILE_PATH) {
         args[0] = (args[0] as string).replace(/(?<!%)%s/g, () => args.length > 1 ? String(args.splice(1, 1)) : '%s');
       }
 
-      logFile.write(prefix + timeStamp() + ' ' + args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ') + '\n');
+      logFile.write(prefix + timeStamp() + ' ' + args.map(a => {
+        let str = isObject(a) ? JSON.stringify(a) : String(a);
+
+        if (isObject(a) && str === '{}' && !isEqual(a, {}))
+          str = String(a);
+
+        return str;
+      }).join(' ') + '\n');
     };
   }
 }
@@ -97,28 +104,33 @@ async function getServerIp(): Promise<string> {
 async function monitor(): Promise<void> {
   if (shuttingDown) return;
 
-  const db = await getDb();
-  const now = Now();
+  try {
+    const db = await getDb();
+    const now = Now();
 
-  await db.run('DELETE FROM messages WHERE dm > 0 AND synced_time < ?', now - MAX_DM_AGE);
-  await db.run('DELETE FROM dm_session WHERE name1_present <= 1 AND name2_present <= 1 AND start_time < ?1 AND last_post < ?1', now - MAX_DM_AGE);
+    await db.run('DELETE FROM messages WHERE dm > 0 AND synced_time < ?', now - MAX_DM_AGE);
+    await db.run('DELETE FROM dm_session WHERE name1_present <= 1 AND name2_present <= 1 AND start_time < ?1 AND last_post < ?1', now - MAX_DM_AGE);
 
-  for (const participant of await db.all<DbParticipant>('DELETE FROM participants WHERE last_active < ?', now - MAX_IDLE_PARTICIPANT_AGE))
-    console.info(`Deleted participant record for ${participant.name}`);
-  await db.run('DELETE FROM participants WHERE last_active < ?', now - MAX_IDLE_PARTICIPANT_AGE);
+    for (const participant of await db.all<DbParticipant>('DELETE FROM participants WHERE last_active < ?', now - MAX_IDLE_PARTICIPANT_AGE))
+      console.info(`Deleted participant record for ${participant.name}`);
+    await db.run('DELETE FROM participants WHERE last_active < ?', now - MAX_IDLE_PARTICIPANT_AGE);
 
-  for (const session of await db.all<DbSessionInfo>('SELECT * FROM sessions WHERE last_alive < ?', now - MAX_IDLE_SESSION_AGE))
-    console.info(`Deleted session ${session.token} for ${session.name}, ${session.ip}`);
-  await db.run('DELETE FROM sessions WHERE last_alive < ?', now - MAX_IDLE_SESSION_AGE);
+    for (const session of await db.all<DbSessionInfo>('SELECT * FROM sessions WHERE last_alive < ?', now - MAX_IDLE_SESSION_AGE))
+      console.info(`Deleted session ${session.token} for ${session.name}, ${session.ip}`);
+    await db.run('DELETE FROM sessions WHERE last_alive < ?', now - MAX_IDLE_SESSION_AGE);
 
-  const messageCount = (await db.get<any>('SELECT COUNT(*) as count FROM messages WHERE dm = 0'))?.count || 0;
+    const messageCount = (await db.get<any>('SELECT COUNT(*) as count FROM messages WHERE dm = 0'))?.count || 0;
 
-  if (messageCount > MAX_HISTORY + MAX_HISTORY_TOLERANCE)
-    await db.run(`DELETE FROM messages WHERE dm = 0 AND id IN (
-      SELECT id FROM (
-        SELECT id FROM messages ORDER BY synced_time LIMIT ?
-      ) AS subquery
-    )`, messageCount - MAX_HISTORY);
+    if (messageCount > MAX_HISTORY + MAX_HISTORY_TOLERANCE)
+      await db.run(`DELETE FROM messages WHERE dm = 0 AND id IN (
+        SELECT id FROM (
+          SELECT id FROM messages ORDER BY synced_time LIMIT ?
+        ) AS subquery
+      )`, messageCount - MAX_HISTORY);
+  }
+  catch (err) {
+    console.error('Error cleaning up database:', err);
+  }
 
   monitorTimeout = setTimeout(monitor, MONITOR_INTERVAL);
 }

@@ -98,6 +98,7 @@ export class App implements OnInit {
   protected messageEntrySignal = signal<MessageEntry>(undefined);
   protected messages = signal([] as Message[]);
   protected name = signal('');
+  protected nameLastPolled = '';
   protected newOnBottom = signal(true);
   protected navigation = signal([] as { name: string; url: string; target?: string }[]);
   protected notificationMessage = signal('');
@@ -404,13 +405,15 @@ export class App implements OnInit {
     this.lastGetMessagesTime = now;
     const wasActive = this.activity;
     this.activity = false;
+    const nameChanged = this.name() !== this.nameLastPolled;
+    this.nameLastPolled = this.name();
 
     this.httpClient.get<Messages>('/api/messages',
       {
         params: {
           active: wasActive,
           allowDMs: this.allowDMs(),
-          force: this.messages().length < 1,
+          force: this.messages().length < 1 || nameChanged,
           framed: this.framed,
           inChat: this.inChat(),
           name: this.name(),
