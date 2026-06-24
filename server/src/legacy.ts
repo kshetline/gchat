@@ -501,7 +501,7 @@ export async function legacySendMessage(ip: string, name: string, email: string,
 }
 
 const pendingRetries = new Map<string, any>();
-const MAX_EDIT_TRIES = 4;
+const MAX_EDIT_TRIES = 5;
 const EDIT_RETRY_DELAY = 10000;
 
 export async function legacyEditMessage(name: string, trip: string, date: number, message: string, color?: string, tries = 1): Promise<void> {

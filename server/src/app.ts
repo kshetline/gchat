@@ -220,6 +220,7 @@ async function getDirectMessages(name: string, tripCode: string, openDmString: s
   const result: DmSession[] = [];
   const dmSessions = await db.all<DbDmSession>('SELECT * FROM dm_session WHERE name1 = ? or name2 = ?', name, name);
   const participantTrip = (await getNamedParticipantRecord(name))?.trip || '';
+  const now = Now();
 
   if (participantTrip !== (tripCode || ''))
     return [];
@@ -244,8 +245,8 @@ async function getDirectMessages(name: string, tripCode: string, openDmString: s
     }
 
     const rows = (await db.all<DbMessage>(
-      'SELECT * FROM messages WHERE deleted = 0 AND dm = ? ORDER BY messages.synced_time',
-        dmSession.id)).slice(-MAX_CLIENT_MESSAGES);
+      'SELECT * FROM messages WHERE deleted = 0 AND dm = ? AND synced_time >= ? ORDER BY messages.synced_time',
+        dmSession.id, now - MAX_DM_AGE)).slice(-MAX_CLIENT_MESSAGES);
     const messages = rows.filter(row => !row.deleted).map(row => ({
       editCount: row.edit_count,
       email: row.email,

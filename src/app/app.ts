@@ -970,6 +970,13 @@ export class App implements OnInit {
     let totalNewMessages = 0;
     let notificationTab = this.selectedChat() || -1;
 
+    for (let i = currentDMs.length - 1; i >= 0; --i) {
+      if (dms.findIndex(d => d.id === currentDMs[i].id) < 0) {
+        currentDMs.splice(i, 1);
+        changed = true;
+      }
+    }
+
     for (const dm of dms) {
       let index = currentDMs.findIndex(d => d.id === dm.id);
 

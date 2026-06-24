@@ -8,7 +8,7 @@ import { SafeHtmlPipe } from '../safe-html-pipe/safe-html-pipe';
 
 const matchEmoji = regex`(([☀☁☎☝☺♈♉♊♋♌♍♎♏♐♑♒♓♠♣♥♦⚠⛎✂✅✈✌✳✴❌❤➿〽㊗㊙]\uFE0F?| // Various symbols and dingbats
                            // True emoji plus some emoji-like characters, with possible variations and modifiers
-                           ([\u{1F000}-\u{1FAFF}]\uFE0F?(\u200D.\uFE0F?)*)|
+                           ([\u{1F000}-\u{1FAFF}]\uFE0F?\p{Emoji_Modifier}?(\u200D.\p{Emoji_Modifier}?\uFE0F?)*)|
                            .\uFE0F[\u20D0-\u20EF]? // Any character with an emoji variation selector, plus potential combining symbol
                           )+
                          )
