@@ -1,7 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import { randomUUID, randomBytes, createCipheriv, createDecipheriv } from 'crypto';
-import { colors, Config, DbDmSession, DbMessage, DbParticipant, DmSession, Message, ParticipantInfo, TypingStatus } from './shared-types.js';
+import {
+  colors, Config, DbDmSession, DbMessage, DbParticipant, DmSession, MAX_DM_AGE, Message, ParticipantInfo, TypingStatus
+} from './shared-types.js';
 import { clone, isEqual, isObject, isString, processMillis, throttle, toBoolean, toInt } from '@tubular/util';
 import { uploadSingle } from './uploader.js';
 import { DbSessionInfo, SessionInfo } from './session-info';
@@ -80,7 +82,6 @@ const config: Config = {
 };
 const URL_MATCHER = /\b(https?:\/\/[-A-Za-z0-9+&@#/%?=~_()|!:,.;]*[-A-Za-z0-9+&@#/%=~_()|])/g;
 const MONITOR_INTERVAL = 60000; // 1 minute
-const MAX_DM_AGE = 7200; // 2 hours
 const MAX_HISTORY = 5000; // number of chat messages to keep in DB
 const MAX_HISTORY_TOLERANCE = 500; // Overflow before deleting messages
 const MAX_CLIENT_MESSAGES = 2000;

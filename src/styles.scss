@@ -70,7 +70,7 @@ a {
   }
 }
 
-.local-light {
+.local-light, .local-dark .local-light {
   b, h1, h2, h3, h4, h5, h6, strong, th {
     color: hsl(from currentColor h s calc(l * 0.83));
     font-weight: 900;
@@ -93,7 +93,7 @@ a {
   }
 }
 
-.local-dark {
+.local-dark, .local-light .local-dark {
   @extend .theme-dark;
 
   a {
@@ -249,6 +249,14 @@ a {
 mark {
   background: none;
   color: red;
+}
+
+.truncate-links a {
+  display: inline-flex;
+  max-width: min(500px, 33dvw);
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 @media (max-width: 900px) {

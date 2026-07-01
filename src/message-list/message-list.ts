@@ -1,19 +1,14 @@
 import { Component, ElementRef, input, OnInit, output, signal } from '@angular/core';
 import { kaomojiNonGothicRegex, Message } from '../../server/src/shared-types';
 import { colorFromStyle, getLuminance, getTextBackground, notify } from '../main';
-import { debounce, htmlUnescape, isObject, isString, regex } from '@tubular/util';
+import { debounce, htmlUnescape, isObject, isString } from '@tubular/util';
 import { MessageEntry } from '../message-entry/message-entry';
 import { HttpClient } from '@angular/common/http';
 import { SafeHtmlPipe } from '../safe-html-pipe/safe-html-pipe';
 
-const matchEmoji = regex`(([☀☁☎☝☺♈♉♊♋♌♍♎♏♐♑♒♓♠♣♥♦⚠⛎✂✅✈✌✳✴❌❤➿〽㊗㊙]\uFE0F?| // Various symbols and dingbats
-                           // True emoji plus some emoji-like characters, with possible variations and modifiers
-                           ([\u{1F000}-\u{1FAFF}]\uFE0F?\p{Emoji_Modifier}?(\u200D.\p{Emoji_Modifier}?\uFE0F?)*)|
-                           .\uFE0F[\u20D0-\u20EF]? // Any character with an emoji variation selector, plus potential combining symbol
-                          )+
-                         )
-                         ${'gu'}`;
-const matchDarkEmoji = /((?:♠️|♣️|➿|⚫️|⬛️|◾️|◼️|[👣🕶🖤🦾️🦇🌚🌑🎱🕋])+)/gu;
+const matchEmojiish = /^[☀☁☎☝☺♈♉♊♋♌♍♎♏♐♑♒♓♠♣♥♦⚠⛎✂✅✈✌✳✴❌❤➿〽㊗㊙]/u;
+// noinspection RegExpDuplicateAlternationBranch (Seems to be a false positive)
+const matchDarkEmoji = /^♠️|♣️|➿|⚫️|⬛️|👣|◾️|◼️|🕶|🖤|🦾|️🦇|🌚|🌑|🎱|🕋/u;
 const QUOTE_MARKER = '\u00A0◀︎ ';
 const QUOTE_MARKER_PATTERN = /\u00A0[◀︎◁◂⏴] /;
 const QUOTE_NAME_PATTERN = /<u>([^>]+)<\/u>:/;
@@ -102,6 +97,64 @@ export class MessageList implements OnInit {
       this.toolTimer = setTimeout(() => this.toolHash.set(''), 2000);
   }
 
+  private breakOutEmoji(s: string, emojiType?: string): string {
+    let text = '';
+    let type: string;
+    let index = 0;
+    let chars = [...s];
+    const result: { text: string, type: string }[] = [];
+    const addText = (t: string, theType: string) => {
+      if (text && type !== theType) {
+        result.push({ text, type });
+        text = t;
+      }
+      else
+        text += t;
+
+      type = theType;
+    };
+
+    for (let i = 0; i < chars.length; ++i) {
+      let ch = chars[i];
+      const cp = ch.codePointAt(0);
+
+      if (s.codePointAt(index + 1) === 0xFE0F && 0x20D0 <= s.codePointAt(index + 2) && s.codePointAt(index + 2) <= 0x20EF) {
+        ch = ch + s.substring(index + 1, index + 3);
+        addText(ch, emojiType || 'big-emoji');
+        i += 2;
+      }
+      else if (s.codePointAt(index + 1) === 0xFE0F) {
+        ch = ch + s.charAt(index + 1);
+        addText(ch, emojiType || (matchDarkEmoji.test(ch) ? 'big-dark-emoji' : 'big-emoji'));
+        i += 1;
+      }
+      else if (cp === 0x200D)
+        addText(ch, type);
+      else if (matchDarkEmoji.test(ch))
+        addText(ch, emojiType || 'big-dark-emoji');
+      else if (0x1F000 <= cp && cp <= 0x1F9FF || matchEmojiish.test(ch))
+        addText(ch, emojiType || 'big-emoji');
+      else
+        addText(ch, '');
+
+      index += ch.length;
+    }
+
+    if (text)
+      result.push({ text, type });
+
+    text = '';
+
+    for (const tt of result) {
+      if (tt.type)
+        text += `<span class="${tt.type}">${tt.text}</span>`;
+      else
+        text += tt.text;
+    }
+
+    return text;
+  }
+
   protected adjustMarkup(text: string, currentColor: string): string {
     let start = '';
     let qm = '';
@@ -139,16 +192,8 @@ export class MessageList implements OnInit {
       end = text.substring(match.index + match[0].length);
     }
 
-    start = start.replace(matchEmoji, '<span class="straight-emoji">$1</span>');
-    end = end.replace(matchEmoji, (_$0, $1) => {
-      const parts = $1.split(matchDarkEmoji);
-      let result = '';
-
-      for (let i = 0; i < parts.length; ++i)
-        result += parts[i] ? `<span class="${i % 2 === 0 ? 'big-emoji' : 'big-dark-emoji'}">${parts[i]}</span>` : '';
-
-      return result;
-    });
+    start = this.breakOutEmoji(start, 'straight-emoji');
+    end = this.breakOutEmoji(end);
     text = start + qm + end;
 
     const parts = text.split(kaomojiNonGothicRegex);

@@ -2,7 +2,7 @@ import { ChangeDetectorRef, Component, inject, OnInit, signal, ViewChild, Writab
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import {
-  Config, DmSession, NotifySound, Message, Messages, ParticipantInfo, Preferences, TypingStatus
+  Config, DmSession, NotifySound, Message, Messages, ParticipantInfo, Preferences, TypingStatus, MAX_DM_AGE
 } from '../../server/src/shared-types';
 import { clone, forEach, isAndroid, isEqual, processMillis } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
@@ -966,14 +966,20 @@ export class App implements OnInit {
 
   protected receiveDirectMessages(dms: DmSession[]): void {
     const currentDMs = clone(this.dms(), true);
+    const now = Date.now() / 1000;
     let changed = false;
     let totalNewMessages = 0;
     let notificationTab = this.selectedChat() || -1;
 
     for (let i = currentDMs.length - 1; i >= 0; --i) {
       if (dms.findIndex(d => d.id === currentDMs[i].id) < 0) {
-        currentDMs.splice(i, 1);
-        changed = true;
+        const messages = currentDMs[i].messages();
+        const newMessages = messages.filter(m => m.time > now - MAX_DM_AGE);
+
+        if (newMessages.length !== messages.length) {
+          currentDMs[i].messages.set(newMessages);
+          changed = true;
+        }
       }
     }
 
