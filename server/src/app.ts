@@ -613,6 +613,26 @@ function hasChatOpen(name: string, dmId: number): boolean {
         sendToAll('newMessages');
     }
 
+    const latestActivity = new Map<string, { time: number; remote: boolean }>();
+
+    for (const message of messages) {
+      const latest = latestActivity.get(message.name);
+
+      if (!latest)
+        latestActivity.set(message.name, { time: message.time, remote: message.remote });
+      else if (message.time > latest.time) {
+        latest.time = message.time;
+        latest.remote = message.remote;
+      }
+    }
+
+    for (const session of sessions.values()) {
+      const latest = latestActivity.get(session.name);
+
+      if (!latest || session.lastActive > latest.time)
+        latestActivity.set(session.name, { time: session.lastActive, remote: false });
+    }
+
     const participantNames = (await db.all<any>('SELECT name FROM participants WHERE name != ?',
       proxyName)).map(r => r.name);
     const participants = [...new Set(participantNames)].sort().map(p => ({ name: p } as ParticipantInfo));
@@ -649,6 +669,13 @@ function hasChatOpen(name: string, dmId: number): boolean {
         participantInfo.allowsDms = !!participant.allow_dm && !participant.remote;
         participantInfo.idle = now - Math.max(participant.last_active, participant.last_post) > (participant.remote ? 1800 : 600) ? 1 : 0;
         participantInfo.remote = !!participant.remote;
+      }
+
+      const latest = latestActivity.get(participantInfo.name);
+
+      if (latest) {
+        participantInfo.remote = latest.remote;
+        participantInfo.allowsDms = !!participant.allow_dm && !latest.remote;
       }
     }
 

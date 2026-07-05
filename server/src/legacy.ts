@@ -9,6 +9,7 @@ import { convertBBCodeToHtml, getTextAndMarkupAsBBCode, messageHash, Now, simpli
 import tripcode from 'tripcode';
 import { isShuttingDown, MAX_IDLE_PARTICIPANT_AGE } from './app.js';
 import { clearLegacyAccessTimes, tallyForLockout, TIME_WINDOW } from './intrusion-detector.js';
+import { distance } from 'fastest-levenshtein';
 
 const domain = process.env.CHAT_DOMAIN;
 const userEdit = process.env.CHAT_USER_EDIT ? domain + process.env.CHAT_USER_EDIT : null;
@@ -211,18 +212,42 @@ function similar(s1: string, s2: string): boolean {
   return s1 === s2;
 }
 
+function findClosestMessage(msgs: Message[], timestamp: number): Message {
+  if (!msgs.length) return undefined;
+
+  let lo = 0;
+  let hi = msgs.length - 1;
+
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+
+    if (msgs[mid].time < timestamp)
+      lo = mid + 1;
+    else
+      hi = mid;
+  }
+
+  if (lo === 0) return msgs[0];
+  if (lo === msgs.length) return msgs[msgs.length - 1];
+
+  const before = msgs[lo - 1];
+  const after = msgs[lo];
+
+  return (timestamp - before.time <= after.time - timestamp) ? before : after;
+}
+
 async function pollLegacyMessages(overrideCount?: number): Promise<void> {
   if (isShuttingDown()) return;
 
   const now = processMillis();
   const retrieveCount = overrideCount ??
     (lastLegacyPoll < 0 || now > lastLegacyPoll + 3_600_000 ? 1000 : now > lastLegacyPoll + 600_000 ? 200 : 30);
-  let existing: Map<string, number>;
+  let existing: Map<string, DbMessage>;
 
   try {
     const db = await getDb();
-    existing = (await db.all<any>('SELECT hash, synced_time, name, trip, message FROM messages WHERE dm = 0 AND deleted = 0 AND LENGTH(style) > 2'))
-      .reduce((acc, row) => acc.set(row.hash, row.synced_time), new Map<string, number>());
+    existing = (await db.all<DbMessage>('SELECT * FROM messages WHERE dm = 0 AND deleted = 0 AND flagged = 0 AND LENGTH(style) > 2'))
+      .reduce((acc, row) => acc.set(row.hash, row), new Map<string, DbMessage>());
     const messages = await getLegacyMessages('', retrieveCount);
     const remoteExisting = new Set(messages.messages.map(m => m.hash));
     let earliest = Number.MAX_SAFE_INTEGER;
@@ -284,21 +309,25 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
       }
     }
 
-    [...existing.entries()].forEach(([hash, time]) => (time < earliest + 600 || time > latestInDb - 300) && existing.delete(hash));
+    [...existing.entries()].forEach(([hash, msg]) => (msg.time < earliest + 600 || msg.time > latestInDb - 120) && existing.delete(hash));
 
     // Check messages in our DB which are not found in the legacy chat anymore, at least with a matching hash.
     for (const hash of existing.keys()) {
-      const time = existing.get(hash);
-      const row = await db.get<DbMessage>('SELECT * FROM messages WHERE dm = 0 AND hash = ? LIMIT 1', hash);
+      const msg = existing.get(hash);
+      const row = await db.get<DbMessage>('SELECT * FROM messages WHERE dm = 0 AND hash = ? and name = ? LIMIT 1', hash, msg.name);
 
       if (row) {
-        // Within 5 seconds of the timestamp in the DB, update the synced_time column.
-        if (time !== row.synced_time && Math.abs(time - row.synced_time) < 5)
-          await db.run('UPDATE messages SET synced_time = ? WHERE dm = 0 AND hash = ?', time, messageHash(row.name, row.trip, time));
+        const sameNameMessages = messages.messages.reduce((acc, m) => m.name === msg.name ? [...acc, m] : acc, []);
+        const closestMessage = findClosestMessage(sameNameMessages, msg.time);
+
+        // Within 15 seconds of the timestamp in the DB, update the synced_time column.
+        if (Math.abs(closestMessage.time - row.synced_time) < 15 && distance(closestMessage.bbCode, msg.message) < 5) {
+          if (closestMessage.time !== row.synced_time)
+            await db.run('UPDATE messages SET hash = ?, synced_time = ? WHERE id = ?', closestMessage.hash, closestMessage.time, row.id);
+        }
         // Otherwise, presume the message was administratively deleted on the legacy site and follow suit here.
-        else if (!remoteExisting.has(hash) && row.synced_time < clockNow - 600) {
-          // TODO: Figure out why these flagged messages aren't the candidates for deletion that I think they should be.
-          await db.run('UPDATE messages SET flagged = 1 WHERE dm = 0 AND hash = ?', hash);
+        else if (!remoteExisting.has(hash) && row.synced_time < clockNow - 60) {
+          await db.run('UPDATE messages SET deleted = 1, flagged = 1 WHERE id = ?', row.id);
           existing.delete(hash);
         }
       }
