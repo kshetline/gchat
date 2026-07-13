@@ -259,6 +259,21 @@ mark {
   white-space: nowrap;
 }
 
+.code-point {
+  border: 1px solid currentColor;
+  display: inline-block;
+  height: 1.2em;
+  font-size: 0.5em;
+  margin-right: 2px;
+  overflow: hidden;
+  white-space: nowrap;
+  width: 1.2em;
+
+  > span {
+    color: transparent;
+  }
+}
+
 @media (max-width: 900px) {
   input, textarea, select, .ql-editor {
     font-size: 16px;

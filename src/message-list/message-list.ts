@@ -1,6 +1,6 @@
 import { Component, ElementRef, input, OnInit, output, signal } from '@angular/core';
 import { kaomojiNonGothicRegex, Message } from '../../server/src/shared-types';
-import { colorFromStyle, getLuminance, getTextBackground, notify } from '../main';
+import { colorFromStyle, getLuminance, getTextBackground, notify, showInvisibles } from '../main';
 import { debounce, htmlUnescape, isObject, isString } from '@tubular/util';
 import { MessageEntry } from '../message-entry/message-entry';
 import { HttpClient } from '@angular/common/http';
@@ -33,6 +33,8 @@ export interface EditEvent {
   styleUrl: './message-list.scss',
 })
 export class MessageList implements OnInit {
+  showInvisibles = showInvisibles;
+
   private lastSelectedText = '';
 
   protected alwaysChanging = signal(1);
@@ -149,7 +151,7 @@ export class MessageList implements OnInit {
       if (tt.type)
         text += `<span class="${tt.type}">${tt.text}</span>`;
       else
-        text += tt.text;
+        text += showInvisibles(tt.text);
     }
 
     return text;
@@ -311,7 +313,7 @@ export class MessageList implements OnInit {
         html = html.substring(match.index + match[0].length);
     }
 
-    return html.split(/\bhref="(http(s?):\/\/.+?\.(avif|gif|jpeg|jpg|png|svg|webp))"/g).filter((_s, i) => (i - 1) % 4 === 0);
+    return html.split(/\bhref="(http(s?):\/\/[^>]+?\.(avif|gif|jpeg|jpg|png|svg|webp))"/g).filter((_s, i) => (i - 1) % 4 === 0);
   }
 
   protected hasImages(html: string): boolean {

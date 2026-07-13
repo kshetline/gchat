@@ -9,8 +9,8 @@ import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { FileUploadEvent, MessageEntry, MessageUpdateEvent } from '../message-entry/message-entry';
 import {
-  NotificationHandler, notify, registerNotificationHandler, setIsTypingFunction, shouldIgnoreClick, startClickSuppress,
-  userscriptAction
+  NotificationHandler, notify, registerNotificationHandler, setIsTypingFunction, shouldIgnoreClick, showInvisibles,
+  startClickSuppress, userscriptAction
 } from '../main';
 import { applyTheme, getThemeMenuStyle, getThemes, resetDefaultThemeBackground } from '../themes';
 import { DeleteEvent, EditEvent, MessageList } from '../message-list/message-list';
@@ -57,6 +57,8 @@ interface DmInfo {
   styleUrl: './app.scss'
 })
 export class App implements OnInit {
+  showInvisibles = showInvisibles;
+
   protected getThemeMenuStyle = getThemeMenuStyle;
   protected themes = getThemes();
 

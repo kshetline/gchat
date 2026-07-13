@@ -16,8 +16,8 @@
     @else {
       <div class="message-row">
         <div class="name" [class.me]="message.isMe">
-            <span [style.color]="getColor(message)" [style.background-color]="getBackground(message)">{{
-                message.name }}@if (message.email) { &nbsp;<a class="email-link" [href]="message.email">📫</a> }</span>
+            <span [style.color]="getColor(message)" [style.background-color]="getBackground(message)"><span
+                [innerHTML]="showInvisibles(message.name)"></span>@if (message.email) { &nbsp;<a class="email-link" [href]="message.email">📫</a> }</span>
           @if (message.trip || !message.remote) {
             <span class="trip" [class.native]="!message.remote">{{ message.trip || '' }}</span>
           }

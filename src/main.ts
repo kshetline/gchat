@@ -38,6 +38,13 @@ export function getTextBackground(styleOrColor: string, darkMode = false): strin
   return lightBackground ? (darkMode ? '#CCC' : '#FFF') : '#333';
 }
 
+export function showInvisibles(text: string): string {
+  return text.replace(/\p{Cc}|\p{Cn}|\p{Co}|\p{Cs}/gu, (m) => {
+    const cp = m.codePointAt(0).toString(16).toUpperCase();
+    return `<span class="code-point"><span>«${cp}»</span></span>`;
+  });
+}
+
 let clickSuppress: any;
 
 export function startClickSuppress(): void {

@@ -93,7 +93,7 @@
         @let canChat = inChat() && participant.allowsDms && participant.name !== name();
         <span class="participant" [class.native]="!participant.remote" [class.idle]="!!participant.idle"
               [class.can-chat]="canChat" (click)="canChat && startDmChat(participant.name)"
-          >{{ participant.name }}
+          ><span [innerHTML]="showInvisibles(participant.name)"></span>
           <div class="typing-indicator" [style.display]="alwaysChanging() && isTyping(participant.name, 0) ? '' : 'none'">
             <div class="dot"></div><div class="dot"></div><div class="dot"></div>
           </div>

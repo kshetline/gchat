@@ -10,6 +10,7 @@ import tripcode from 'tripcode';
 import { isShuttingDown, MAX_IDLE_PARTICIPANT_AGE } from './app.js';
 import { clearLegacyAccessTimes, tallyForLockout, TIME_WINDOW } from './intrusion-detector.js';
 import { distance } from 'fastest-levenshtein';
+import { sendToAll } from './web-socket.js';
 
 const domain = process.env.CHAT_DOMAIN;
 const userEdit = process.env.CHAT_USER_EDIT ? domain + process.env.CHAT_USER_EDIT : null;
@@ -236,6 +237,8 @@ function findClosestMessage(msgs: Message[], timestamp: number): Message {
   return (timestamp - before.time <= after.time - timestamp) ? before : after;
 }
 
+let lastLatest = 0;
+
 async function pollLegacyMessages(overrideCount?: number): Promise<void> {
   if (isShuttingDown()) return;
 
@@ -309,7 +312,10 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
       }
     }
 
-    [...existing.entries()].forEach(([hash, msg]) => (msg.time < earliest + 600 || msg.time > latestInDb - 120) && existing.delete(hash));
+    [...existing.entries()].forEach(([hash, msg]) =>
+      (msg.time < earliest + 600 || msg.time > Math.max(latestInDb - 120, clockNow - 60)) && existing.delete(hash));
+
+    let modified = false;
 
     // Check messages in our DB which are not found in the legacy chat anymore, at least with a matching hash.
     for (const hash of existing.keys()) {
@@ -321,7 +327,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
         const closestMessage = findClosestMessage(sameNameMessages, msg.time);
 
         // Within 15 seconds of the timestamp in the DB, update the synced_time column.
-        if (Math.abs(closestMessage.time - row.synced_time) < 15 && distance(closestMessage.bbCode, msg.message) < 5) {
+        if (closestMessage && Math.abs(closestMessage.time - row.synced_time) < 15 && distance(closestMessage.bbCode, msg.message) < 5) {
           if (closestMessage.time !== row.synced_time)
             await db.run('UPDATE messages SET hash = ?, synced_time = ? WHERE id = ?', closestMessage.hash, closestMessage.time, row.id);
         }
@@ -329,12 +335,18 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
         else if (!remoteExisting.has(hash) && row.synced_time < clockNow - 60) {
           await db.run('UPDATE messages SET deleted = 1, flagged = 1 WHERE id = ?', row.id);
           existing.delete(hash);
+          modified = true;
         }
       }
     }
 
     if (retrieveCount < 1000 && latestInDb && earliest > latestInDb)
       return pollLegacyMessages(1000);
+
+    if (latest > lastLatest || modified) {
+      lastLatest = latest;
+      setTimeout(() => sendToAll('newMessages'), 1000);
+    }
 
     const latestPosts = new Map<string, number>();
 
