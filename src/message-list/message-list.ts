@@ -134,7 +134,7 @@ export class MessageList implements OnInit {
         addText(ch, type);
       else if (matchDarkEmoji.test(ch))
         addText(ch, emojiType || 'big-dark-emoji');
-      else if (0x1F000 <= cp && cp <= 0x1F9FF || matchEmojiish.test(ch))
+      else if (0x1F000 <= cp && cp <= 0x1FAFF || matchEmojiish.test(ch))
         addText(ch, emojiType || 'big-emoji');
       else
         addText(ch, '');
