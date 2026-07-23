@@ -19,7 +19,7 @@
             <span [style.color]="getColor(message)" [style.background-color]="getBackground(message)"><span
                 [innerHTML]="showInvisibles(message.name)"></span>@if (message.email) { &nbsp;<a class="email-link" [href]="message.email">📫</a> }</span>
           @if (message.trip || !message.remote) {
-            <span class="trip" [class.native]="!message.remote">{{ message.trip || '' }}</span>
+            <span class="trip" [class.native]="!message.remote" [class.flagged]="!!message.flagged">{{ message.trip || '' }}</span>
           }
           @if (message.time) {
             <span class="time">{{ formatTime(message) }}</span>

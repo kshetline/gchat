@@ -851,8 +851,23 @@ function hasChatOpen(name: string, dmId: number): boolean {
     }
 
     if (!framed && !proxyStarted) {
-      await enterLegacyChat(session?.ip, proxyName, null, 0);
-      proxyStarted = true;
+      await new Promise<void>(resolve => {
+        let resolved = false;
+        enterLegacyChat(session?.ip, proxyName, null, 0).then(() => {
+          proxyStarted = true;
+
+          if (!resolved) {
+            resolved = true;
+            resolve();
+          }
+        }).finally();
+        setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            resolve();
+          }
+        }, 5000);
+      });
     }
 
     if (!(session as any).temp)
@@ -992,12 +1007,38 @@ function hasChatOpen(name: string, dmId: number): boolean {
       await db.run('UPDATE participants SET last_post = ?1, last_active = ?1 WHERE id = ?2', now, participant.id);
 
     if (!dm && !framed && !comment.includes('##cpc-only##')) {
-      if (!proxyStarted) {
-        await enterLegacyChat(session?.ip, proxyName, null, 0);
-        proxyStarted = true;
-      }
+      await new Promise<void>(resolve => {
+        let resolved = false;
+        let tries = 3;
 
-      await legacySendMessage(session?.ip, name, q.email, rawComment, q.color, q.tripCode);
+        const doSend = () => {
+          legacySendMessage(session?.ip, name, q.email, rawComment, q.color, q.tripCode).then(() => {
+            if (!resolved) {
+              resolved = true;
+              resolve();
+            }
+          }).catch(() => {
+            if (--tries > 0)
+              setTimeout(doSend, 1000);
+          });
+        };
+
+        if (proxyStarted)
+          doSend();
+        else {
+          enterLegacyChat(session?.ip, proxyName, null, 0).then(() => {
+            proxyStarted = true;
+            doSend();
+          }).finally();
+        }
+
+        setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            resolve();
+          }
+        }, 5000);
+      });
     }
 
     res.json(null);
@@ -1192,7 +1233,10 @@ function hasChatOpen(name: string, dmId: number): boolean {
     try {
       const url = await uploadSingle(req, res);
 
-      res.json({ url });
+      if (url)
+        res.json({ url });
+      else // noinspection ExceptionCaughtLocallyJS
+        throw new Error('Link not found');
     }
     catch (error) {
       console.error('Upload error:', error);

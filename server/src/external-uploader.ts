@@ -195,6 +195,12 @@ export async function getExternalUploadLink(req: express.Request, file: MFile): 
     if (!link) {
       try {
         error = await page.$eval('div.dz-preview.dz-complete .dz-error-message', el => el.innerText);
+
+        if (error.startsWith('<'))
+          error = error.replace(/<p>/g, '\n').replace(/<style[^>]*>.*?<\/style>/g, ' ').replace(/<[^>]*>/g, ' ').replace(/ +/g, ' ');
+
+        if (error.length > 252)
+          error = error.substring(0, 252) + '...';
       }
       catch {}
     }

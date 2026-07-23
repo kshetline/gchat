@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import fs from 'fs/promises';
 import os from 'os';
 import { HtmlParser  } from 'fortissimo-html';
-import { toBoolean, toInt } from '@tubular/util';
+import { sleep, toBoolean, toInt } from '@tubular/util';
 import { allowedExtensions, allowedTypes, MB } from './shared-types.js';
 import * as puppeteer from 'puppeteer';
 import { browser } from './legacy.js';
@@ -102,15 +102,19 @@ export async function uploadSingle(req: express.Request, res: express.Response):
   await uploadPage.$eval('#comment', (input, comment) => input.value = comment, comment);
   await uploadPage.$eval('button[type="submit"]', btn => btn.click());
 
-  await Promise.all([
-    uploadPage.waitForNavigation({ waitUntil: 'networkidle0' }),
-    uploadPage.$eval('button[type="submit"]', btn => btn.click())
-  ]);
+  let tries = 0;
+  let link = '';
+
+  do {
+    if (tries) await sleep(2000);
+    link = extractLinkFromPageContent(await uploadPage.content(), comment);
+  }
+  while (!link && ++tries < 10);
 
   try {
     await fs.unlink(file.path);
   }
   catch {}
 
-  return extractLinkFromPageContent(await uploadPage.content(), comment);
+  return link;
 }

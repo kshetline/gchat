@@ -20,6 +20,9 @@ const proxyTripEncoded = tripcode(proxyTrip);
 const parser = new HtmlParser();
 export const MAX_IDLE_PARTICIPANT_LEEWAY = 600; // 10 minutes
 const DEPARTURE_SUSTAIN = 660; // 11 minutes
+const MESSAGE_POLL_RATE = 5000; // 5 seconds
+const MESSAGE_REPOLL_RATE = 1000; // 1 second
+const MESSAGE_FULL_REPOLL_DELAY = 10_000; // 10 seconds
 
 export let browser: puppeteer.Browser;
 export let participantsRaw: string;
@@ -238,6 +241,9 @@ function findClosestMessage(msgs: Message[], timestamp: number): Message {
 }
 
 let lastLatest = 0;
+let badResponses = 0;
+let lastBadResponseReport = 0;
+const lastSeen = new Map<string, number>();
 
 async function pollLegacyMessages(overrideCount?: number): Promise<void> {
   if (isShuttingDown()) return;
@@ -246,6 +252,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
   const retrieveCount = overrideCount ??
     (lastLegacyPoll < 0 || now > lastLegacyPoll + 3_600_000 ? 1000 : now > lastLegacyPoll + 600_000 ? 200 : 30);
   let existing: Map<string, DbMessage>;
+  let failed = false;
 
   try {
     const db = await getDb();
@@ -333,7 +340,11 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
         }
         // Otherwise, presume the message was administratively deleted on the legacy site and follow suit here.
         else if (!remoteExisting.has(hash) && row.synced_time < clockNow - 60) {
-          await db.run('UPDATE messages SET deleted = 1, flagged = 1 WHERE id = ?', row.id);
+          // This might be a new local message that failed to sync back to the legacy chat.
+          // If so, keep the message, flag it in user display as not being visible in the legacy chat.
+          const del = (row.remote > 0 || row.synced_time < clockNow - 180) ? 1 : 0;
+
+          await db.run('UPDATE messages SET deleted = ?, flagged = 1 WHERE id = ?', del, row.id);
           existing.delete(hash);
           modified = true;
         }
@@ -357,6 +368,8 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
       if (!participant || participant === proxyName)
         continue;
 
+      lastSeen.set(participant, now);
+
       let row = await db.get<DbParticipant>('SELECT * FROM participants where name = ? AND remote = 0 LIMIT 1', participant);
 
       if (row) {
@@ -372,10 +385,13 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
       const lastPost = latestPosts.has(participant) ? latestPosts.get(participant) : 0;
 
       if (!row && (!departureTimes.has(participant) || lastPost > departureTimes.get(participant) + 60)) {
-        await db.run('INSERT INTO participants (name, remote, last_active, last_post) VALUES (?, ?, ?, ?)',
-          participant, 1, lastActive, lastPost);
+        const changes = (await db.run('INSERT INTO participants (name, remote, last_active, last_post) VALUES (?, ?, ?, ?)',
+          participant, 1, lastActive, lastPost))?.changes ?? 0;
+
         departureTimes.delete(participant);
-        console.info(`Created remote participant record for ${participant}`);
+
+        if (changes > 0)
+          console.info(`Created remote participant record for ${participant}`);
       }
     }
 
@@ -384,7 +400,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
     const rows = await db.all<DbParticipant>('SELECT * FROM participants where remote = 1');
 
     for (const row of rows) {
-      if (messages.participants?.findIndex(p => p.name === row.name) < 0 &&
+      if (messages.participants?.findIndex(p => p.name === row.name) < 0 && (lastSeen.get(row.name) ?? 0) < now - 120_000 &&
           ((await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', row.name))?.changes || 0) > 0)
         console.info(`Deleted remote participant record for ${row.name}`);
     }
@@ -396,14 +412,29 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
     }
   }
   catch (err) {
-    console.error(`Error polling legacy chat: ${simplifyError(err)}`);
+    failed = true;
+
+    const error = simplifyError(err);
+
+    if (error === 'ERR_BAD_RESPONSE')
+      ++badResponses;
+    else
+      console.error(`Error polling legacy chat: ${error}`);
+  }
+
+  if (lastBadResponseReport < now - 300_000) {
+    if (badResponses > 0)
+      console.error(`ERR_BAD_RESPONSE x ${badResponses} in last five minutes`);
+
+    badResponses = 0;
+    lastBadResponseReport = now;
   }
 
   if (!isShuttingDown()) {
     if (existing.size < 1000)
-      pollingTimeout = setTimeout(() => pollLegacyMessages(1000), 10_000);
+      pollingTimeout = setTimeout(() => pollLegacyMessages(1000), MESSAGE_FULL_REPOLL_DELAY);
     else
-      pollingTimeout = setTimeout(pollLegacyMessages, 5000);
+      pollingTimeout = setTimeout(pollLegacyMessages, failed ? MESSAGE_REPOLL_RATE : MESSAGE_POLL_RATE);
   }
 
   lastLegacyPoll = processMillis();
