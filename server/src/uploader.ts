@@ -8,12 +8,12 @@ import { HtmlParser  } from 'fortissimo-html';
 import { sleep, toBoolean, toInt } from '@tubular/util';
 import { allowedExtensions, allowedTypes, MB } from './shared-types.js';
 import * as puppeteer from 'puppeteer';
-import { browser } from './legacy.js';
 import { getExternalUploadLink } from './external-uploader.js';
 
 type MFile = Express.Multer.File;
 
 const domain = process.env.CHAT_DOMAIN;
+let browser: puppeteer.Browser;
 const parser = new HtmlParser();
 let uploadPage: puppeteer.Page;
 let fileIndex = 0;
@@ -90,6 +90,13 @@ export async function uploadSingle(req: express.Request, res: express.Response):
   const pwd = req.body.password;
 
   if (!uploadPage) {
+    browser = browser || (await (process.env.CHROME_PATH ?
+      puppeteer.launch({
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
+        executablePath: process.env.CHROME_PATH
+      }) :
+      puppeteer.launch()));
+
     uploadPage = uploadPage = await browser.newPage();
     await uploadPage.goto(`https://${domain}/up.php`);
     await uploadPage.waitForSelector('form');

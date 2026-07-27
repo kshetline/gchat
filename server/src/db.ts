@@ -57,6 +57,7 @@ export async function getDb(): Promise<AsyncDatabase> {
       dm INTEGER NOT NULL DEFAULT 0,
       time INTEGER NOT NULL DEFAULT 0,
       synced_time INTEGER NOT NULL DEFAULT 0,
+      synced BOOLEAN NOT NULL DEFAULT 0,
       name TEXT NOT NULL,
       trip TEXT,
       email TEXT,

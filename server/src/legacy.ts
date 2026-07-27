@@ -1,9 +1,8 @@
 import { DbMessage, DbParticipant, kaomojiOriginal, Message, Messages, ParticipantInfo } from './shared-types.js';
-import { encodeForUri, htmlUnescape, processMillis } from '@tubular/util';
-import axios from 'axios';
+import { encodeForUri, htmlUnescape, processMillis, sleep } from '@tubular/util';
+import axios, { AxiosInstance } from 'axios';
 import { HtmlParser } from 'fortissimo-html';
 import { DomNode } from 'fortissimo-html/dist/dom.js';
-import * as puppeteer from 'puppeteer';
 import { getDb } from './db.js';
 import { convertBBCodeToHtml, getTextAndMarkupAsBBCode, messageHash, Now, simplifyError } from './chat-util.js';
 import tripcode from 'tripcode';
@@ -11,6 +10,8 @@ import { isShuttingDown, MAX_IDLE_PARTICIPANT_AGE } from './app.js';
 import { clearLegacyAccessTimes, tallyForLockout, TIME_WINDOW } from './intrusion-detector.js';
 import { distance } from 'fastest-levenshtein';
 import { sendToAll } from './web-socket.js';
+import { wrapper } from 'axios-cookiejar-support';
+import { CookieJar } from 'tough-cookie';
 
 const domain = process.env.CHAT_DOMAIN;
 const userEdit = process.env.CHAT_USER_EDIT ? domain + process.env.CHAT_USER_EDIT : null;
@@ -24,11 +25,12 @@ const MESSAGE_POLL_RATE = 5000; // 5 seconds
 const MESSAGE_REPOLL_RATE = 1000; // 1 second
 const MESSAGE_FULL_REPOLL_DELAY = 10_000; // 10 seconds
 
-export let browser: puppeteer.Browser;
 export let participantsRaw: string;
 export let lastSuccessfulLegacyPoll = -1;
 
-let messagePage: puppeteer.Page;
+let chatClient: AxiosInstance;
+const jar = new CookieJar();
+
 let inChat = false;
 let lastLegacyPoll = -1;
 let firstParticipantPoll = true;
@@ -78,7 +80,7 @@ function extractMessage(messageRow: DomNode): Message {
   const trip = (nameElem?.children?.at(nameIndex + 1) as DomNode)?.content?.substring(1);
   const hash = messageHash(name, trip, timestamp);
 
-  return { bbCode, email, hash, msgId: -1, name, style, html, remote: true, time, trip };
+  return { bbCode, email, hash, msgId: -1, name, style, synced: false, html, remote: true, time, trip };
 }
 
 export async function getLegacyMessages(name: string, count = 200): Promise<Messages> {
@@ -301,7 +303,7 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
         messages.messages.splice(i, 1);
         pendingDuplicates.splice(dupIndex, 1);
 
-        await db.run('UPDATE messages SET synced_time = ?, hash = ?, message = ? WHERE id = ?',
+        await db.run('UPDATE messages SET synced_time = ?, synced = 1, hash = ?, message = ? WHERE id = ?',
           message.time, message.hash, message.bbCode + delayMsg, duplicate.id);
       }
 
@@ -352,10 +354,10 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
             await db.run('UPDATE messages SET hash = ?, synced_time = ? WHERE id = ?', closestMessage.hash, closestMessage.time, row.id);
         }
         // Otherwise, presume the message was administratively deleted on the legacy site and follow suit here.
-        else if (!remoteExisting.has(hash) && row.synced_time < clockNow - MAX_SEND_DELAY) {
+        else if (!remoteExisting.has(hash) && (row.synced || row.synced_time < clockNow - MAX_SEND_DELAY)) {
           // This might be a new local message that failed to sync back to the legacy chat.
           // If so, keep the message, flag it in user display as not being visible in the legacy chat.
-          const del = (row.remote > 0 || row.synced_time === row.time) ? 1 : 0;
+          const del = (row.remote > 0 || row.synced) ? 1 : 0;
 
           await db.run('UPDATE messages SET deleted = ?, flagged = 1 WHERE id = ?', del, row.id);
           existing.delete(hash);
@@ -454,83 +456,65 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
 }
 
 pollLegacyMessages().finally();
-legacyBrowserSetup().finally();
 
-async function legacyBrowserSetup(): Promise<void> {
-  browser = browser || (await (process.env.CHROME_PATH ?
-    puppeteer.launch({
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
-      executablePath: process.env.CHROME_PATH
-    }) :
-    puppeteer.launch()));
+const MAX_ENTER_TRIES = 3;
+const ENTER_RETRY_DELAY = 1000;
+const MAX_ENTER_DELAY = 30;
 
-  if (!messagePage) {
-    messagePage = await browser.newPage();
-    messagePage.on('console', msg => {
-      const type = msg.type();
+export async function enterLegacyChat(ip: string, name: string, email: string, color: number,
+                                      tries = 0, sendTime = processMillis()): Promise<void> {
+  chatClient = chatClient || wrapper(axios.create({ jar }));
+  await chatClient.get(`https://${domain}/comchat.cgi?mode=form&name=&email=&color=&retime=30&lines=30`);
 
-      if (type !== 'verbose')
-        console.log('Puppeteer (%s): %s', type, msg.text());
-    });
-  }
-
-  await loadEnterForm(messagePage);
-}
-
-async function loadEnterForm(page: puppeteer.Page): Promise<void> {
-  await page.goto(`https://${domain}/comchat.cgi?mode=form&name=&email=&color=&retime=30&lines=30`);
-  await page.waitForSelector('form');
-  await page.$eval('form', form => form.setAttribute('target', '_self'));
-
-  await page.evaluate(trip => {
-    // @ts-ignore
-    let input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'xip';
-    input.value = '';
-    // @ts-ignore
-    document.querySelector('form').appendChild(input);
-    // @ts-ignore
-    input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'password';
-    input.value = trip || '';
-    // @ts-ignore
-    document.querySelector('form').appendChild(input);
-  }, proxyTrip);
-}
-
-export async function enterLegacyChat(ip: string, name: string, email: string, color: number): Promise<void> {
-  messagePage = messagePage || await browser.newPage();
-
-  await messagePage.waitForSelector('input[name="name"]');
-  await messagePage.$eval('input[name="name"]', (input, name) => input.value = name, name);
-  await messagePage.$eval('input[name="email"]', (input, email) => input.value = email || '', email);
-  await messagePage.$eval('input[name="xip"]', (input, ip) => input.value = ip || '', ip);
+  const now = processMillis();
+  const formUrl = `https://${domain}/comchat.cgi`;
+  let error = '';
+  const delayed = Math.floor((now - sendTime) / 1000);
 
   try {
-    await messagePage.$eval(`input[type="radio"][value="${color}"]`, btn => btn.click());
+    const params = new URLSearchParams();
+
+    params.append('name', name);
+    params.append('email', email);
+    params.append('mode', 'into');
+    params.append('retime', '20');
+    params.append('lines', '30');
+    params.append('xip', ip);
+
+    await chatClient.post(formUrl, params);
+    inChat = true;
   }
-  catch {}
+  catch (err: any) {
+    error = err.message || String(err);
+  }
 
-  await messagePage.$eval('input[type="submit"]', btn => btn.click());
-  await messagePage.waitForSelector('input[name="comment"]');
-  await messagePage.$eval('form', form => form.setAttribute('target', '_blank'));
+  if (error) {
+    console.error('Failed to enter legacy chat:', error);
 
-  inChat = true;
+    if (tries < MAX_ENTER_TRIES && delayed < MAX_ENTER_DELAY) {
+      await sleep(ENTER_RETRY_DELAY);
+      return enterLegacyChat(ip, name, email, color, tries + 1, sendTime);
+    }
+  }
 }
 
 export async function leaveLegacyChat(): Promise<void> {
-  if (!messagePage)
+  if (!chatClient)
     return;
 
-  await messagePage.waitForSelector('input[type="button"]');
-  await messagePage.$eval('input[type="button"]', btn => btn.click());
+  const formUrl = `https://${domain}/comchat.cgi`;
+  const params = new URLSearchParams();
 
-  const oldPage = messagePage;
-  messagePage = await browser.newPage();
-  await oldPage.close();
-  await loadEnterForm(messagePage);
+  params.append('name', proxyName);
+  params.append('mode', 'out');
+
+  try {
+    await chatClient.get(formUrl, { params });
+  }
+  catch {}
+
+  await jar.removeAllCookies();
+  chatClient = null;
   inChat = false;
 }
 
@@ -580,7 +564,7 @@ export async function legacySendMessage(ip: string, name: string, email: string,
     console.error(`Failed to send legacy message for ${name}:`, error);
 
     if (tries < MAX_SEND_TRIES && delayed < MAX_SEND_DELAY)
-      setTimeout(() => legacySendMessage(ip, name, email, comment, color, tripCode, tries + 1, sendTime), SEND_RETRY_DELAY);
+      setTimeout(() => legacySendMessage(ip, name, email, comment0, color, tripCode, tries + 1, sendTime), SEND_RETRY_DELAY);
   }
 }
 

@@ -13,6 +13,8 @@ const externals = {
   'puppeteer': { import: 'puppeteer' },
   'sqlite3': { import: 'sqlite3' },
   'ws': { import: 'ws' },
+  'axios-cookiejar-support': { import: 'axios-cookiejar-support' },
+  'tough-cookie': { import: 'tough-cookie' }
 };
 
 const rootPkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));

@@ -260,6 +260,7 @@ async function getDirectMessages(name: string, tripCode: string, openDmString: s
       name: row.name,
       remote: !!row.remote,
       style: row.style,
+      synced: !!row.synced,
       time: row.synced_time,
       trip: tripcode(row.trip ?? '')
     } as Message));

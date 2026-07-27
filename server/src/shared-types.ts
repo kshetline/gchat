@@ -52,6 +52,7 @@ export interface Message {
   msgId: number;
   remote: boolean;
   style: string;
+  synced: boolean;
   time: number;
   trip: string;
 }
@@ -72,6 +73,7 @@ export interface DbMessage {
   spam: number;
   style: string;
   synced_time: number;
+  synced: number;
   time: number;
   trip: string;
 }
