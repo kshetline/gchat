@@ -209,9 +209,19 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
   return { messages, participants, participantsRaw };
 }
 
+const DELAYED_MESSAGE_REGEX = /\s*\[s2]\[i]〔delayed \d+s〕\[\/i]\[\/s2]$/;
+const MAX_SEND_TRIES = 10;
+const SEND_RETRY_DELAY = 1000;
+const MARK_AS_DELAYED = 45;
+const MAX_SEND_DELAY = 90;
+
+function normalize(s: string): string {
+  return s.trim().replace(/\s+/g, ' ').replace(/◇/g, '♦').replace(DELAYED_MESSAGE_REGEX, '');
+}
+
 function similar(s1: string, s2: string): boolean {
-  s1 = s1.trim().replace(/\s+/g, ' ').replace(/◇/g, '♦');
-  s2 = s2.trim().replace(/\s+/g, ' ').replace(/◇/g, '♦');
+  s1 = normalize(s1);
+  s2 = normalize(s2);
 
   return s1 === s2;
 }
@@ -274,14 +284,16 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
     for (let i = pendingDuplicates.length - 1; i >= 0; --i) {
       const time = pendingDuplicates[i].time;
 
-      if (time < clockNow - 60)
+      if (time < clockNow - MAX_SEND_DELAY)
         pendingDuplicates.splice(i, 1);
     }
 
     for (let i = messages.messages?.length - 1; i >= 0 && pendingDuplicates.length > 0; --i) {
       const message = messages.messages[i];
+      const delayMsg = (DELAYED_MESSAGE_REGEX.exec(message.bbCode) || [])[0] || '';
+      const allowedDelay = delayMsg ? 120 : 60;
       const dupIndex = pendingDuplicates.findIndex(d => d.name === message.name && similar(d.comment, message.bbCode) &&
-        Math.abs(d.time - message.time) < 60);
+        Math.abs(d.time - message.time) < allowedDelay);
 
       if (dupIndex >= 0) {
         const duplicate = pendingDuplicates[dupIndex];
@@ -289,7 +301,8 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
         messages.messages.splice(i, 1);
         pendingDuplicates.splice(dupIndex, 1);
 
-        await db.run('UPDATE messages SET synced_time = ?, hash = ? WHERE id = ?', message.time, message.hash, duplicate.id);
+        await db.run('UPDATE messages SET synced_time = ?, hash = ?, message = ? WHERE id = ?',
+          message.time, message.hash, message.bbCode + delayMsg, duplicate.id);
       }
 
       existing.delete(message.hash);
@@ -339,10 +352,10 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
             await db.run('UPDATE messages SET hash = ?, synced_time = ? WHERE id = ?', closestMessage.hash, closestMessage.time, row.id);
         }
         // Otherwise, presume the message was administratively deleted on the legacy site and follow suit here.
-        else if (!remoteExisting.has(hash) && row.synced_time < clockNow - 60) {
+        else if (!remoteExisting.has(hash) && row.synced_time < clockNow - MAX_SEND_DELAY) {
           // This might be a new local message that failed to sync back to the legacy chat.
           // If so, keep the message, flag it in user display as not being visible in the legacy chat.
-          const del = (row.remote > 0 || row.synced_time < clockNow - 180) ? 1 : 0;
+          const del = (row.remote > 0 || row.synced_time === row.time) ? 1 : 0;
 
           await db.run('UPDATE messages SET deleted = ?, flagged = 1 WHERE id = ?', del, row.id);
           existing.delete(hash);
@@ -521,22 +534,15 @@ export async function leaveLegacyChat(): Promise<void> {
   inChat = false;
 }
 
-export async function legacySendMessage(ip: string, name: string, email: string, comment: string, color: number, tripCode: string): Promise<void> {
+export async function legacySendMessage(ip: string, name: string, email: string, comment0: string,
+                                        color: number, tripCode: string, tries = 0, sendTime = processMillis()): Promise<void> {
   if (!inChat)
     await enterLegacyChat(ip, proxyName, null, 0);
 
-  messagePage = messagePage || await browser.newPage();
-  comment = `《${name}${tripCode ? '◆' + tripcode(tripCode) : ''}》${comment}`;
-
-  // Clean up spun-off pages created by previous message sending.
-  const pages = [...await browser.pages()];
+  const now = processMillis();
   const formUrl = `https://${domain}/comchat.cgi`;
-
-  for (const page of pages) {
-    if (page.url() === formUrl)
-      await page.close();
-  }
-
+  let error = '';
+  let comment = `《${name}${tripCode ? '◆' + tripcode(tripCode) : ''}》${comment0}`;
   let face = '';
   const $ = /^(.+)(\[kao](.+)\[\/kao])\s*$/.exec(comment);
 
@@ -545,31 +551,37 @@ export async function legacySendMessage(ip: string, name: string, email: string,
     face = $[3];
   }
 
-  await messagePage.waitForSelector('input[name="comment"]');
-  await messagePage.$eval('select[name="color"]', (sel, c) => sel.value = c, color);
-  await messagePage.$eval('#face', (sel, face) => sel.value = face, face);
-  await messagePage.$eval('input[name="comment"]', (input, comment) => input.value = comment, comment || '\u00A0');
-  await messagePage.$eval('input[name="password"]', (input, tripCode) => input.value = tripCode, proxyTrip || '');
-  await messagePage.$eval('input[name="email"]', (input, email) => input.value = email, email || '');
-  await messagePage.focus('input[name="comment"]');
+  const delayed = Math.floor((now - sendTime) / 1000);
 
-  await messagePage.evaluate(ip => {
-    // @ts-ignore
-    let input = document.querySelector('form input[name="xip"]');
+  if (delayed > MARK_AS_DELAYED)
+    comment += ` [s2][i]〔delayed ${delayed}s〕[/i][/s2]`;
 
-    if (!input) {
-      // @ts-ignore
-      input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = 'xip';
-      // @ts-ignore
-      document.querySelector('form').appendChild(input);
-    }
+  try {
+    const params = new URLSearchParams();
 
-    input.value = ip || '';
-  }, ip);
+    params.append('name', proxyName);
+    params.append('email', email);
+    params.append('password', proxyTrip || '');
+    params.append('comment', comment || '\u00A0');
+    params.append('face', face);
+    params.append('color', color.toString() || '');
+    params.append('mode', 'regist');
+    params.append('retime', '20');
+    params.append('lines', '30');
+    params.append('xip', ip);
 
-  await messagePage.keyboard.press('Enter');
+    await axios.post(formUrl, params);
+  }
+  catch (err: any) {
+    error = err.message || String(err);
+  }
+
+  if (error) {
+    console.error(`Failed to send legacy message for ${name}:`, error);
+
+    if (tries < MAX_SEND_TRIES && delayed < MAX_SEND_DELAY)
+      setTimeout(() => legacySendMessage(ip, name, email, comment, color, tripCode, tries + 1, sendTime), SEND_RETRY_DELAY);
+  }
 }
 
 const pendingRetries = new Map<string, any>();

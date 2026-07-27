@@ -1007,38 +1007,18 @@ function hasChatOpen(name: string, dmId: number): boolean {
       await db.run('UPDATE participants SET last_post = ?1, last_active = ?1 WHERE id = ?2', now, participant.id);
 
     if (!dm && !framed && !comment.includes('##cpc-only##')) {
-      await new Promise<void>(resolve => {
-        let resolved = false;
-        let tries = 3;
+      const doSend = () => {
+        legacySendMessage(session?.ip, name, q.email, rawComment, q.color, q.tripCode).finally();
+      };
 
-        const doSend = () => {
-          legacySendMessage(session?.ip, name, q.email, rawComment, q.color, q.tripCode).then(() => {
-            if (!resolved) {
-              resolved = true;
-              resolve();
-            }
-          }).catch(() => {
-            if (--tries > 0)
-              setTimeout(doSend, 1000);
-          });
-        };
-
-        if (proxyStarted)
+      if (proxyStarted)
+        doSend();
+      else {
+        enterLegacyChat(session?.ip, proxyName, null, 0).then(() => {
+          proxyStarted = true;
           doSend();
-        else {
-          enterLegacyChat(session?.ip, proxyName, null, 0).then(() => {
-            proxyStarted = true;
-            doSend();
-          }).finally();
-        }
-
-        setTimeout(() => {
-          if (!resolved) {
-            resolved = true;
-            resolve();
-          }
-        }, 5000);
-      });
+        }).finally();
+      }
     }
 
     res.json(null);
