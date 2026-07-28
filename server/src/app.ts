@@ -52,7 +52,7 @@ if (process.env.LOG_FILE_PATH) {
         if (isObject(a) && str === '{}' && !isEqual(a, {}))
           str = String(a);
 
-        return str;
+        return method === 'log' || method === 'info' || str.length < 1000 ? str : str.slice(0, 1000) + '...';
       }).join(' ') + '\n');
     };
   }
@@ -133,7 +133,7 @@ async function monitor(): Promise<void> {
     console.error('Error cleaning up database:', err);
   }
 
-  monitorTimeout = setTimeout(monitor, MONITOR_INTERVAL);
+  monitorTimeout = setTimeout(() => monitor().catch(), MONITOR_INTERVAL);
 }
 
 async function getLastSessions(): Promise<void> {
@@ -443,8 +443,8 @@ function hasChatOpen(name: string, dmId: number): boolean {
 
 (async () => {
   await getLastSessions();
-  monitor().finally();
-  initExternalUploader().catch().finally();
+  monitor().catch();
+  initExternalUploader().catch();
 
   app.set('trust proxy', 1);
   app.use(express.json());
@@ -861,7 +861,7 @@ function hasChatOpen(name: string, dmId: number): boolean {
             resolved = true;
             resolve();
           }
-        }).finally();
+        }).catch();
         setTimeout(() => {
           if (!resolved) {
             resolved = true;
@@ -1009,7 +1009,7 @@ function hasChatOpen(name: string, dmId: number): boolean {
 
     if (!dm && !framed && !comment.includes('##cpc-only##')) {
       const doSend = () => {
-        legacySendMessage(session?.ip, name, q.email, rawComment, q.color, q.tripCode).finally();
+        legacySendMessage(session?.ip, name, q.email, rawComment, q.color, q.tripCode).catch();
       };
 
       if (proxyStarted)
@@ -1018,7 +1018,7 @@ function hasChatOpen(name: string, dmId: number): boolean {
         enterLegacyChat(session?.ip, proxyName, null, 0).then(() => {
           proxyStarted = true;
           doSend();
-        }).finally();
+        }).catch();
       }
     }
 
@@ -1060,7 +1060,7 @@ function hasChatOpen(name: string, dmId: number): boolean {
       sendToAll('newMessages');
 
       if (!dm)
-        legacyEditMessage(oldMessage.name, q.tripCode, oldMessage.synced_time, rawBbCode, colors[q.color].trim()).finally();
+        legacyEditMessage(oldMessage.name, q.tripCode, oldMessage.synced_time, rawBbCode, colors[q.color].trim()).catch();
 
       res.json(null);
     }
@@ -1078,7 +1078,7 @@ function hasChatOpen(name: string, dmId: number): boolean {
       sendToAll('newMessages');
 
       if (!oldMessage.dm)
-        legacyDeleteMessage(oldMessage.name, req.query.tripCode as string, oldMessage.synced_time).finally();
+        legacyDeleteMessage(oldMessage.name, req.query.tripCode as string, oldMessage.synced_time).catch();
 
       res.json(null);
     }

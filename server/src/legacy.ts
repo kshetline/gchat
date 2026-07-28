@@ -447,15 +447,15 @@ async function pollLegacyMessages(overrideCount?: number): Promise<void> {
 
   if (!isShuttingDown()) {
     if (existing.size < 1000)
-      pollingTimeout = setTimeout(() => pollLegacyMessages(1000), MESSAGE_FULL_REPOLL_DELAY);
+      pollingTimeout = setTimeout(() => pollLegacyMessages(1000).catch(), MESSAGE_FULL_REPOLL_DELAY);
     else
-      pollingTimeout = setTimeout(pollLegacyMessages, failed ? MESSAGE_REPOLL_RATE : MESSAGE_POLL_RATE);
+      pollingTimeout = setTimeout(() => pollLegacyMessages().catch(), failed ? MESSAGE_REPOLL_RATE : MESSAGE_POLL_RATE);
   }
 
   lastLegacyPoll = processMillis();
 }
 
-pollLegacyMessages().finally();
+pollLegacyMessages().catch();
 
 const MAX_ENTER_TRIES = 3;
 const ENTER_RETRY_DELAY = 1000;
@@ -564,7 +564,7 @@ export async function legacySendMessage(ip: string, name: string, email: string,
     console.error(`Failed to send legacy message for ${name}:`, error);
 
     if (tries < MAX_SEND_TRIES && delayed < MAX_SEND_DELAY)
-      setTimeout(() => legacySendMessage(ip, name, email, comment0, color, tripCode, tries + 1, sendTime), SEND_RETRY_DELAY);
+      setTimeout(() => legacySendMessage(ip, name, email, comment0, color, tripCode, tries + 1, sendTime).catch(), SEND_RETRY_DELAY);
   }
 }
 
@@ -606,12 +606,12 @@ export async function legacyEditMessage(name: string, trip: string, date: number
     if (tries < MAX_EDIT_TRIES && response.data.startsWith('not ')) {
       pendingRetries.set(key, setTimeout(() => {
         pendingRetries.delete(key);
-        legacyEditMessage(name, trip, date, message, color, tries + 1);
+        legacyEditMessage(name, trip, date, message, color, tries + 1).catch();
       }, EDIT_RETRY_DELAY));
     }
 
     pendingRetries.set(key, setTimeout(() => {
-      legacyEditMessage(name, trip, date, message, color, tries + 1);
+      legacyEditMessage(name, trip, date, message, color, tries + 1).catch();
     }, 1000));
   }
   catch (err: any) {

@@ -212,7 +212,7 @@ export class App implements OnInit {
       }
       else if (event.key === 'Enter' && this.name().trim() && !this.inChat()) {
         event.preventDefault();
-        this.enterMainChat().finally();
+        this.enterMainChat().catch();
       }
       else if (event.key === 'p' && (event.ctrlKey || event.metaKey) && this.framed &&
                this.messageEntry?.getText().trim() === 'peek') {
@@ -484,7 +484,7 @@ export class App implements OnInit {
     const unseen = this.unseenMessages() + this.dms().reduce((sum, dm) => sum + dm.missed(), 0);
 
     document.title = `${unseen ? '(' + unseen + ') ' : ''}${this.baseTitle}`;
-    userscriptAction('updateTitle', document.title).finally();
+    userscriptAction('updateTitle', document.title).catch();
   }
 
   protected async enterMainChat(): Promise<void> {
@@ -683,7 +683,7 @@ export class App implements OnInit {
 
   protected upload(evt: FileUploadEvent): void {
     const doUpload = () => {
-      this.uploader.upload(evt, this.name(), this.tripCode()).finally();
+      this.uploader.upload(evt, this.name(), this.tripCode()).catch();
     }
 
     if (this.selectedChat() > 0) {

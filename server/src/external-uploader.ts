@@ -222,6 +222,6 @@ export async function getExternalUploadLink(req: express.Request, file: MFile): 
   if (link)
     return link;
 
-  initExternalUploader(true).catch().finally();
+  initExternalUploader(true).catch();
   throw new Error('External uploader: ' + (error || 'failed to upload file'));
 }
