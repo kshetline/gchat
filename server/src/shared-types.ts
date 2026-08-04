@@ -48,8 +48,9 @@ export interface Message {
   hash: string;
   html: string;
   isMe?: boolean;
-  name: string;
   msgId: number;
+  name: string;
+  origTime?: number;
   remote: boolean;
   style: string;
   synced: boolean;

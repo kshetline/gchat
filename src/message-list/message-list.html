@@ -11,7 +11,7 @@
   @for (message of msgs; track message.hash) {
     @if (message.style?.length < 2) {
       <div class="enter-leave">{{ message.name }}{{ message.trip ? '⬥' + message.trip : '' }}
-        <span [innerHTML]="message.html"></span>, {{ formatTime(message) }}</div>
+        <span [innerHTML]="message.html"></span>, {{ formatMessageTime(message) }}</div>
     }
     @else {
       <div class="message-row">
@@ -19,10 +19,11 @@
             <span [style.color]="getColor(message)" [style.background-color]="getBackground(message)"><span
                 [innerHTML]="showInvisibles(message.name)"></span>@if (message.email) { &nbsp;<a class="email-link" [href]="message.email">📫</a> }</span>
           @if (message.trip || !message.remote) {
-            <span class="trip" [class.native]="!message.remote" [class.flagged]="!!message.flagged">{{ message.trip || '' }}</span>
+            <span class="trip" [class.native]="!message.remote">{{ message.trip || '' }}</span>
           }
           @if (message.time) {
-            <span class="time">{{ formatTime(message) }}</span>
+            <span class="time" [class.flagged]="!!message.flagged && !message.remote"
+              [title]="message.origTime === message.time ? '' : formatTime(message.origTime)">{{ formatMessageTime(message) }}</span>
           }
         </div>
         <div class="bubble-wrap" [class.me]="message.isMe"
@@ -32,7 +33,7 @@
           <div class="bubble" [class.local-light]="isLight(message)" [class.local-dark]="!isLight(message)"
                [style.color]="color" [style.background-color]="getBackground(message)">
             <span [innerHTML]="adjustMarkup(message.html, color) | safeHtml"></span>
-            <span class="trailing-time"> ({{ formatTime(message) }})</span>
+            <span class="trailing-time"> ({{ formatMessageTime(message) }})</span>
           </div>
           @if (inChat()) {
             <div class="tools">

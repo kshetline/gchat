@@ -211,7 +211,16 @@ export class MessageList implements OnInit {
       .replace(/\uFE68/g, '\\\u200D');
   }
 
-  protected formatTime(time: number | Message): string {
+  protected formatTime(time: number): string {
+    if (!time)
+      return '';
+    else if (this.localTime())
+      return new Date(time * 1000).toLocaleString();
+    else
+      return new Date(time * 1000).toISOString().substring(0, 19).replace('T', ' ');
+  }
+
+  protected formatMessageTime(time: number | Message): string {
     let message: Message;
 
     if (isObject(time)) {
@@ -219,12 +228,7 @@ export class MessageList implements OnInit {
       time = time.time;
     }
 
-    let formatted: string;
-
-    if (this.localTime())
-      formatted = new Date(time * 1000).toLocaleString();
-    else
-      formatted = new Date(time * 1000).toISOString().substring(0, 19).replace('T', ' ');
+    let formatted = this.formatTime(time);
 
     if (message && message.style?.length > 2)
       formatted += (message.editCount ? '✏️' : '') + (message.flagged ? '°' : '');
@@ -272,7 +276,7 @@ export class MessageList implements OnInit {
       { params: { name: this.name(), tripCode: this.tripCode(), msgId: message.msgId } }).subscribe({
       next: (response): void => {
         this.edit.emit({ bbCode: response.bbCode, color: response.color, chatIndex: this.chatIndex(),
-          msgId: message.msgId, time: this.formatTime(message.time) });
+          msgId: message.msgId, time: this.formatMessageTime(message.time) });
       },
       error: (error): void => {
         if (error.status === 400 && error.error?.error)

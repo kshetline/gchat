@@ -581,6 +581,7 @@ function hasChatOpen(name: string, dmId: number): boolean {
         (row.trip && (row.trip === q.tripCode || row.trip === tripCode))),
       msgId: row.id,
       name: row.name,
+      origTime: row.time,
       remote: !!row.remote,
       style: row.style,
       time: row.synced_time,
