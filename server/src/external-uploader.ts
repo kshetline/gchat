@@ -68,9 +68,9 @@ export async function initExternalUploader(force = false, newProxy = false): Pro
       break;
     }
     catch (e) {
-      await page?.close().catch(() => {});
+      try { await page?.close(); } catch {} // eslint-disable-line @stylistic/brace-style
       page = undefined;
-      await browser?.close().catch(() => {});
+      try { await browser?.close(); } catch {} // eslint-disable-line @stylistic/brace-style
       browser = undefined;
       newProxy = true;
       error = (e as any).message || e.toString();

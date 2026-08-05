@@ -3,6 +3,7 @@ export interface SessionInfo {
   ip?: string;
   inChat?: boolean;
   inChatLock?: boolean;
+  isAdmin?: boolean;
   lastActive?: number;
   lastAlive?: number;
   lastContentUpdate?: number;

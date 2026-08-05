@@ -48,6 +48,7 @@ export interface Message {
   hash: string;
   html: string;
   isMe?: boolean;
+  ip?: string;
   msgId: number;
   name: string;
   origTime?: number;
@@ -59,6 +60,7 @@ export interface Message {
 }
 
 export interface DbMessage {
+  allowedAsAdmin?: boolean; // Not a DB field
   deleted: number;
   dm: number;
   edit_count: number;
@@ -122,11 +124,18 @@ export interface Messages {
   deleteCount?: number;
   dms?: DmSession[];
   errorMessage?: string;
+  isAdmin?: boolean;
   lastSuccessfulLegacyPoll?: number;
   messages?: Message[];
   participants?: ParticipantInfo[];
   participantsRaw?: string;
   progress?: number;
+}
+
+export interface MessageInfo {
+  ip: string;
+  name: string;
+  time: number;
 }
 
 export type TypingStatus = Record<string, { dm: number, since: number }>;

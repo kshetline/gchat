@@ -4,7 +4,7 @@ import axios, { AxiosInstance } from 'axios';
 import { HtmlParser } from 'fortissimo-html';
 import { DomNode } from 'fortissimo-html/dist/dom.js';
 import { getDb } from './db.js';
-import { convertBBCodeToHtml, getTextAndMarkupAsBBCode, messageHash, Now, simplifyError } from './chat-util.js';
+import { convertBBCodeToHtml, getTextAndMarkupAsBBCode, messageHash, Now, parseChatTime, simplifyError } from './chat-util.js';
 import tripcode from 'tripcode';
 import { isShuttingDown, MAX_IDLE_PARTICIPANT_AGE } from './app.js';
 import { clearLegacyAccessTimes, tallyForLockout, TIME_WINDOW } from './intrusion-detector.js';
@@ -74,11 +74,10 @@ function extractMessage(messageRow: DomNode): Message {
 
   const name = htmlUnescape((nameElem?.children?.at(nameIndex) as DomNode)?.children?.at(0)?.content || '').trim();
   const rawTime = messageRow.querySelector('.messageDate')?.children?.at(0)?.content?.slice(1, -1);
-  const parts = rawTime?.split(/[- :/]/).map((p, i) => p.padStart(i === 0 ? 4 : 2, '0'));
-  const timestamp = parts?.length !== 6 ? null : `${parts[0]}-${parts[1]}-${parts[2]}T${parts[3]}:${parts[4]}:${parts[5]}`;
-  const time = Math.floor(new Date(timestamp + 'Z').getTime() / 1000);
+  const timestamp: string[] = [];
+  const time = parseChatTime(rawTime, timestamp);
   const trip = (nameElem?.children?.at(nameIndex + 1) as DomNode)?.content?.substring(1);
-  const hash = messageHash(name, trip, timestamp);
+  const hash = messageHash(name, trip, timestamp[0]);
 
   return { bbCode, email, hash, msgId: -1, name, style, synced: false, html, remote: true, time, trip };
 }

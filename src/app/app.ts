@@ -70,11 +70,13 @@ export class App implements OnInit {
   private readonly prefs: Preferences;
 
   private activity = false;
+  private adminSet = 0;
   // noinspection TypeScriptFieldCanBeMadeReadonly
   private baseTitle = 'Chat';
   private chatActive = true;
   private confirmCallback: (approved: boolean) => void;
   private dmsJustClosed = new Map<number, number>();
+  private isAdminFlag = signal(false);
   private lastActive = 0;
   private lastReceiveTime = 0
   private _messageEntry: MessageEntry;
@@ -430,6 +432,9 @@ export class App implements OnInit {
           this.checkChatActive();
           this.lastSuccessfulLegacyPoll.set(messages.lastSuccessfulLegacyPoll);
 
+         if (!this.adminSet || !(--this.adminSet))
+            this.isAdminFlag.set(messages.isAdmin);
+
           if (!isEqual(messages.messages, [null])) {
             const newMessages = (messages.deleteCount || messages.append) ? clone(this.messages(), true) : messages.messages;
 
@@ -510,8 +515,11 @@ export class App implements OnInit {
 
     const params = { ...this.prefs, framed: this.framed };
 
-    this.httpClient.post('/api/enter', {}, { params }).subscribe({
-      next: (): void => {
+    this.httpClient.post<boolean>('/api/enter', {}, { params }).subscribe({
+      next: (isAdmin: boolean): void => {
+        this.isAdminFlag.set(isAdmin);
+        this.adminSet = 4;
+
         this.connectionTrouble.set(false);
         this.pendingFocus = true;
         this.inChat.set(true);
@@ -527,6 +535,8 @@ export class App implements OnInit {
         this.delayedAdjustScrolling();
       },
       error: (error): void => {
+        this.isAdminFlag.set(false);
+
         if (error.status === 400 && error.error?.error)
           notify('error', error.error.error);
         else
@@ -555,6 +565,8 @@ export class App implements OnInit {
         this.connectionTrouble.set(false);
         this.inChat.set(false);
         this.dms.set(this.dms().map(dm => (dm.leftMainChat = true) && dm));
+        this.isAdminFlag.set(false);
+        this.adminSet = 4;
         this.delayedAdjustScrolling();
       },
       error: (_error): void => this.connectionTrouble.set(true)
@@ -725,6 +737,11 @@ export class App implements OnInit {
     doUpload();
   }
 
+  protected changeNotifySound(): void {
+    this.prefs.notifySound = this.notifySound();
+    this.prefService.set(this.prefs);
+  }
+
   protected toggleLocalTime(): void {
     this.prefs.localTime = this.localTime();
     this.prefService.set(this.prefs);
@@ -750,7 +767,7 @@ export class App implements OnInit {
   }
 
   protected isAdmin(): boolean {
-    return false;
+    return this.isAdminFlag();
   }
 
   private reenterDm(dm: DmInfo): void {

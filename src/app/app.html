@@ -56,7 +56,7 @@
           </div>
         }
         <div class="option-block" [class.in-chat]="inChat()">
-          <p-select style="width: 13em" [options]="notifyOptions" [(ngModel)]="notifySound"
+          <p-select style="width: 13em" [options]="notifyOptions" [(ngModel)]="notifySound" (ngModelChange)="changeNotifySound()"
                     optionLabel="label" optionValue="value">
             @if (!isIosSafari()) {
               <ng-template #footer>

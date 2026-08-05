@@ -7,7 +7,10 @@ import {
 import { clone, isEqual, isObject, isString, processMillis, throttle, toBoolean, toInt } from '@tubular/util';
 import { uploadSingle } from './uploader.js';
 import { DbSessionInfo, SessionInfo } from './session-info';
-import { addPendingDuplicate, announceDeparture, clearDeparture, enterLegacyChat, lastSuccessfulLegacyPoll, leaveLegacyChat, legacyDeleteMessage, legacyEditMessage, legacySendMessage, participantsRaw, stopLegacyPolling } from './legacy.js';
+import {
+  addPendingDuplicate, announceDeparture, clearDeparture, enterLegacyChat, lastSuccessfulLegacyPoll, leaveLegacyChat,
+  legacyDeleteMessage, legacyEditMessage, legacySendMessage, participantsRaw, stopLegacyPolling
+} from './legacy.js';
 import { getDb, getNamedParticipantRecord } from './db.js';
 import ip_ from 'ip';
 import axios from 'axios';
@@ -19,6 +22,7 @@ import { initExternalUploader, proxyIp } from './external-uploader.js';
 import { isBannedName, intrusionDetector, isBannedIp } from './intrusion-detector.js';
 import { stopLocalSocksProxy } from './socks-proxy.js';
 import { startWebSocketServer, sendToAll, sendToIp, wsPort } from './web-socket.js';
+import { adminDeleteMessage, updateRemoteIps } from './legacy-admin.js';
 
 // noinspection ES6ConvertVarToLetConst
 var shuttingDown = false;
@@ -68,6 +72,8 @@ const devMode = process.argv.includes('-d');
 const sessions = new Map<string, SessionInfo>();
 const proxyHidden = toBoolean(process.env.CHAT_PROXY_HIDDEN);
 const proxyName = process.env.CHAT_PROXY || 'CHAT②';
+const adminName = process.env.CHAT_ADMIN_NAME;
+const adminTrip = process.env.CHAT_ADMIN_TRIP;
 const typingStatus = {} as TypingStatus;
 const config: Config = {
   backgroundColor: process.env.CHAT_BACKGROUND || '#DDD',
@@ -281,6 +287,7 @@ async function participantCheck(req: express.Request, forceInChat = false, nameO
   const inChat = session?.inChat || forceInChat;
   const q = req.query as any;
   const name = nameOverride ?? cleanName(q.name);
+  const tripCode = q.tripCode && tripcode(q.tripCode);
   const token = getToken(req);
   const ip = getIp(req);
   const proxied = +(!toBoolean(q.framed));
@@ -290,6 +297,12 @@ async function participantCheck(req: express.Request, forceInChat = false, nameO
 
   if (session) {
     let changed = false;
+    const isAdmin = (name === adminName && tripCode === adminTrip);
+
+    if (session.isAdmin !== isAdmin) {
+      session.isAdmin = isAdmin;
+      changed = true;
+    }
 
     if (session.ip !== ip) {
       session.ip = ip;
@@ -412,6 +425,7 @@ async function allowedToEdit(req: express.Request, res: express.Response, action
   const q = req.query as any;
   const name = cleanName(q.name);
   const tripCode = q.tripCode && tripcode(q.tripCode);
+  const session = sessions.get(getToken(req));
 
   if (!await isBannedName(name, tripCode) && !await isBannedIp(getIp(req))) {
     const id = toInt(q.msgId);
@@ -427,6 +441,11 @@ async function allowedToEdit(req: express.Request, res: express.Response, action
         if (dmSession)
           message.message = decryptMessage(message.message, dmSession.ekey);
       }
+
+      return message;
+    }
+    else if (session?.isAdmin && action === 'delete') {
+      message.allowedAsAdmin = true;
 
       return message;
     }
@@ -512,6 +531,7 @@ function hasChatOpen(name: string, dmId: number): boolean {
   });
 
   startWebSocketServer(server);
+  updateRemoteIps(true).catch();
 
   app.use(intrusionDetector);
   app.use(express.static(path.join(__dirname, 'public')));
@@ -544,6 +564,8 @@ function hasChatOpen(name: string, dmId: number): boolean {
 
     if (toBoolean(q.inChat))
       await participantCheck(req);
+
+    await updateRemoteIps();
 
     const token = getToken(req);
     const session = sessions.get(token);
@@ -579,6 +601,7 @@ function hasChatOpen(name: string, dmId: number): boolean {
       html: convertBBCodeToHtml(row.message),
       isMe: row.name === name && (row.session_id === getToken(req) || row.ip === session?.ip ||
         (row.trip && (row.trip === q.tripCode || row.trip === tripCode))),
+      ip: session?.isAdmin ? row.ip : undefined,
       msgId: row.id,
       name: row.name,
       origTime: row.time,
@@ -587,6 +610,9 @@ function hasChatOpen(name: string, dmId: number): boolean {
       time: row.synced_time,
       trip: row.remote ? row.trip : tripcode(row.trip)
     } as Message));
+
+    if (!session?.isAdmin)
+      messages.forEach(m => !m.ip && delete m.ip);
 
     const force = toBoolean(req.query.force);
     let participant = await getNamedParticipantRecord(name);
@@ -753,6 +779,7 @@ function hasChatOpen(name: string, dmId: number): boolean {
       append: appendAt > 0,
       participants,
       participantsRaw,
+      isAdmin: session?.isAdmin || false,
       dms: await getDirectMessages(name, q.tripCode, q.openDms),
       lastSuccessfulLegacyPoll: lslp,
       progress: session?.progress,
@@ -768,8 +795,9 @@ function hasChatOpen(name: string, dmId: number): boolean {
   app.post('/api/enter', async (req, res) => {
     const q = req.query as any;
     const name = cleanName(q.name);
+    const tripCode = q.tripCode && tripcode(q.tripCode);
 
-    if (await isBannedName(name, tripcode(q.tripCode)) || await isBannedIp(getIp(req))) {
+    if (await isBannedName(name, tripCode) || await isBannedIp(getIp(req))) {
       res.status(400).json({ error: 'Entry into chat room failed' });
       return;
     }
@@ -875,7 +903,7 @@ function hasChatOpen(name: string, dmId: number): boolean {
     if (!(session as any).temp)
       await updateDbSession(token);
 
-    res.json(null);
+    res.json(name === adminName && tripCode === adminTrip);
   });
 
   app.post('/api/leave', async (req, res) => {
@@ -884,6 +912,8 @@ function hasChatOpen(name: string, dmId: number): boolean {
     const token = getToken(req);
     const session = sessions.get(token);
     const wasInChat = session?.inChat;
+
+    session.isAdmin = false;
 
     if (!wasInChat) {
       res.json(null);
@@ -1070,16 +1100,23 @@ function hasChatOpen(name: string, dmId: number): boolean {
   app.delete('/api/delete', async (req, res) => {
     await participantCheck(req, true);
 
-    if (await allowedToEdit(req, res, 'delete')) {
+    let message: DbMessage;
+
+    if ((message = await allowedToEdit(req, res, 'delete'))) {
       const id = toInt(req.query.msgId);
       const db = await getDb();
       const oldMessage = await db.get<DbMessage>('SELECT * FROM messages WHERE id = ?', id);
+      const session = sessions.get(getToken(req));
 
       await db.run('UPDATE messages SET deleted = 1 WHERE id = ?', id);
       sendToAll('newMessages');
 
-      if (!oldMessage.dm)
-        legacyDeleteMessage(oldMessage.name, req.query.tripCode as string, oldMessage.synced_time).catch();
+      if (!oldMessage.dm) {
+        if (message.allowedAsAdmin && session?.isAdmin)
+          adminDeleteMessage(oldMessage.name, oldMessage.synced_time).catch();
+        else
+          legacyDeleteMessage(oldMessage.name, req.query.tripCode as string, oldMessage.synced_time).catch();
+      }
 
       res.json(null);
     }
@@ -1279,6 +1316,6 @@ function hasChatOpen(name: string, dmId: number): boolean {
     stopLocalSocksProxy().then(() => getDb().then(db => db.close().then(() => {
       clearTimeout(monitorTimeout);
       stopLegacyPolling();
-    })));
+    }).catch())).catch();
   }
 })();

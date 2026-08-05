@@ -114,3 +114,13 @@ export function timeStamp(): string {
 }
 
 export function Now(): number { return Math.floor(Date.now() / 1000); }
+
+export function parseChatTime(time: string, asString?: string[]): number {
+  const parts = time?.split(/[- :/]/).map((p, i) => p.padStart(i === 0 ? 4 : 2, '0'));
+  const timestamp = parts?.length !== 6 ? null : `${parts[0]}-${parts[1]}-${parts[2]}T${parts[3]}:${parts[4]}:${parts[5]}`;
+
+  if (asString)
+    asString[0] = timestamp;
+
+  return timestamp ? Math.floor(new Date(timestamp + 'Z').getTime() / 1000) : 0;
+}
