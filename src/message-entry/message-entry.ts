@@ -214,7 +214,7 @@ export function bbCodeToQuillOps(bbCode: string): QuillOp[] {
   templateUrl: './message-entry.html',
   styleUrl: './message-entry.scss',
 })
-export class MessageEntry implements OnInit{
+export class MessageEntry implements OnInit {
   protected kaomoji = kaomoji;
 
   private _color = 0;
@@ -434,7 +434,7 @@ export class MessageEntry implements OnInit{
 
   private insertFile(file: File): void {
     this.canCancelUpload.set(false);
-    this.currentUpload ={
+    this.currentUpload = {
       external: this.externalUploader(),
       file,
       finished: () => {
@@ -490,7 +490,7 @@ export class MessageEntry implements OnInit{
         }
       },
       reject: () => {}
-    })
+    });
   }
 
   setColor(color: number): void {
@@ -652,7 +652,7 @@ export class MessageEntry implements OnInit{
             this.prefService.set(prefs);
           },
           reject: () => this.externalUploader.set(false)
-        })
+        });
   }
 
   protected onFileSelected(evt: Event): void {
@@ -727,11 +727,11 @@ export class MessageEntry implements OnInit{
       bbCode: quillOpsToBBCode(this.quill.getContents().ops),
       color: this.color,
       msgId: this.editId,
-      callback: (success) => {
+      callback: success => {
         if (success)
           this.cancelEdit();
       }
-    })
+    });
   }
 
   protected formatKaomoji(kao: string): string {

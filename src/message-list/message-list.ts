@@ -104,7 +104,7 @@ export class MessageList implements OnInit {
     let type: string;
     let index = 0;
     let chars = [...s];
-    const result: { text: string, type: string }[] = [];
+    const result: { text: string; type: string }[] = [];
     const addText = (t: string, theType: string) => {
       if (text && type !== theType) {
         result.push({ text, type });
@@ -281,9 +281,9 @@ export class MessageList implements OnInit {
       error: (error): void => {
         if (error.status === 400 && error.error?.error)
           notify('error', error.error.error);
-       else
-         this.connectionTrouble.emit(error.message || error.toString());
-       }
+        else
+          this.connectionTrouble.emit(error.message || error.toString());
+      }
     });
   }
 

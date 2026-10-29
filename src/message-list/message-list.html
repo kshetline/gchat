@@ -8,7 +8,7 @@
     }
   }
   @let msgs = isAtBottom() ? messages() : messages().slice(0).reverse();
-  @for (message of msgs; track message.hash) {
+  @for (message of msgs; track message.msgId) {
     @if (message.style?.length < 2) {
       <div class="enter-leave">{{ message.name }}{{ message.trip ? '⬥' + message.trip : '' }}
         <span [innerHTML]="message.html"></span>, {{ formatMessageTime(message) }}</div>
@@ -22,7 +22,7 @@
             <span class="trip" [class.native]="!message.remote">{{ message.trip || '' }}</span>
           }
           @if (message.time) {
-            <span class="time" [class.flagged]="!!message.flagged && !message.remote"
+            <span class="time" [class.flagged]="!!message.flagged && !message.remote" [class.expired]="!!message.expired"
               [title]="message.origTime === message.time ? '' : formatTime(message.origTime)">{{ formatMessageTime(message) }}</span>
           }
         </div>

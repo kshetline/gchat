@@ -78,7 +78,7 @@ export class App implements OnInit {
   private dmsJustClosed = new Map<number, number>();
   private isAdminFlag = signal(false);
   private lastActive = 0;
-  private lastReceiveTime = 0
+  private lastReceiveTime = 0;
   private _messageEntry: MessageEntry;
   private messageTimer: any;
   private messageTimerLastDelay = Number.MAX_SAFE_INTEGER;
@@ -201,7 +201,7 @@ export class App implements OnInit {
       else if (event.key === 'Escape' && this.showConfirmation()) {
         event.preventDefault();
         this.showConfirmation.set(false);
-        this.confirmCallback && this.confirmCallback(false);
+        if (this.confirmCallback) this.confirmCallback(false);
       }
       else if (event.key === 'Escape') {
         event.preventDefault();
@@ -210,7 +210,7 @@ export class App implements OnInit {
       else if (event.key === 'Enter' && this.showConfirmation()) {
         event.preventDefault();
         this.showConfirmation.set(false);
-        this.confirmCallback && this.confirmCallback(true);
+        if (this.confirmCallback) this.confirmCallback(true);
       }
       else if (event.key === 'Enter' && this.name().trim() && !this.inChat()) {
         event.preventDefault();
@@ -245,7 +245,7 @@ export class App implements OnInit {
     });
 
     window.addEventListener('blur', () => { blurTime = processMillis(); this.checkChatActive(); });
-    window.addEventListener('focus', () => { this.checkChatActive(true); this.adjustScrolling(processMillis() < blurTime + 15000) });
+    window.addEventListener('focus', () => { this.checkChatActive(true); this.adjustScrolling(processMillis() < blurTime + 15000); });
     window.addEventListener('scroll', () => this.checkChatActive(true));
     window.addEventListener('mousemove', () => (this.activity = true) && (this.lastActive = processMillis()));
     window.addEventListener('beforeunload', () => this.inChat() && this.leaveMainChat());
@@ -331,7 +331,7 @@ export class App implements OnInit {
     const ts = this.typingStatus;
 
     return name !== this.name() && ts && ts[name]?.dm === dm && ts[name]?.since > processMillis() - 5000;
-  }
+  };
 
   private async initToken(): Promise<void> {
     if (!localStorage.getItem('chat-token')) {
@@ -352,12 +352,12 @@ export class App implements OnInit {
 
   protected confirm() {
     this.showConfirmation.set(false);
-    this.confirmCallback && this.confirmCallback(true);
+    if (this.confirmCallback) this.confirmCallback(true);
   }
 
   protected dontConfirm() {
     this.showConfirmation.set(false);
-    this.confirmCallback && this.confirmCallback(false);
+    if (this.confirmCallback) this.confirmCallback(false);
   }
 
   private checkChatActive(active?: boolean): void {
@@ -661,13 +661,13 @@ export class App implements OnInit {
 
     this.httpClient.put('/api/update', { bbCode, framed: this.framed }, { params }).subscribe({
       next: (): void => {
-        evt.callback && evt.callback(true);
+        if (evt.callback) evt.callback(true);
         setTimeout(() => this.getMessages(true), 500);
       },
       error: (error): void => {
         notify('error', error.error?.error || 'Failed to update message');
         console.error(error);
-        evt.callback && evt.callback(false);
+        if (evt.callback) evt.callback(false);
       }
     });
   }
@@ -688,15 +688,15 @@ export class App implements OnInit {
             notify('error', error.error?.error || 'Failed to delete message');
             console.error(error);
           }
-        })
+        });
       }
-    }
+    };
   }
 
   protected upload(evt: FileUploadEvent): void {
     const doUpload = () => {
       this.uploader.upload(evt, this.name(), this.tripCode()).catch();
-    }
+    };
 
     if (this.selectedChat() > 0) {
       if (!this.tripCode()?.trim() && !evt.external) {
@@ -728,7 +728,7 @@ export class App implements OnInit {
             doUpload();
           },
           reject: () => {}
-        })
+        });
 
         return;
       }
@@ -850,7 +850,7 @@ export class App implements OnInit {
     this.confirmCallback = (approved: boolean): void => {
       if (approved)
         userscriptAction('revert').catch(err => notify('error', err));
-    }
+    };
   }
 
   private async verifyAllowingDMs(): Promise<boolean> {
@@ -881,7 +881,7 @@ export class App implements OnInit {
           resolve(true);
         },
         reject: () => resolve(false)
-      })
+      });
     });
   }
 
@@ -924,8 +924,8 @@ export class App implements OnInit {
           this.selectedChat.set(dms.length);
         },
         error: (error): void => notify('error', error.error?.error || 'Failed to start chat')
-      })
-    }
+      });
+    };
   }
 
   protected closeDmChat(evt: Event, tabIndex: number): void {
@@ -1006,10 +1006,14 @@ export class App implements OnInit {
       let index = currentDMs.findIndex(d => d.id === dm.id);
 
       if (isEqual(dm.messages, [null]))
-        continue
+        continue;
       else if (index >= 0) {
         const currentDM = currentDMs[index];
-        const oldMessages = currentDM.messages();
+        let oldMessages = currentDM.messages();
+        let expired = oldMessages.filter(m => m.time <= now - MAX_DM_AGE);
+
+        expired.forEach(m => m.expired = true);
+        oldMessages = oldMessages.filter(m => m.time > now - MAX_DM_AGE);
 
         if (!isEqual(oldMessages, dm.messages)) {
           const newMessages = this.countNewMessages(oldMessages, dm.messages);
@@ -1022,7 +1026,8 @@ export class App implements OnInit {
           if (notificationTab !== this.selectedChat())
             currentDM.missed.set(currentDM.missed() + newMessages);
 
-          currentDM.messages.set(dm.messages);
+          expired = expired.filter(m => m.time >= dm.messages[0].time);
+          currentDM.messages.set([...expired, ...dm.messages]);
           changed = true;
         }
       }

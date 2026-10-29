@@ -109,7 +109,7 @@ const themes: Record<string, any> = {
     displayName: 'Like It’s 1999',
     darkMode: false,
     _background: '*',
-  }};
+  } };
 
 export function getThemes(): Theme[] {
   return Object.keys(themes).map(key => ({

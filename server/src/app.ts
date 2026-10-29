@@ -728,7 +728,7 @@ function hasChatOpen(name: string, dmId: number): boolean {
     let appendAt = 0;
     let oldMessages: Message[];
 
-    if (!isEqual(lastMessages, messages, { keysToIgnore: ['isMe'] })) {
+    if (!isEqual(lastMessages, messages, { keysToIgnore: ['isMe', 'ip'] })) {
       if (lastMessages?.length > 50 && messages?.length > 50) {
         deleteCount = Math.max(lastMessages.findIndex(m => m.hash === messages[0].hash), 0);
         appendAt = messages.findIndex(m => m.hash === lastMessages.at(-1).hash);

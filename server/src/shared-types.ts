@@ -37,13 +37,14 @@ export interface Config {
   fileSizeLimitExtInMb: number;
   navigation: { name: string; url: string; target?: string }[];
   title: string;
-  wsPort: number
+  wsPort: number;
 }
 
 export interface Message {
   bbCode?: string;
   editCount?: number;
   email?: string;
+  expired?: boolean;
   flagged?: number;
   hash: string;
   html: string;
@@ -138,9 +139,9 @@ export interface MessageInfo {
   time: number;
 }
 
-export type TypingStatus = Record<string, { dm: number, since: number }>;
+export type TypingStatus = Record<string, { dm: number; since: number }>;
 
-export type NotifySound = boolean | 'never' | 'background' | 'always'
+export type NotifySound = boolean | 'never' | 'background' | 'always';
 
 export interface Preferences {
   allowDMs: boolean;
