@@ -1,5 +1,5 @@
 import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
-import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { provideHttpClient, withInterceptors, withXhr } from '@angular/common/http';
 import { authInterceptor } from '../auth.interceptor';
 import { providePrimeNG } from 'primeng/config';
 import { ConfirmationService } from 'primeng/api';
@@ -9,11 +9,11 @@ export const appConfig: ApplicationConfig = {
   providers: [
     ConfirmationService,
     provideBrowserGlobalErrorListeners(),
-    provideHttpClient(withInterceptors([authInterceptor])),
+    provideHttpClient(withXhr(), withInterceptors([authInterceptor])),
     providePrimeNG({
       theme: {
-        preset: Aura
-      }
-    })
-  ]
+        preset: Aura,
+      },
+    }),
+  ],
 };

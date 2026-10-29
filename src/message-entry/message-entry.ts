@@ -1,13 +1,36 @@
-import { Component, ElementRef, input, OnInit, output, signal, WritableSignal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  input,
+  OnInit,
+  output,
+  signal,
+  WritableSignal,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import Quill from 'quill';
-import { QuillModule  } from 'ngx-quill';
+import { QuillModule } from 'ngx-quill';
 import { forEach, throttle } from '@tubular/util';
-import { colorByIndex, getTextBackground, notify, shouldIgnoreClick, startClickSuppress } from '../main';
+import {
+  colorByIndex,
+  getTextBackground,
+  notify,
+  shouldIgnoreClick,
+  startClickSuppress,
+} from '../main';
 import { PickerComponent } from '@ctrl/ngx-emoji-mart';
 import { Emoji, EmojiData } from '@ctrl/ngx-emoji-mart/ngx-emoji';
 import { ColorSelector } from '../color-selector/color-selector';
-import { allowedExtensions, Config, kaomoji, kaomojiGothic, kaomojiRegex, MB, sizeMap } from '../../server/src/shared-types';
+import {
+  allowedExtensions,
+  Config,
+  kaomoji,
+  kaomojiGothic,
+  kaomojiRegex,
+  MB,
+  sizeMap,
+} from '../../server/src/shared-types';
 import { EditEvent } from '../message-list/message-list';
 import { toObservable } from '@angular/core/rxjs-interop';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
@@ -41,7 +64,13 @@ Size.whitelist = Object.keys(sizeMap);
 Quill.register(Size, true);
 
 const tagMap: Record<string, string> = {
-  bold: 'b', code: 'code', font: 'kao', italic: 'i', size: '', strike: 's', underline: 'u'
+  bold: 'b',
+  code: 'code',
+  font: 'kao',
+  italic: 'i',
+  size: '',
+  strike: 's',
+  underline: 'u',
 };
 const recognizedAttributes = new Set(Object.keys(tagMap));
 
@@ -50,8 +79,10 @@ FontAttributor.whitelist = ['ms-pgothic'];
 Quill.register(FontAttributor, true);
 
 if (!localStorage.getItem('emoji-mart.frequently'))
-  localStorage.setItem('emoji-mart.frequently',
-    '{"grinning":9,"laughing":8,"joy":7,"wink":6,"skull":5,"scream":4,"slightly_frowning_face":3,"+1":2,"-1":1}');
+  localStorage.setItem(
+    'emoji-mart.frequently',
+    '{"grinning":9,"laughing":8,"joy":7,"wink":6,"skull":5,"scream":4,"slightly_frowning_face":3,"+1":2,"-1":1}',
+  );
 
 const QUOTE_NAME_DELIM = ': ';
 const QUOTE_MARKER = '\u00A0◀︎ ';
@@ -62,19 +93,17 @@ function quillOpsToBBCode(ops: any[]): string {
   let result = '';
   const stacks = new Map<string, any[]>();
 
-  recognizedAttributes.forEach(attr => stacks.set(attr, []));
+  recognizedAttributes.forEach((attr) => stacks.set(attr, []));
 
   for (const op of ops) {
     const attrs = new Set<string>();
 
-    recognizedAttributes.forEach(attr => {
+    recognizedAttributes.forEach((attr) => {
       const stack = stacks.get(attr);
 
       if (stack.length > 0 && !attrs.has(attr)) {
-        if (attr === 'size')
-          result += `[/${sizeMap[stack.at(-1)]}]`;
-        else
-          result += `[/${tagMap[attr]}]`;
+        if (attr === 'size') result += `[/${sizeMap[stack.at(-1)]}]`;
+        else result += `[/${tagMap[attr]}]`;
 
         stack.pop();
       }
@@ -94,9 +123,7 @@ function quillOpsToBBCode(ops: any[]): string {
             }
 
             result += `[${sizeMap[value as string]}]`;
-          }
-          else
-            result += `[${tagMap[key]}]`;
+          } else result += `[${tagMap[key]}]`;
 
           stack.push(value);
         }
@@ -123,10 +150,11 @@ export function bbCodeToQuillOps(bbCode: string): QuillOp[] {
   let pos = 0;
 
   function peekTag(): { closing: boolean; tag: string; href?: string; len: number } | null {
-    const match = /^\[(\/?)(b|i|u|s|code|kao|s[1-5]|url(?:=([^\]]*?))?|img)]/.exec(bbCode.slice(pos));
+    const match = /^\[(\/?)(b|i|u|s|code|kao|s[1-5]|url(?:=([^\]]*?))?|img)]/.exec(
+      bbCode.slice(pos),
+    );
 
-    if (!match)
-      return null;
+    if (!match) return null;
 
     const rawTag = match[2];
     const tag = rawTag.startsWith('url') ? 'url' : rawTag;
@@ -145,8 +173,7 @@ export function bbCodeToQuillOps(bbCode: string): QuillOp[] {
         if (text) {
           const op: QuillOp = { insert: text };
 
-          if (Object.keys(activeAttrs).length)
-            op.attributes = { ...activeAttrs };
+          if (Object.keys(activeAttrs).length) op.attributes = { ...activeAttrs };
 
           ops.push(op);
         }
@@ -154,8 +181,7 @@ export function bbCodeToQuillOps(bbCode: string): QuillOp[] {
         continue;
       }
 
-      if (tag.closing)
-        break;
+      if (tag.closing) break;
 
       pos += tag.len;
 
@@ -175,26 +201,35 @@ export function bbCodeToQuillOps(bbCode: string): QuillOp[] {
           }
 
           ops.push({ insert: content, attributes: { ...activeAttrs, link: content } });
-        }
-        else {
+        } else {
           parse({ ...activeAttrs, link: href });
           const t = peekTag();
-          if (t?.closing && t.tag === 'url')
-            pos += t.len;
+          if (t?.closing && t.tag === 'url') pos += t.len;
         }
-      }
-      else {
+      } else {
         const newAttrs: QuillAttributes = { ...activeAttrs };
         switch (tag.tag) {
-          case 'b':    newAttrs['bold'] = true; break;
-          case 'i':    newAttrs['italic'] = true; break;
-          case 'u':    newAttrs['underline'] = true; break;
-          case 's':    newAttrs['strike'] = true; break;
-          case 'code': newAttrs['code'] = true; break;
-          case 'kao':  newAttrs['font'] = 'ms-pgothic'; break;
+          case 'b':
+            newAttrs['bold'] = true;
+            break;
+          case 'i':
+            newAttrs['italic'] = true;
+            break;
+          case 'u':
+            newAttrs['underline'] = true;
+            break;
+          case 's':
+            newAttrs['strike'] = true;
+            break;
+          case 'code':
+            newAttrs['code'] = true;
+            break;
+          case 'kao':
+            newAttrs['font'] = 'ms-pgothic';
+            break;
           default:
-            if (/s[1-5]/.test(tag.tag))
-              newAttrs['size'] = bbSizeMap[tag.tag]; break; // s1–s5 → em values
+            if (/s[1-5]/.test(tag.tag)) newAttrs['size'] = bbSizeMap[tag.tag];
+            break; // s1–s5 → em values
         }
 
         parse(newAttrs);
@@ -210,8 +245,16 @@ export function bbCodeToQuillOps(bbCode: string): QuillOp[] {
 
 @Component({
   selector: 'chat-message-entry',
-  imports: [ConfirmDialogModule, ColorSelector, FormsModule, PickerComponent, QuillModule, ToggleButton],
+  imports: [
+    ConfirmDialogModule,
+    ColorSelector,
+    FormsModule,
+    PickerComponent,
+    QuillModule,
+    ToggleButton,
+  ],
   templateUrl: './message-entry.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './message-entry.scss',
 })
 export class MessageEntry implements OnInit {
@@ -248,35 +291,38 @@ export class MessageEntry implements OnInit {
   protected modules = {
     clipboard: {
       matchers: [
-        [Node.ELEMENT_NODE, (_node: any, delta: any) => {
-          delta.ops = delta.ops.map((op: any) => {
-            if (!op.attributes) return op;
-            const attributes: Record<string, any> = {};
-            forEach(op.attributes, (key, value) => {
-              if (!((key === 'font' && value !== 'ms-pgothic') || !formatSet.has(key)))
-                attributes[key] = value;
+        [
+          Node.ELEMENT_NODE,
+          (_node: any, delta: any) => {
+            delta.ops = delta.ops.map((op: any) => {
+              if (!op.attributes) return op;
+              const attributes: Record<string, any> = {};
+              forEach(op.attributes, (key, value) => {
+                if (!((key === 'font' && value !== 'ms-pgothic') || !formatSet.has(key)))
+                  attributes[key] = value;
+              });
+              return { ...op, attributes };
             });
-            return { ...op, attributes };
-          });
-          return delta;
-        }]
-      ]
+            return delta;
+          },
+        ],
+      ],
     },
     keyboard: {
       bindings: {
         enter: {
           key: 'Enter',
-          'handler': () => !this.disabled() && this.sendMessage() // eslint-disable-line @stylistic/quote-props
+          handler: () => !this.disabled() && this.sendMessage(), // eslint-disable-line @stylistic/quote-props
         },
         tab: {
           key: 'Tab',
-          'handler': () => true // eslint-disable-line @stylistic/quote-props
+          handler: () => true, // eslint-disable-line @stylistic/quote-props
         },
         escape: {
           key: 'Escape',
-          'handler': () => this.cancelEdit() // eslint-disable-line @stylistic/quote-props
-        }
-      }
+          handler: () => this.cancelEdit(), // eslint-disable-line @stylistic/quote-props
+        },
+      },
     },
     toolbar: '#my-toolbar',
   };
@@ -290,7 +336,9 @@ export class MessageEntry implements OnInit {
   updateMessage = output<MessageUpdateEvent>();
   uploadFile = output<FileUploadEvent>();
 
-  get color(): number { return this._color; }
+  get color(): number {
+    return this._color;
+  }
   set color(value: number) {
     if (this._color !== value) {
       this._color = value;
@@ -298,10 +346,12 @@ export class MessageEntry implements OnInit {
     }
   }
 
-  constructor(private elementRef: ElementRef<HTMLElement>,
-              private prefService: PreferencesService,
-              private httpClient: HttpClient,
-              private confirmationService: ConfirmationService) {
+  constructor(
+    private elementRef: ElementRef<HTMLElement>,
+    private prefService: PreferencesService,
+    private httpClient: HttpClient,
+    private confirmationService: ConfirmationService,
+  ) {
     document.addEventListener('keydown', (event: KeyboardEvent) => {
       if (event.key === 'Escape' && this.showEmoji()) {
         this.showEmoji.set(false);
@@ -310,17 +360,24 @@ export class MessageEntry implements OnInit {
     });
 
     document.addEventListener('mousedown', (evt: MouseEvent) => {
-      if (!document.querySelector('#upload-panel')?.contains(evt.target as Node) && this.showFilePrompt()) {
+      if (
+        !document.querySelector('#upload-panel')?.contains(evt.target as Node) &&
+        this.showFilePrompt()
+      ) {
         this.showFilePrompt.set(false);
         evt.preventDefault();
         startClickSuppress();
-      }
-      else if (!document.querySelector('emoji-mart')?.contains(evt.target as Node) && this.showEmoji()) {
+      } else if (
+        !document.querySelector('emoji-mart')?.contains(evt.target as Node) &&
+        this.showEmoji()
+      ) {
         this.showEmoji.set(false);
         evt.preventDefault();
         startClickSuppress();
-      }
-      else if (!document.querySelector('#kaomoji-panel')?.contains(evt.target as Node) && this.showKaomoji()) {
+      } else if (
+        !document.querySelector('#kaomoji-panel')?.contains(evt.target as Node) &&
+        this.showKaomoji()
+      ) {
         this.showKaomoji.set(false);
         evt.preventDefault();
         startClickSuppress();
@@ -328,7 +385,7 @@ export class MessageEntry implements OnInit {
     });
 
     // Make sure direct user typing clears the kaomoji font.
-    document.addEventListener('keydown', evt => {
+    document.addEventListener('keydown', (evt) => {
       if (!evt.ctrlKey && !evt.metaKey && !evt.altKey && [...(evt.key || '')].length === 1) {
         const range = this.quill?.getSelection();
 
@@ -337,7 +394,7 @@ export class MessageEntry implements OnInit {
       }
     });
 
-    toObservable(this.disabled).subscribe(state => this.quill?.enable(!state));
+    toObservable(this.disabled).subscribe((state) => this.quill?.enable(!state));
   }
 
   ngOnInit(): void {
@@ -351,8 +408,7 @@ export class MessageEntry implements OnInit {
         this.externalUploaderShortName.set(config.externalUploaderShortName || 'Ext. Uploader');
         this.maxExtFileSizeInMb.set(config.fileSizeLimitExtInMb || 200);
         this.maxFileSizeInMb.set(config.fileSizeLimitInMb || 15000);
-      }
-      catch {}
+      } catch {}
     }
   }
 
@@ -365,14 +421,15 @@ export class MessageEntry implements OnInit {
     quill.root.addEventListener('paste', (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
 
-      if (!items)
-        return;
+      if (!items) return;
 
       for (let i = 0; i < items.length; i++) {
         if (/\bimage\b/.test(items[i].type)) {
           e.preventDefault();
           const blob = items[i].getAsFile();
-          const maxSize = this.externalUploader() ? this.maxExtFileSizeInMb() : this.maxFileSizeInMb();
+          const maxSize = this.externalUploader()
+            ? this.maxExtFileSizeInMb()
+            : this.maxFileSizeInMb();
 
           if (blob?.size > maxSize * MB)
             notify('error', `Image too big. Maximum size is ${maxSize} MB.`);
@@ -397,8 +454,7 @@ export class MessageEntry implements OnInit {
 
       if (quill.getLength() > INPUT_LENGTH_WARN)
         this.lengthWarning.set(INPUT_LENGTH_LIMIT - quill.getLength() + 1);
-      else
-        this.lengthWarning.set(-1);
+      else this.lengthWarning.set(-1);
     });
   }
 
@@ -408,28 +464,21 @@ export class MessageEntry implements OnInit {
   });
 
   private processFiles(files: File[]): void {
-    if (!files)
-      return;
+    if (!files) return;
 
     const uploads: File[] = [];
     let tooBig = false;
     const maxSize = this.externalUploader() ? this.maxExtFileSizeInMb() : this.maxFileSizeInMb();
 
     for (let i = 0; i < files.length; i++) {
-      if (files[i].size > maxSize * MB)
-        tooBig = true;
-      else if (allowedExtensions.test(files[i].name))
-        uploads.push(files[i]);
+      if (files[i].size > maxSize * MB) tooBig = true;
+      else if (allowedExtensions.test(files[i].name)) uploads.push(files[i]);
     }
 
-    if (tooBig)
-      notify('error', `File too big. Maximum size is ${maxSize} MB.`);
-    else if (uploads.length === 1 && !tooBig)
-      this.insertFile(uploads[0]);
-    else if (uploads.length > 1)
-      notify('error', 'Only one file can be sent at a time.');
-    else if (files.length > 0)
-      notify('error', 'File type is not supported.');
+    if (tooBig) notify('error', `File too big. Maximum size is ${maxSize} MB.`);
+    else if (uploads.length === 1 && !tooBig) this.insertFile(uploads[0]);
+    else if (uploads.length > 1) notify('error', 'Only one file can be sent at a time.');
+    else if (files.length > 0) notify('error', 'File type is not supported.');
   }
 
   private insertFile(file: File): void {
@@ -454,12 +503,11 @@ export class MessageEntry implements OnInit {
             this.busyTimer = undefined;
           }
 
-          if (this.currentUpload.interrupt)
-            this.canCancelUpload.set(true);
+          if (this.currentUpload.interrupt) this.canCancelUpload.set(true);
 
           this.busy.set(true);
         }, 3000);
-      }
+      },
     };
 
     this.uploadFile.emit(this.currentUpload);
@@ -475,11 +523,11 @@ export class MessageEntry implements OnInit {
       rejectButtonProps: {
         label: 'No, keep uploading',
         severity: 'secondary',
-        outlined: true
+        outlined: true,
       },
       acceptButtonProps: {
         label: 'Cancel upload',
-        severity: 'danger'
+        severity: 'danger',
       },
       accept: () => {
         if (this.currentUpload.interrupt) {
@@ -489,7 +537,7 @@ export class MessageEntry implements OnInit {
           this.currentUpload = undefined;
         }
       },
-      reject: () => {}
+      reject: () => {},
     });
   }
 
@@ -498,15 +546,13 @@ export class MessageEntry implements OnInit {
   }
 
   focus(color?: number): void {
-    if (color != null)
-      this.color = color;
+    if (color != null) this.color = color;
 
     setTimeout(() => this.quill?.focus(), 250);
   }
 
   updateColor(emit = true): void {
-    if (emit)
-      this.changeColor.emit(this.color);
+    if (emit) this.changeColor.emit(this.color);
 
     if (this.quill?.root) {
       const savedSelection = this.quill.getSelection();
@@ -525,8 +571,7 @@ export class MessageEntry implements OnInit {
   }
 
   sendMessage(): void {
-    if (this.editMode())
-      return;
+    if (this.editMode()) return;
 
     const message = quillOpsToBBCode(this.quill.getContents().ops);
 
@@ -542,7 +587,12 @@ export class MessageEntry implements OnInit {
     return this.quill?.getText() ?? '';
   }
 
-  private togglePanel(state: WritableSignal<any>, position: WritableSignal<any>, btn: string, panel: string): void {
+  private togglePanel(
+    state: WritableSignal<any>,
+    position: WritableSignal<any>,
+    btn: string,
+    panel: string,
+  ): void {
     state.set(!state());
 
     if (state()) {
@@ -577,20 +627,16 @@ export class MessageEntry implements OnInit {
         const viewportHeight = window.innerHeight;
 
         // Adjust horizontal position if clipped on right
-        if (left + pickerRect.width > viewportWidth)
-          left = viewportWidth - pickerRect.width;
+        if (left + pickerRect.width > viewportWidth) left = viewportWidth - pickerRect.width;
 
         // Adjust horizontal position if clipped on left
-        if (left < 0)
-          left = 0;
+        if (left < 0) left = 0;
 
         // Adjust vertical position if clipped on bottom
-        if (top + pickerRect.height > viewportHeight)
-          top = viewportHeight - pickerRect.height;
+        if (top + pickerRect.height > viewportHeight) top = viewportHeight - pickerRect.height;
 
         // Adjust vertical position if clipped on top
-        if (top < 0)
-          top = 0;
+        if (top < 0) top = 0;
 
         position.set({ top: `${top}px`, left: `${left}px` });
       });
@@ -598,27 +644,28 @@ export class MessageEntry implements OnInit {
   }
 
   protected toggleEmoji(): void {
-    if (shouldIgnoreClick())
-      return;
+    if (shouldIgnoreClick()) return;
 
     this.togglePanel(this.showEmoji, this.pickerPosition, '#emoji-button', 'emoji-mart');
   }
 
   protected toggleKaomoji(): void {
-    if (shouldIgnoreClick())
-      return;
+    if (shouldIgnoreClick()) return;
 
     this.togglePanel(this.showKaomoji, this.kaomojiPosition, '#kaomoji-button', '#kaomoji-panel');
   }
 
   protected toggleFileUpload(): void {
-    if (shouldIgnoreClick())
-      return;
+    if (shouldIgnoreClick()) return;
 
-    if (!this.showFilePrompt())
-      this.lastSelectedFiles = undefined;
+    if (!this.showFilePrompt()) this.lastSelectedFiles = undefined;
 
-    this.togglePanel(this.showFilePrompt, this.filePromptPosition, '#upload-button', '#upload-panel');
+    this.togglePanel(
+      this.showFilePrompt,
+      this.filePromptPosition,
+      '#upload-button',
+      '#upload-panel',
+    );
   }
 
   protected toggleExternalUploader(): void {
@@ -631,28 +678,29 @@ export class MessageEntry implements OnInit {
 
     this.confirmationService.confirm({
       key: 'messageEntry',
-      message: `This option sends your uploads to ${this.externalUploaderName()}.<br><br>\n` +
+      message:
+        `This option sends your uploads to ${this.externalUploaderName()}.<br><br>\n` +
         'This provides greater privacy for your shared files, but a smaller maximum file ' +
         `size of ${this.maxExtFileSizeInMb()} MB. You also must abide by the ` +
         `${this.externalUploaderName()} terms of service.`,
-          header: `Uploading to ${this.externalUploaderName()}`,
-          icon: 'pi pi-info-circle',
-          rejectLabel: 'Cancel',
-          rejectButtonProps: {
-            label: 'Cancel',
-            severity: 'secondary',
-            outlined: true
-          },
-          acceptButtonProps: {
-            label: 'Continue',
-            severity: 'success'
-          },
-          accept: () => {
-            useExternalUploader = prefs.suppressExternalUploadWarning = true;
-            this.prefService.set(prefs);
-          },
-          reject: () => this.externalUploader.set(false)
-        });
+      header: `Uploading to ${this.externalUploaderName()}`,
+      icon: 'pi pi-info-circle',
+      rejectLabel: 'Cancel',
+      rejectButtonProps: {
+        label: 'Cancel',
+        severity: 'secondary',
+        outlined: true,
+      },
+      acceptButtonProps: {
+        label: 'Continue',
+        severity: 'success',
+      },
+      accept: () => {
+        useExternalUploader = prefs.suppressExternalUploadWarning = true;
+        this.prefService.set(prefs);
+      },
+      reject: () => this.externalUploader.set(false),
+    });
   }
 
   protected onFileSelected(evt: Event): void {
@@ -665,11 +713,14 @@ export class MessageEntry implements OnInit {
   }
 
   protected emojiClick(emoji: Emoji): void {
-    const char = ((emoji.emoji instanceof String) ? emoji.emoji : (emoji.emoji as EmojiData)?.native)?.toString() || '';
+    const char =
+      (emoji.emoji instanceof String
+        ? emoji.emoji
+        : (emoji.emoji as EmojiData)?.native
+      )?.toString() || '';
     const range = this.quill.selection.savedRange;
 
-    if (range.length > 0)
-      this.quill.deleteText(range.index, range.length);
+    if (range.length > 0) this.quill.deleteText(range.index, range.length);
 
     this.quill.insertText(range.index, char);
     this.quill.setSelection(range.index + char.length);
@@ -690,11 +741,17 @@ export class MessageEntry implements OnInit {
     for (let i = 0; i < parts.length; ++i) {
       const part = parts[i];
 
-      if (!part)
-        continue;
+      if (!part) continue;
 
-      this.quill.insertText(index, part, i % 2 === 0 ? { italic: true } :
-        (kaomojiGothic.has(part) ? { font: 'ms-pgothic', italic: false } : { italic: false }));
+      this.quill.insertText(
+        index,
+        part,
+        i % 2 === 0
+          ? { italic: true }
+          : kaomojiGothic.has(part)
+            ? { font: 'ms-pgothic', italic: false }
+            : { italic: false },
+      );
       index += part.length;
     }
 
@@ -713,8 +770,7 @@ export class MessageEntry implements OnInit {
   }
 
   cancelEdit(): void {
-    if (!this.editMode())
-      return;
+    if (!this.editMode()) return;
 
     this.editMode.set(false);
     this.editTime.set('');
@@ -727,29 +783,28 @@ export class MessageEntry implements OnInit {
       bbCode: quillOpsToBBCode(this.quill.getContents().ops),
       color: this.color,
       msgId: this.editId,
-      callback: success => {
-        if (success)
-          this.cancelEdit();
-      }
+      callback: (success) => {
+        if (success) this.cancelEdit();
+      },
     });
   }
 
   protected formatKaomoji(kao: string): string {
-    return kao.replace(/^#/, '').replace(/\uFE68/g, '\\').replace(/\(\*＾＾\*\)/g, '(<mark>*</mark>＾＾<mark>*</mark>)');
+    return kao
+      .replace(/^#/, '')
+      .replace(/\uFE68/g, '\\')
+      .replace(/\(\*＾＾\*\)/g, '(<mark>*</mark>＾＾<mark>*</mark>)');
   }
 
   protected insertKaomoji(text: string): void {
     const range = this.quill.selection.savedRange;
 
-    if (range.length > 0)
-      this.quill.deleteText(range.index, range.length);
+    if (range.length > 0) this.quill.deleteText(range.index, range.length);
 
     if (text.startsWith('#')) {
       text = text.substring(1);
       this.quill.insertText(range.index, text);
-    }
-    else
-      this.quill.insertText(range.index, text, { font: 'ms-pgothic', color: 'black' });
+    } else this.quill.insertText(range.index, text, { font: 'ms-pgothic', color: 'black' });
 
     this.quill.setSelection(range.index + text.length);
     this.quill.format('font', undefined);
