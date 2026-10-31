@@ -120,8 +120,9 @@ export class MessageList implements OnInit {
     for (let i = 0; i < chars.length; ++i) {
       let ch = chars[i];
       const cp = ch.codePointAt(0);
+      const s2 = s.codePointAt(index + 2);
 
-      if (s.codePointAt(index + 1) === 0xFE0F && 0x20D0 <= s.codePointAt(index + 2) && s.codePointAt(index + 2) <= 0x20EF) {
+      if (s.codePointAt(index + 1) === 0xFE0F && (0x20D0 <= s2 && s2 <= 0x20EF)) {
         ch = ch + s.substring(index + 1, index + 3);
         addText(ch, emojiType || 'big-emoji');
         i += 2;
@@ -135,7 +136,7 @@ export class MessageList implements OnInit {
         addText(ch, type);
       else if (matchDarkEmoji.test(ch))
         addText(ch, emojiType || 'big-dark-emoji');
-      else if (0x1F000 <= cp && cp <= 0x1FAFF || matchEmojiish.test(ch))
+      else if ((0x1F000 <= cp && cp <= 0x1FAFF) || matchEmojiish.test(ch))
         addText(ch, emojiType || 'big-emoji');
       else
         addText(ch, '');
@@ -274,19 +275,18 @@ export class MessageList implements OnInit {
 
   protected editMessage(message: Message): void {
     this.httpClient.get<any>('/api/can-edit',
-      {
-        params: { name: this.name(), tripCode: this.tripCode(), msgId: message.msgId } }).subscribe({
-          next: (response): void => {
-            this.edit.emit({ bbCode: response.bbCode, color: response.color, chatIndex: this.chatIndex(),
-              msgId: message.msgId, time: this.formatMessageTime(message.time) });
-          },
-          error: (error): void => {
-            if (error.status === 400 && error.error?.error)
-              notify('error', error.error.error);
-            else
-              this.connectionTrouble.emit(error.message || error.toString());
-          }
-      });
+      { params: { name: this.name(), tripCode: this.tripCode(), msgId: message.msgId } }).subscribe({
+      next: (response): void => {
+        this.edit.emit({ bbCode: response.bbCode, color: response.color, chatIndex: this.chatIndex(),
+                         msgId: message.msgId, time: this.formatMessageTime(message.time) });
+      },
+      error: (error): void => {
+        if (error.status === 400 && error.error?.error)
+          notify('error', error.error.error);
+        else
+          this.connectionTrouble.emit(error.message || error.toString());
+      }
+    });
   }
 
   protected deleteMessage(message: Message): void {

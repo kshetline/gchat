@@ -251,16 +251,16 @@ export class MessageEntry implements OnInit {
     clipboard: {
       matchers: [
         [Node.ELEMENT_NODE, (_node: any, delta: any) => {
-            delta.ops = delta.ops.map((op: any) => {
-              if (!op.attributes) return op;
-              const attributes: Record<string, any> = {};
-              forEach(op.attributes, (key, value) => {
-                if (!((key === 'font' && value !== 'ms-pgothic') || !formatSet.has(key)))
-                  attributes[key] = value;
-              });
-              return { ...op, attributes };
+          delta.ops = delta.ops.map((op: any) => {
+            if (!op.attributes) return op;
+            const attributes: Record<string, any> = {};
+            forEach(op.attributes, (key, value) => {
+              if (!((key === 'font' && value !== 'ms-pgothic') || !formatSet.has(key)))
+                attributes[key] = value;
             });
-            return delta;
+            return { ...op, attributes };
+          });
+          return delta;
         }]
       ]
     },
@@ -643,17 +643,17 @@ export class MessageEntry implements OnInit {
       rejectButtonProps: {
         label: 'Cancel',
         severity: 'secondary',
-            outlined: true
+        outlined: true
       },
       acceptButtonProps: {
         label: 'Continue',
-            severity: 'success'
+        severity: 'success'
       },
       accept: () => {
         useExternalUploader = prefs.suppressExternalUploadWarning = true;
         this.prefService.set(prefs);
       },
-          reject: () => this.externalUploader.set(false)
+      reject: () => this.externalUploader.set(false)
     });
   }
 

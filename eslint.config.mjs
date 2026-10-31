@@ -78,7 +78,7 @@ const rules = {
     'error',
     'single',
     {
-      allowTemplateLiterals: true,
+      allowTemplateLiterals: 'always',
       avoidEscape: true
     }
   ],
@@ -150,7 +150,7 @@ export default [
       parserOptions: {
         ecmaVersion: 2020,
         sourceType: 'module',
-        project: './tsconfig.json'
+        projectService: true
       }
     }
   },

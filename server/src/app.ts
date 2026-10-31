@@ -394,7 +394,6 @@ export function decryptMessage(encryptedText: string, keyBase64: string): string
 
 async function notifyDmPartners(dmSession: DbDmSession, message?: string): Promise<void>;
 async function notifyDmPartners(name1: string, name2: string, message?: string): Promise<void>;
-// eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
 async function notifyDmPartners(dmSessionOrName: string | DbDmSession, name2orMessage?: string, message?: string): Promise<void> {
   let name1: string;
   let name2: string;
@@ -663,6 +662,7 @@ function hasChatOpen(name: string, dmId: number): boolean {
 
     const participantNames = (await db.all<any>('SELECT name FROM participants WHERE name != ?',
       proxyName)).map(r => r.name);
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     const participants = [...new Set(participantNames)].sort().map(p => ({ name: p } as ParticipantInfo));
 
     for (let i = participants.length - 1; i >= 0; --i) {

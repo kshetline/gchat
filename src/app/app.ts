@@ -4,7 +4,7 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import {
-  Config, DmSession, NotifySound, MAX_DM_AGE, Message, Messages, ParticipantInfo, Preferences, TypingStatus
+  Config, DmSession, MAX_DM_AGE, Message, Messages, NotifySound, ParticipantInfo, Preferences, TypingStatus
 } from '../../server/src/shared-types';
 import { clone, forEach, isAndroid, isEqual, processMillis } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
@@ -110,7 +110,7 @@ export class App implements OnInit {
   protected navigation = signal([] as { name: string; url: string; target?: string }[]);
   protected notificationMessage = signal('');
   protected notificationType = signal('');
-  protected notifySound = signal('never' as NotifySound);
+  protected notifySound: WritableSignal<NotifySound> = signal('never');
   protected panelToggle = signal(false);
   protected participants = signal([] as ParticipantInfo[]);
   protected selectedChat = signal(0);
@@ -301,19 +301,18 @@ export class App implements OnInit {
   private getDirectMessages(): void {
     this.saveTripCode();
     this.httpClient.get<DmSession[]>('/api/dms',
-      {
-        params: { name: this.name(), tripCode: this.tripCode(), openDms: this.openDmList() } }).subscribe({
-        next: data => {
-          if (!(data as any).errorMessage) {
-            this.connectionTrouble.set(false);
-            this.receiveDirectMessages(data);
-          }
-          else
-            this.connectionTrouble.set(true);
-        },
-        error: (error): void => {
+      { params: { name: this.name(), tripCode: this.tripCode(), openDms: this.openDmList() } }).subscribe({
+      next: data => {
+        if (!(data as any).errorMessage) {
+          this.connectionTrouble.set(false);
+          this.receiveDirectMessages(data);
+        }
+        else
           this.connectionTrouble.set(true);
-          this.repollMessages(error.status === 429 ? REPOLL_RATE_429 : REPOLL_RATE_QUICK);
+      },
+      error: (error): void => {
+        this.connectionTrouble.set(true);
+        this.repollMessages(error.status === 429 ? REPOLL_RATE_429 : REPOLL_RATE_QUICK);
       }
     });
   }
@@ -429,17 +428,17 @@ export class App implements OnInit {
           tripCode: this.tripCode()
         }
       }).subscribe({
-        next: (messages: Messages): void => {
-          if (!messages.errorMessage) {
-            this.lastReceiveTime = processMillis();
-            this.connectionTrouble.set(false);
-            this.checkChatActive();
-            this.lastSuccessfulLegacyPoll.set(messages.lastSuccessfulLegacyPoll);
+      next: (messages: Messages): void => {
+        if (!messages.errorMessage) {
+          this.lastReceiveTime = processMillis();
+          this.connectionTrouble.set(false);
+          this.checkChatActive();
+          this.lastSuccessfulLegacyPoll.set(messages.lastSuccessfulLegacyPoll);
 
-         if (!this.adminSet || !(--this.adminSet))
+          if (!this.adminSet || !(--this.adminSet))
             this.isAdminFlag.set(messages.isAdmin);
 
-            if (!isEqual(messages.messages, [null])) {
+          if (!isEqual(messages.messages, [null])) {
             const newMessages = (messages.deleteCount || messages.append) ? clone(this.messages(), true) : messages.messages;
 
             if (messages.deleteCount)
@@ -452,41 +451,41 @@ export class App implements OnInit {
             if (newMessages.length > 4000)
               newMessages.splice(newMessages.length - 4000);
 
-              const changed = !isEqual(newMessages, this.messages());
-              const newMessageCount = this.countNewMessages(this.messages(), newMessages);
+            const changed = !isEqual(newMessages, this.messages());
+            const newMessageCount = this.countNewMessages(this.messages(), newMessages);
 
-              if (changed) {
-                if (this.messages().length > 0) {
-                  if (!this.chatActive || this.selectedChat() !== 0) {
-                    this.unseenMessages.set(this.unseenMessages() + newMessageCount);
-                    this.updateTitle();
-                  }
+            if (changed) {
+              if (this.messages().length > 0) {
+                if (!this.chatActive || this.selectedChat() !== 0) {
+                  this.unseenMessages.set(this.unseenMessages() + newMessageCount);
+                  this.updateTitle();
+                }
 
                 if (newMessageCount)
                   this.playNotificationSound();
-                }
-
-                this.messages.set(newMessages);
-                this.adjustScrolling(true);
               }
 
-              this.enterLeaveCheck(0, newMessages);
+              this.messages.set(newMessages);
+              this.adjustScrolling(true);
             }
 
-            this.participants.set(messages.participants);
+            this.enterLeaveCheck(0, newMessages);
+          }
+
+          this.participants.set(messages.participants);
         }
         else
           this.connectionTrouble.set(true);
 
-          this.receiveDirectMessages(messages.dms);
-          this.messageEntry?.setProgress(messages.progress);
-          this.repollMessages(messages.progress > 0 ? REPOLL_RATE_CHECK_PROGRESS : REPOLL_RATE);
-        },
-        error: (error): void => {
-          this.connectionTrouble.set(true);
-          this.repollMessages(error.status === 429 ? REPOLL_RATE_429 : REPOLL_RATE_QUICK);
-        }
-      });
+        this.receiveDirectMessages(messages.dms);
+        this.messageEntry?.setProgress(messages.progress);
+        this.repollMessages(messages.progress > 0 ? REPOLL_RATE_CHECK_PROGRESS : REPOLL_RATE);
+      },
+      error: (error): void => {
+        this.connectionTrouble.set(true);
+        this.repollMessages(error.status === 429 ? REPOLL_RATE_429 : REPOLL_RATE_QUICK);
+      }
+    });
   }
 
   protected updateTitle(): void {
@@ -779,11 +778,11 @@ export class App implements OnInit {
       dm.viewed = true;
       dm.leftMainChat = false;
       this.httpClient.post('/api/start-chat', { framed: this.framed }, { params: {
-              id: dm.id,
-              name: dm.name,
-              self: this.name(),
-              tripCode: this.tripCode(),
-        } }).subscribe({ next: () => { } });
+        id: dm.id,
+        name: dm.name,
+        self: this.name(),
+        tripCode: this.tripCode(),
+      } }).subscribe({ next: () => { } });
     }
   }
 
@@ -908,27 +907,27 @@ export class App implements OnInit {
         return;
 
       this.httpClient.post<{ id: number }>('/api/start-chat', { framed: this.framed }, {
-            params: {
-              self: this.name(),
-              tripCode: this.tripCode(),
-            name
-          } }).subscribe({
+        params: {
+          self: this.name(),
+          tripCode: this.tripCode(),
+          name
+        } }).subscribe({
         next: data => {
           const match = this.dms().findIndex(dm => dm.id === data.id);
 
-            if (match >= 0) {
-              this.selectedChat.set(match + 1);
-              return;
-            }
+          if (match >= 0) {
+            this.selectedChat.set(match + 1);
+            return;
+          }
 
-            const dms = clone(this.dms(), true);
+          const dms = clone(this.dms(), true);
 
           dms.push({ id: data.id, name, viewed: true, messages: signal<Message[]>([]), missed: signal(0) });
-            this.dms.set(dms);
-            this.selectedChat.set(dms.length);
-          },
+          this.dms.set(dms);
+          this.selectedChat.set(dms.length);
+        },
         error: (error): void => notify('error', error.error?.error || 'Failed to start chat')
-        });
+      });
     };
   }
 
