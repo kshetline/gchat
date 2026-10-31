@@ -1,4 +1,4 @@
-import { DbMessage, DbParticipant, kaomojiOriginal, Message, Messages, ParticipantInfo } from './shared-types.js';
+import { DbMessage, DbParticipant, kaomojiOriginal, Message, Messages } from './shared-types.js';
 import { encodeForUri, htmlUnescape, processMillis, sleep } from '@tubular/util';
 import axios, { AxiosInstance } from 'axios';
 import { HtmlParser } from 'fortissimo-html';
@@ -90,7 +90,7 @@ export async function getLegacyMessages(name: string, count = 200): Promise<Mess
   const participantDiv = body?.querySelector('#participantList');
   participantsRaw = participantDiv.children[0].content.trim().replace(/^.*:\s*/g, '').replace(/[◆◇]/g, '\t').trim();
   const participants = Array.from(new Set(participantsRaw.split(/\t+/)
-    .map(p => p.trim()).filter(p => !!p)).values()).sort().map(p => ({ name: p }) as ParticipantInfo);
+    .map(p => p.trim()).filter(p => !!p)).values()).sort().map(p => ({ name: p }));
   const messageRows = body?.querySelectorAll('.messageRow').reverse();
   let messages = messageRows.map(row => extractMessage(row)).filter(m => m.name !== proxyName || m.trip !== proxyTripEncoded);
   const proxyMessages = messageRows.map(row => extractMessage(row)).filter(m => m.name === proxyName && m.trip === proxyTripEncoded);

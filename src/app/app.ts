@@ -52,20 +52,8 @@ interface DmInfo {
 
 @Component({
   selector: 'chat-root',
-  imports: [
-    ColorSelector,
-    ConfirmDialogModule,
-    DecimalPipe,
-    FormsModule,
-    MessageEntry,
-    MessageList,
-    NgTemplateOutlet,
-    SelectModule,
-    SliderModule,
-    TabsModule,
-    ToastModule,
-    ToggleButtonModule
-  ],
+  imports: [ColorSelector, ConfirmDialogModule, DecimalPipe, FormsModule, MessageEntry, MessageList,
+            NgTemplateOutlet, SelectModule, SliderModule, TabsModule, ToastModule, ToggleButtonModule],
   providers: [MessageService],
   templateUrl: './app.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -142,16 +130,16 @@ export class App implements OnInit {
     { label: 'Notify always', value: 'always' },
   ];
 
-  get messageEntry(): MessageEntry {
-    return this._messageEntry;
-  }
+  get messageEntry(): MessageEntry { return this._messageEntry; }
   @ViewChild(MessageEntry) set messageEntry(value: MessageEntry) {
     if (this._messageEntry !== value) {
       this._messageEntry = value;
       setTimeout(() => this.messageEntrySignal.set(value), 0);
 
-      if (this.pendingFocus && !isAndroid()) this.messageEntry?.focus(this.color());
-      else this.messageEntry?.setColor(this.color());
+      if (this.pendingFocus && !isAndroid())
+        this.messageEntry?.focus(this.color());
+      else
+        this.messageEntry?.setColor(this.color());
 
       this.pendingFocus = false;
     }
@@ -161,15 +149,12 @@ export class App implements OnInit {
     private httpClient: HttpClient,
     private prefService: PreferencesService,
     private changeRef: ChangeDetectorRef,
-    private confirmationService: ConfirmationService,
+    private confirmationService: ConfirmationService
   ) {
     this.uploader = new Uploader(this.httpClient);
     setInterval(() => this.alwaysChanging.set(1 + Math.random()), 500);
     this.prefs = this.prefService.get();
-    forEach(
-      this.prefs as Record<string, any>,
-      (key, value) => (this as any)[key] && (this as any)[key]?.set(value),
-    );
+    forEach(this.prefs as Record<string, any>, (key, value) => (this as any)[key] && (this as any)[key]?.set(value));
 
     const configStr = localStorage.getItem('gchat-config');
     const root = document.documentElement;
@@ -183,7 +168,8 @@ export class App implements OnInit {
         this.updateTitle();
         root.style.setProperty('--primary-background', config.backgroundColor || '#DDD');
         this.navigation.set(config.navigation);
-      } catch {}
+      }
+      catch {}
     }
 
     this.setTheme(this.prefs.theme);
@@ -201,7 +187,7 @@ export class App implements OnInit {
         this.connectToWebSocket(config.wsPort);
         localStorage.setItem('gchat-config', JSON.stringify(config));
       },
-      error: (_error): void => this.connectionTrouble.set(true),
+      error: (_error): void => this.connectionTrouble.set(true)
     });
 
     document.addEventListener('keydown', (event: KeyboardEvent) => {
@@ -210,41 +196,40 @@ export class App implements OnInit {
       if (event.key === 'Escape' && this.showNotification()) {
         event.preventDefault();
         this.showNotification.set(false);
-      } else if (event.key === 'Escape' && this.showThemes()) {
+      }
+      else if (event.key === 'Escape' && this.showThemes()) {
         event.preventDefault();
         this.showThemes.set(false);
-      } else if (event.key === 'Escape' && this.showConfirmation()) {
+      }
+      else if (event.key === 'Escape' && this.showConfirmation()) {
         event.preventDefault();
         this.showConfirmation.set(false);
         if (this.confirmCallback) this.confirmCallback(false);
-      } else if (event.key === 'Escape') {
+      }
+      else if (event.key === 'Escape') {
         event.preventDefault();
         this.messageEntry.cancelEdit();
-      } else if (event.key === 'Enter' && this.showConfirmation()) {
+      }
+      else if (event.key === 'Enter' && this.showConfirmation()) {
         event.preventDefault();
         this.showConfirmation.set(false);
         if (this.confirmCallback) this.confirmCallback(true);
-      } else if (event.key === 'Enter' && this.name().trim() && !this.inChat()) {
+      }
+      else if (event.key === 'Enter' && this.name().trim() && !this.inChat()) {
         event.preventDefault();
         this.enterMainChat().catch();
-      } else if (
-        event.key === 'p' &&
-        (event.ctrlKey || event.metaKey) &&
-        this.framed &&
-        this.messageEntry?.getText().trim() === 'peek'
-      ) {
+      }
+      else if (event.key === 'p' && (event.ctrlKey || event.metaKey) && this.framed &&
+               this.messageEntry?.getText().trim() === 'peek') {
         event.preventDefault();
-        userscriptAction('peek').catch((err) => notify('error', err));
+        userscriptAction('peek').catch(err => notify('error', err));
       }
     });
 
     document.addEventListener('mousedown', (evt: MouseEvent) => {
       this.activity = true;
 
-      if (
-        !document.getElementById('theme-select')?.contains(evt.target as Node) &&
-        this.showThemes()
-      ) {
+      if (!document.getElementById('theme-select')?.contains(evt.target as Node) && this.showThemes()) {
         this.showThemes.set(false);
         evt.preventDefault();
         startClickSuppress();
@@ -256,26 +241,19 @@ export class App implements OnInit {
     document.addEventListener('visibilitychange', () => {
       this.checkChatActive(document.hidden ? undefined : true);
 
-      if (document.hidden) blurTime = processMillis();
-      else this.adjustScrolling(processMillis() < blurTime + 15000);
+      if (document.hidden)
+        blurTime = processMillis();
+      else
+        this.adjustScrolling(processMillis() < blurTime + 15000);
     });
 
-    window.addEventListener('blur', () => {
-      blurTime = processMillis();
-      this.checkChatActive();
-    });
-    window.addEventListener('focus', () => {
-      this.checkChatActive(true);
-      this.adjustScrolling(processMillis() < blurTime + 15000);
-    });
+    // window.addEventListener('blur', () => { blurTime = processMillis(); this.checkChatActive(); });
+    // window.addEventListener('focus', () => { this.checkChatActive(true); this.adjustScrolling(processMillis() < blurTime + 15000); });
     window.addEventListener('scroll', () => this.checkChatActive(true));
-    window.addEventListener(
-      'mousemove',
-      () => (this.activity = true) && (this.lastActive = processMillis()),
-    );
+    window.addEventListener('mousemove', () => (this.activity = true) && (this.lastActive = processMillis()));
     window.addEventListener('beforeunload', () => this.inChat() && this.leaveMainChat());
 
-    toObservable(this.color).subscribe((color) => (this.prefs.color = color));
+    toObservable(this.color).subscribe(color => this.prefs.color = color);
     toObservable(this.sending).subscribe(() => this.updateDisableEditor());
     toObservable(this.selectedChat).subscribe(() => this.updateDisableEditor());
     toObservable(this.allowDMs).subscribe(() => this.getMessages());
@@ -294,13 +272,14 @@ export class App implements OnInit {
   }
 
   private connectToWebSocket(wsPort?: number): void {
-    if (wsPort < 0 || this.webSocket) return;
+    if (wsPort < 0 || this.webSocket)
+      return;
 
-    const protocol = /https/.test(location.protocol) ? 'wss' : 'ws';
+    const protocol = (/https/.test(location.protocol) ? 'wss' : 'ws');
     const port = (wsPort ?? location.port) || (protocol === 'wss' ? 443 : 80);
 
     this.webSocket = new ReconnectingWebSocket(`${protocol}://${location.hostname}:${port}`);
-    this.webSocket.addEventListener('message', (evt) => {
+    this.webSocket.addEventListener('message', evt => {
       const parts = evt.data.split('\t');
       const message = parts[0];
       const data = parts.length > 1 ? JSON.parse(parts[1]) : undefined;
@@ -321,28 +300,26 @@ export class App implements OnInit {
 
   private getDirectMessages(): void {
     this.saveTripCode();
-    this.httpClient
-      .get<
-        DmSession[]
-      >('/api/dms', { params: { name: this.name(), tripCode: this.tripCode(), openDms: this.openDmList() } })
-      .subscribe({
-        next: (data) => {
+    this.httpClient.get<DmSession[]>('/api/dms',
+      {
+        params: { name: this.name(), tripCode: this.tripCode(), openDms: this.openDmList() } }).subscribe({
+        next: data => {
           if (!(data as any).errorMessage) {
             this.connectionTrouble.set(false);
             this.receiveDirectMessages(data);
-          } else this.connectionTrouble.set(true);
+          }
+          else
+            this.connectionTrouble.set(true);
         },
         error: (error): void => {
           this.connectionTrouble.set(true);
           this.repollMessages(error.status === 429 ? REPOLL_RATE_429 : REPOLL_RATE_QUICK);
-        },
-      });
+      }
+    });
   }
 
   private openDmList(): string {
-    return this.dms()
-      .map((dm) => dm.id)
-      .join('_');
+    return this.dms().map(dm => dm.id).join('_');
   }
 
   private setTypingStatus(ts: TypingStatus): void {
@@ -350,16 +327,14 @@ export class App implements OnInit {
 
     const now = processMillis();
 
-    Object.keys(ts).forEach((key) => (ts[key].since = now - ts[key].since));
+    Object.keys(ts).forEach(key => ts[key].since = now - ts[key].since);
     this.typingStatus = ts;
   }
 
   protected isTyping = (name: string, dm: number): boolean => {
     const ts = this.typingStatus;
 
-    return (
-      name !== this.name() && ts && ts[name]?.dm === dm && ts[name]?.since > processMillis() - 5000
-    );
+    return name !== this.name() && ts && ts[name]?.dm === dm && ts[name]?.since > processMillis() - 5000;
   };
 
   private async initToken(): Promise<void> {
@@ -392,12 +367,14 @@ export class App implements OnInit {
   private checkChatActive(active?: boolean): void {
     this.lastActive = processMillis();
 
-    if (active) this.activity = active;
+    if (active)
+      this.activity = active;
 
     this.chatActive = document.hasFocus() && !document.hidden;
 
     if (this.chatActive) {
-      if (this.selectedChat() === 0) this.unseenMessages.set(0);
+      if (this.selectedChat() === 0)
+        this.unseenMessages.set(0);
       else {
         const dms = clone(this.dms(), true);
 
@@ -410,8 +387,10 @@ export class App implements OnInit {
   }
 
   private repollMessages(delay = REPOLL_RATE): void {
-    if (this.messageTimer && delay >= this.messageTimerLastDelay) return;
-    else if (this.messageTimer) clearTimeout(this.messageTimer);
+    if (this.messageTimer && delay >= this.messageTimerLastDelay)
+      return;
+    else if (this.messageTimer)
+      clearTimeout(this.messageTimer);
 
     this.lastReceiveTime = processMillis() + delay;
     this.messageTimerLastDelay = delay;
@@ -428,7 +407,8 @@ export class App implements OnInit {
 
     const now = processMillis();
 
-    if (!force && now - this.lastGetMessagesTime < 2000) return;
+    if (!force && now - this.lastGetMessagesTime < 2000)
+      return;
 
     this.lastGetMessagesTime = now;
     const wasActive = this.activity;
@@ -436,8 +416,8 @@ export class App implements OnInit {
     const nameChanged = this.name() !== this.nameLastPolled;
     this.nameLastPolled = this.name();
 
-    this.httpClient
-      .get<Messages>('/api/messages', {
+    this.httpClient.get<Messages>('/api/messages',
+      {
         params: {
           active: wasActive,
           allowDMs: this.allowDMs(),
@@ -446,10 +426,9 @@ export class App implements OnInit {
           inChat: this.inChat(),
           name: this.name(),
           openDms: this.openDmList(),
-          tripCode: this.tripCode(),
-        },
-      })
-      .subscribe({
+          tripCode: this.tripCode()
+        }
+      }).subscribe({
         next: (messages: Messages): void => {
           if (!messages.errorMessage) {
             this.lastReceiveTime = processMillis();
@@ -457,20 +436,21 @@ export class App implements OnInit {
             this.checkChatActive();
             this.lastSuccessfulLegacyPoll.set(messages.lastSuccessfulLegacyPoll);
 
-            if (!this.adminSet || !--this.adminSet) this.isAdminFlag.set(messages.isAdmin);
+         if (!this.adminSet || !(--this.adminSet))
+            this.isAdminFlag.set(messages.isAdmin);
 
             if (!isEqual(messages.messages, [null])) {
-              const newMessages =
-                messages.deleteCount || messages.append
-                  ? clone(this.messages(), true)
-                  : messages.messages;
+            const newMessages = (messages.deleteCount || messages.append) ? clone(this.messages(), true) : messages.messages;
 
-              if (messages.deleteCount) newMessages.splice(0, messages.deleteCount);
+            if (messages.deleteCount)
+              newMessages.splice(0, messages.deleteCount);
 
-              if (messages.append) newMessages.push(...messages.messages);
+            if (messages.append)
+              newMessages.push(...messages.messages);
 
               // Safety check: Make sure no glitch causes client to choke on an ever-growing message list
-              if (newMessages.length > 4000) newMessages.splice(newMessages.length - 4000);
+            if (newMessages.length > 4000)
+              newMessages.splice(newMessages.length - 4000);
 
               const changed = !isEqual(newMessages, this.messages());
               const newMessageCount = this.countNewMessages(this.messages(), newMessages);
@@ -482,7 +462,8 @@ export class App implements OnInit {
                     this.updateTitle();
                   }
 
-                  if (newMessageCount) this.playNotificationSound();
+                if (newMessageCount)
+                  this.playNotificationSound();
                 }
 
                 this.messages.set(newMessages);
@@ -493,7 +474,9 @@ export class App implements OnInit {
             }
 
             this.participants.set(messages.participants);
-          } else this.connectionTrouble.set(true);
+        }
+        else
+          this.connectionTrouble.set(true);
 
           this.receiveDirectMessages(messages.dms);
           this.messageEntry?.setProgress(messages.progress);
@@ -502,7 +485,7 @@ export class App implements OnInit {
         error: (error): void => {
           this.connectionTrouble.set(true);
           this.repollMessages(error.status === 429 ? REPOLL_RATE_429 : REPOLL_RATE_QUICK);
-        },
+        }
       });
   }
 
@@ -521,7 +504,8 @@ export class App implements OnInit {
     if (this.framed) {
       try {
         await userscriptAction(5000, 'enterChatRoom', this.name(), this.email(), this.color());
-      } catch (err) {
+      }
+      catch (err) {
         notify('error', String(err));
         return;
       }
@@ -557,11 +541,13 @@ export class App implements OnInit {
       error: (error): void => {
         this.isAdminFlag.set(false);
 
-        if (error.status === 400 && error.error?.error) notify('error', error.error.error);
-        else this.connectionTrouble.set(true);
+        if (error.status === 400 && error.error?.error)
+          notify('error', error.error.error);
+        else
+          this.connectionTrouble.set(true);
 
         this.repollMessages();
-      },
+      }
     });
   }
 
@@ -569,7 +555,8 @@ export class App implements OnInit {
     if (this.framed) {
       try {
         await userscriptAction(5000, 'leaveChatRoom');
-      } catch (err) {
+      }
+      catch (err) {
         notify('error', String(err));
         return;
       }
@@ -581,12 +568,12 @@ export class App implements OnInit {
       next: (): void => {
         this.connectionTrouble.set(false);
         this.inChat.set(false);
-        this.dms.set(this.dms().map((dm) => (dm.leftMainChat = true) && dm));
+        this.dms.set(this.dms().map(dm => (dm.leftMainChat = true) && dm));
         this.isAdminFlag.set(false);
         this.adminSet = 4;
         this.delayedAdjustScrolling();
       },
-      error: (_error): void => this.connectionTrouble.set(true),
+      error: (_error): void => this.connectionTrouble.set(true)
     });
   }
 
@@ -598,15 +585,11 @@ export class App implements OnInit {
   }
 
   protected getDMId(): number {
-    return this.selectedChat() === 0 ? 0 : (this.dms()[this.selectedChat() - 1]?.id ?? -1);
+    return this.selectedChat() === 0 ? 0 : this.dms()[this.selectedChat() - 1]?.id ?? -1;
   }
 
   protected async sendComment(comment: string): Promise<void> {
-    if (
-      this.sending() ||
-      !comment?.trim() ||
-      (this.selectedChat() > 0 && !(await this.verifyAllowingDMs()))
-    )
+    if (this.sending() || !comment?.trim() || (this.selectedChat() > 0 && !await this.verifyAllowingDMs()))
       return;
 
     this.sending.set(true);
@@ -617,7 +600,8 @@ export class App implements OnInit {
     if (this.framed && dm === 0) {
       try {
         await userscriptAction(10000, 'sendChatMessage', comment, this.color(), this.tripCode());
-      } catch (err) {
+      }
+      catch (err) {
         if (err === 'Timed out')
           err = 'Original chat site not accepting messages. Refreshing your browser might help.';
 
@@ -646,7 +630,7 @@ export class App implements OnInit {
 
           if (error.error.closed) {
             const dms = clone(this.dms(), true);
-            const dmi = dms.find((d) => d.id === dm);
+            const dmi = dms.find(d => d.id === dm);
 
             if (dmi) {
               dmi.closed = true;
@@ -655,10 +639,12 @@ export class App implements OnInit {
               this.updateDisableEditor();
             }
           }
-        } else this.connectionTrouble.set(true);
+        }
+        else
+          this.connectionTrouble.set(true);
 
         this.sending.set(false);
-      },
+      }
     });
   }
 
@@ -686,7 +672,7 @@ export class App implements OnInit {
         notify('error', error.error?.error || 'Failed to update message');
         console.error(error);
         if (evt.callback) evt.callback(false);
-      },
+      }
     });
   }
 
@@ -696,13 +682,7 @@ export class App implements OnInit {
     this.showConfirmation.set(true);
     this.confirmCallback = (approved: boolean): void => {
       if (approved) {
-        const params = {
-          chatIndex: evt.chatIndex,
-          framed: this.framed,
-          msgId: evt.msgId,
-          name: this.name(),
-          tripCode: this.tripCode(),
-        };
+        const params = { chatIndex: evt.chatIndex, framed: this.framed, msgId: evt.msgId, name: this.name(), tripCode: this.tripCode() };
 
         this.httpClient.delete('/api/delete', { params }).subscribe({
           next: (): void => {
@@ -711,7 +691,7 @@ export class App implements OnInit {
           error: (error): void => {
             notify('error', error.error?.error || 'Failed to delete message');
             console.error(error);
-          },
+          }
         });
       }
     };
@@ -731,8 +711,7 @@ export class App implements OnInit {
       if (!evt.external && !this.prefs.suppressUploadWarning) {
         this.confirmationService.confirm({
           key: 'app',
-          message:
-            'This upload will be visible on the uploader page. ' +
+          message: 'This upload will be visible on the uploader page. ' +
             'Your messages here are private, but uploads are not.<br><br>\nAre you sure you want to proceed?' +
             '<br><br>\nIf you continue, you will not be warned again.',
           header: 'This upload is not private',
@@ -741,18 +720,18 @@ export class App implements OnInit {
           rejectButtonProps: {
             label: 'Cancel',
             severity: 'secondary',
-            outlined: true,
+            outlined: true
           },
           acceptButtonProps: {
             label: 'Continue',
-            severity: 'danger',
+            severity: 'danger'
           },
           accept: () => {
             this.prefs.suppressUploadWarning = true;
             this.prefService.set(this.prefs);
             doUpload();
           },
-          reject: () => {},
+          reject: () => {}
         });
 
         return;
@@ -799,20 +778,12 @@ export class App implements OnInit {
     if (dm?.id && ((!dm.viewed && !dm.closed) || dm.leftMainChat)) {
       dm.viewed = true;
       dm.leftMainChat = false;
-      this.httpClient
-        .post(
-          '/api/start-chat',
-          { framed: this.framed },
-          {
-            params: {
+      this.httpClient.post('/api/start-chat', { framed: this.framed }, { params: {
               id: dm.id,
               name: dm.name,
               self: this.name(),
               tripCode: this.tripCode(),
-            },
-          },
-        )
-        .subscribe({ next: () => {} });
+        } }).subscribe({ next: () => { } });
     }
   }
 
@@ -820,16 +791,17 @@ export class App implements OnInit {
     this.selectedChat.set(value as number);
     this.checkChatActive(true);
 
-    if ((value as number) > 0) {
+    if (value as number > 0) {
       const dms = clone(this.dms(), true);
-      const dm = dms.at((value as number) - 1);
+      const dm = dms.at(value as number - 1);
 
       if (this.chatActive) {
         dm.missed.set(0);
         this.updateTitle();
       }
 
-      if (this.inChat()) this.reenterDm(dm);
+      if (this.inChat())
+        this.reenterDm(dm);
 
       this.dms.set(dms);
     }
@@ -838,26 +810,25 @@ export class App implements OnInit {
   }
 
   private updateDisableEditor(): void {
-    this.disableEditor.set(
-      this.sending() || (this.selectedChat() > 0 && !!this.dms()[this.selectedChat() - 1]?.closed),
-    );
+    this.disableEditor.set(this.sending() || (this.selectedChat() > 0 && !!this.dms()[this.selectedChat() - 1]?.closed));
   }
 
   protected adjustScrolling(onlyWhenClose = false): void {
-    const messages = document.querySelector(
-      'p-tabpanel.p-tabpanel-active chat-message-list .message-content',
-    );
+    const messages = document.querySelector('p-tabpanel.p-tabpanel-active chat-message-list .message-content');
     // Need to check closeness before any new messages are added.
-    const close = this.newOnBottom()
-      ? messages.scrollTop >= messages.scrollHeight - messages.clientHeight - 30
-      : messages.scrollTop <= 30;
+    const close = this.newOnBottom() ?
+      messages.scrollTop >= messages.scrollHeight - messages.clientHeight - 30 :
+      messages.scrollTop <= 30;
 
     setTimeout(() => {
       if (this.newOnBottom() && (!onlyWhenClose || close)) {
         messages.scrollTop = messages.scrollHeight;
 
-        if (isAndroid()) setTimeout(() => (messages.scrollTop = messages.scrollHeight), 250);
-      } else if (!this.newOnBottom() && (!onlyWhenClose || close)) messages.scrollTop = 0;
+        if (isAndroid())
+          setTimeout(() => messages.scrollTop = messages.scrollHeight, 250);
+      }
+      else if (!this.newOnBottom() && (!onlyWhenClose || close))
+        messages.scrollTop = 0;
     });
   }
 
@@ -866,11 +837,12 @@ export class App implements OnInit {
   }
 
   protected setTheme(theme: string): void {
-    if (shouldIgnoreClick()) return;
+    if (shouldIgnoreClick())
+      return;
 
     applyTheme(theme);
     this.showThemes.set(false);
-    this.darkMode.set(this.themes.find((t) => t.name === theme)?.darkMode || false);
+    this.darkMode.set(this.themes.find(t => t.name === theme)?.darkMode || false);
     this.prefs.theme = theme;
     this.prefService.set(this.prefs);
     setTimeout(() => this.messageEntry?.updateColor(false));
@@ -880,18 +852,19 @@ export class App implements OnInit {
     this.notificationMessage.set('Revert to original chat room style and features?');
     this.showConfirmation.set(true);
     this.confirmCallback = (approved: boolean): void => {
-      if (approved) userscriptAction('revert').catch((err) => notify('error', err));
+      if (approved)
+        userscriptAction('revert').catch(err => notify('error', err));
     };
   }
 
   private async verifyAllowingDMs(): Promise<boolean> {
-    if (this.prefs.allowDMs) return true;
+    if (this.prefs.allowDMs)
+      return true;
 
-    return new Promise<boolean>((resolve) => {
+    return new Promise<boolean>(resolve => {
       this.confirmationService.confirm({
         key: 'app',
-        message:
-          'You can only send direct messages if you allow them yourself.<br><br>\n' +
+        message: 'You can only send direct messages if you allow them yourself.<br><br>\n' +
           'Activate DMs?',
         header: 'Your "Allow DMs" setting is unchecked.',
         icon: 'pi pi-info-circle',
@@ -899,11 +872,11 @@ export class App implements OnInit {
         rejectButtonProps: {
           label: 'Not now',
           severity: 'secondary',
-          outlined: true,
+          outlined: true
         },
         acceptButtonProps: {
           label: 'Yes',
-          severity: 'success',
+          severity: 'success'
         },
         accept: () => {
           this.allowDMs.set(true);
@@ -911,15 +884,16 @@ export class App implements OnInit {
           this.prefService.set(this.prefs);
           resolve(true);
         },
-        reject: () => resolve(false),
+        reject: () => resolve(false)
       });
     });
   }
 
   protected async startDmChat(name: string): Promise<void> {
-    if (name === this.name() || !(await this.verifyAllowingDMs())) return;
+    if (name === this.name() || !await this.verifyAllowingDMs())
+      return;
 
-    const match = this.dms().findIndex((dm) => dm.name === name);
+    const match = this.dms().findIndex(dm => dm.name === name);
 
     if (match >= 0) {
       this.selectedChat.set(match + 1);
@@ -930,23 +904,17 @@ export class App implements OnInit {
     this.notificationMessage.set(`Are you sure you want to DM "${name}"?`);
     this.showConfirmation.set(true);
     this.confirmCallback = (approved: boolean): void => {
-      if (!approved) return;
+      if (!approved)
+        return;
 
-      this.httpClient
-        .post<{ id: number }>(
-          '/api/start-chat',
-          { framed: this.framed },
-          {
+      this.httpClient.post<{ id: number }>('/api/start-chat', { framed: this.framed }, {
             params: {
               self: this.name(),
               tripCode: this.tripCode(),
-              name,
-            },
-          },
-        )
-        .subscribe({
-          next: (data) => {
-            const match = this.dms().findIndex((dm) => dm.id === data.id);
+            name
+          } }).subscribe({
+        next: data => {
+          const match = this.dms().findIndex(dm => dm.id === data.id);
 
             if (match >= 0) {
               this.selectedChat.set(match + 1);
@@ -955,17 +923,11 @@ export class App implements OnInit {
 
             const dms = clone(this.dms(), true);
 
-            dms.push({
-              id: data.id,
-              name,
-              viewed: true,
-              messages: signal<Message[]>([]),
-              missed: signal(0),
-            });
+          dms.push({ id: data.id, name, viewed: true, messages: signal<Message[]>([]), missed: signal(0) });
             this.dms.set(dms);
             this.selectedChat.set(dms.length);
           },
-          error: (error): void => notify('error', error.error?.error || 'Failed to start chat'),
+        error: (error): void => notify('error', error.error?.error || 'Failed to start chat')
         });
     };
   }
@@ -981,28 +943,14 @@ export class App implements OnInit {
     dms.splice(tabIndex, 1);
     this.dms.set(dms);
     this.dmsJustClosed.set(id, processMillis());
-    this.httpClient
-      .post(
-        '/api/leave-chat',
-        {},
-        { params: { framed: this.framed, self: this.name(), id, viewed } },
-      )
-      .subscribe({
-        next: () => this.changeRef.detectChanges(),
-        error: () => this.changeRef.detectChanges(),
-      });
+    this.httpClient.post('/api/leave-chat', {}, { params: { framed: this.framed, self: this.name(), id, viewed } })
+      .subscribe({ next: () => this.changeRef.detectChanges(), error: () => this.changeRef.detectChanges() });
   }
 
   private countNewMessages(oldMessages: Message[], newMessages: Message[]): number {
-    const latest = oldMessages.reduce(
-      (acc, msg) => Math.max(acc, !msg.style.match(/^[EL]$/) ? msg.msgId : 0, 0),
-      0,
-    );
+    const latest = oldMessages.reduce((acc, msg) => Math.max(acc, !msg.style.match(/^[EL]$/) ? msg.msgId : 0, 0), 0);
 
-    return newMessages.reduce(
-      (acc, msg) => acc + (!msg.isMe && !msg.style.match(/^[EL]$/) && msg.msgId > latest ? 1 : 0),
-      0,
-    );
+    return newMessages.reduce((acc, msg) => acc + (!msg.isMe && !msg.style.match(/^[EL]$/) && msg.msgId > latest ? 1 : 0), 0);
   }
 
   private enterLeaveCheck(dm: number, messages: Message[]): void {
@@ -1016,14 +964,8 @@ export class App implements OnInit {
       dms = this.dms();
     }
 
-    const latestEnter = messages.reduce(
-      (acc, msg) => Math.max(acc, msg.style === 'E' ? msg.time : 0, 0),
-      0,
-    );
-    const latestLeave = messages.reduce(
-      (acc, msg) => Math.max(acc, msg.style === 'L' ? msg.time : 0, 0),
-      0,
-    );
+    const latestEnter = messages.reduce((acc, msg) => Math.max(acc, msg.style === 'E' ? msg.time : 0, 0), 0);
+    const latestLeave = messages.reduce((acc, msg) => Math.max(acc, msg.style === 'L' ? msg.time : 0, 0), 0);
 
     if (latestEnter > 0 && (!dms[dm - 1].lastEnter || dms[dm - 1].lastEnter < latestEnter)) {
       dms[dm - 1].lastEnter = latestEnter;
@@ -1035,11 +977,14 @@ export class App implements OnInit {
       left = true;
     }
 
-    if (entered || left) this.dms.set(dms);
+    if (entered || left)
+      this.dms.set(dms);
 
-    if (left) this.playNotificationSound(0, this.doorClose);
+    if (left)
+      this.playNotificationSound(0, this.doorClose);
 
-    if (entered) this.playNotificationSound(0, this.doorOpen);
+    if (entered)
+      this.playNotificationSound(0, this.doorOpen);
   }
 
   protected receiveDirectMessages(dms: DmSession[]): void {
@@ -1050,38 +995,36 @@ export class App implements OnInit {
     let notificationTab = this.selectedChat() || -1;
 
     for (const dm of dms) {
-      let index = currentDMs.findIndex((d) => d.id === dm.id);
+      let index = currentDMs.findIndex(d => d.id === dm.id);
 
-      if (isEqual(dm.messages, [null])) continue;
+      if (isEqual(dm.messages, [null]))
+        continue;
       else if (index >= 0) {
         const currentDM = currentDMs[index];
         let oldMessages = currentDM.messages();
-        let expired = oldMessages.filter((m) => m.time <= now - MAX_DM_AGE);
+        let expired = oldMessages.filter(m => m.time <= now - MAX_DM_AGE);
 
-        expired.forEach((m) => (m.expired = true));
-        oldMessages = oldMessages.filter((m) => m.time > now - MAX_DM_AGE);
+        expired.forEach(m => m.expired = true);
+        oldMessages = oldMessages.filter(m => m.time > now - MAX_DM_AGE);
 
         if (!isEqual(oldMessages, dm.messages)) {
           const newMessages = this.countNewMessages(oldMessages, dm.messages);
 
-          if (newMessages > 0 && index + 1 !== this.selectedChat()) notificationTab = index + 1;
+          if (newMessages > 0 && index + 1 !== this.selectedChat())
+            notificationTab = index + 1;
 
           totalNewMessages += newMessages;
 
           if (notificationTab !== this.selectedChat())
             currentDM.missed.set(currentDM.missed() + newMessages);
 
-          expired = expired.filter((m) => m.time >= dm.messages[0].time);
+          expired = expired.filter(m => m.time >= dm.messages[0].time);
           currentDM.messages.set([...expired, ...dm.messages]);
           changed = true;
         }
-      } else if (this.prefs.allowDMs && !this.dmsJustClosed.get(dm.id)) {
-        currentDMs.push({
-          id: dm.id,
-          name: dm.name,
-          messages: signal(dm.messages),
-          missed: signal(0),
-        });
+      }
+      else if (this.prefs.allowDMs && !this.dmsJustClosed.get(dm.id)) {
+        currentDMs.push({ id: dm.id, name: dm.name, messages: signal(dm.messages), missed: signal(0) });
         totalNewMessages += 1;
         notificationTab = currentDMs.length;
         changed = true;
@@ -1092,9 +1035,7 @@ export class App implements OnInit {
     }
 
     const minuteAgo = processMillis() - 60000;
-    [...this.dmsJustClosed.keys()].forEach(
-      (id) => this.dmsJustClosed.get(id) < minuteAgo && this.dmsJustClosed.delete(id),
-    );
+    [...this.dmsJustClosed.keys()].forEach(id => this.dmsJustClosed.get(id) < minuteAgo && this.dmsJustClosed.delete(id));
 
     for (const dm of currentDMs) {
       if (dms.findIndex(d => d.id === dm.id) < 0) {
@@ -1110,7 +1051,8 @@ export class App implements OnInit {
       this.adjustScrolling(true);
     }
 
-    if (totalNewMessages > 0) this.playNotificationSound(notificationTab);
+    if (totalNewMessages > 0)
+      this.playNotificationSound(notificationTab);
   }
 
   private isIdle(): boolean {
@@ -1122,10 +1064,8 @@ export class App implements OnInit {
 
     sound.volume = this.volume() / 100;
 
-    if (
-      this.notifySound() === 'always' ||
-      (this.notifySound() === 'background' && (idleOrInactive || this.selectedChat() !== chat))
-    )
+    if (this.notifySound() === 'always' ||
+        (this.notifySound() === 'background' && (idleOrInactive || this.selectedChat() !== chat)))
       sound.play().catch(() => this.audioFailed());
   }
 
@@ -1134,7 +1074,7 @@ export class App implements OnInit {
       life: 10000,
       key: 'tc',
       severity: 'warning',
-      summary: 'Notification sound was disallowed',
+      summary: 'Notification sound was disallowed'
     });
   }
 

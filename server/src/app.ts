@@ -269,7 +269,7 @@ async function getDirectMessages(name: string, tripCode: string, openDmString: s
       synced: !!row.synced,
       time: row.synced_time,
       trip: tripcode(row.trip ?? '')
-    } as Message));
+    }));
 
     if (sessionName)
       result.push({ id: dmSession.id, messages, name: sessionName });

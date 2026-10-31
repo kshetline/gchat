@@ -5,7 +5,7 @@ import { isArray } from '@tubular/util';
 
 export class AsyncDatabaseWrapperForMySQL extends AsyncDatabase {
   constructor(private connection: Connection) {
-    super(null as any);
+    super(null);
   }
 
   override get inner(): never { throw new Error('Not implemented'); }

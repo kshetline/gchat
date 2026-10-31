@@ -139,6 +139,7 @@ export async function userscriptAction(actionOrMaxWait: string | number, ...args
           acknowledgementFailed = true;
           window.removeEventListener('message', listener);
           resolved = true;
+          // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
           reject('Userscript not responding. You may have to reload the page.\n\nUserscript v2026.05.06 or later now required.');
         }
       }, 2500);
@@ -149,6 +150,7 @@ export async function userscriptAction(actionOrMaxWait: string | number, ...args
         if (!resolved) {
           window.removeEventListener('message', listener);
           resolved = true;
+          // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
           reject(`Timed out waiting for message ${action}`);
         }
       }, maxWait);

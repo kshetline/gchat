@@ -66,22 +66,14 @@ export class MessageList implements OnInit {
     const messages = this.elemRef?.nativeElement?.querySelector('.message-content');
 
     if (messages) {
-      this.showScrollToBottom.set(
-        this.isAtBottom() &&
-          messages.scrollTop < messages.scrollHeight - messages.clientHeight - 10,
-      );
+      this.showScrollToBottom.set(this.isAtBottom() && messages.scrollTop < messages.scrollHeight - messages.clientHeight - 10);
       this.showScrollToTop.set(!this.isAtBottom() && messages.scrollTop > 10);
     }
   });
 
-  constructor(
-    private elemRef: ElementRef,
-    private httpClient: HttpClient,
-  ) {
+  constructor(private elemRef: ElementRef, private httpClient: HttpClient) {
     setInterval(() => this.alwaysChanging.set(1 + Math.random()), 500);
-    document.addEventListener('mouseup', () =>
-      setTimeout(() => (this.lastSelectedText = window.getSelection().toString())),
-    );
+    document.addEventListener('mouseup', () => setTimeout(() => this.lastSelectedText = window.getSelection().toString()));
   }
 
   ngOnInit(): void {
@@ -103,7 +95,8 @@ export class MessageList implements OnInit {
       }
 
       this.toolHash.set(message.hash);
-    } else if (this.toolHash() === message.hash)
+    }
+    else if (this.toolHash() === message.hash)
       this.toolTimer = setTimeout(() => this.toolHash.set(''), 2000);
   }
 
@@ -117,7 +110,9 @@ export class MessageList implements OnInit {
       if (text && type !== theType) {
         result.push({ text, type });
         text = t;
-      } else text += t;
+      }
+      else
+        text += t;
 
       type = theType;
     };
@@ -126,34 +121,38 @@ export class MessageList implements OnInit {
       let ch = chars[i];
       const cp = ch.codePointAt(0);
 
-      if (
-        s.codePointAt(index + 1) === 0xfe0f &&
-        0x20d0 <= s.codePointAt(index + 2) &&
-        s.codePointAt(index + 2) <= 0x20ef
-      ) {
+      if (s.codePointAt(index + 1) === 0xFE0F && 0x20D0 <= s.codePointAt(index + 2) && s.codePointAt(index + 2) <= 0x20EF) {
         ch = ch + s.substring(index + 1, index + 3);
         addText(ch, emojiType || 'big-emoji');
         i += 2;
-      } else if (s.codePointAt(index + 1) === 0xfe0f) {
+      }
+      else if (s.codePointAt(index + 1) === 0xFE0F) {
         ch = ch + s.charAt(index + 1);
         addText(ch, emojiType || (matchDarkEmoji.test(ch) ? 'big-dark-emoji' : 'big-emoji'));
         i += 1;
-      } else if (cp === 0x200d) addText(ch, type);
-      else if (matchDarkEmoji.test(ch)) addText(ch, emojiType || 'big-dark-emoji');
-      else if ((0x1f000 <= cp && cp <= 0x1faff) || matchEmojiish.test(ch))
+      }
+      else if (cp === 0x200D)
+        addText(ch, type);
+      else if (matchDarkEmoji.test(ch))
+        addText(ch, emojiType || 'big-dark-emoji');
+      else if (0x1F000 <= cp && cp <= 0x1FAFF || matchEmojiish.test(ch))
         addText(ch, emojiType || 'big-emoji');
-      else addText(ch, '');
+      else
+        addText(ch, '');
 
       index += ch.length;
     }
 
-    if (text) result.push({ text, type });
+    if (text)
+      result.push({ text, type });
 
     text = '';
 
     for (const tt of result) {
-      if (tt.type) text += `<span class="${tt.type}">${tt.text}</span>`;
-      else text += showInvisibles(tt.text);
+      if (tt.type)
+        text += `<span class="${tt.type}">${tt.text}</span>`;
+      else
+        text += showInvisibles(tt.text);
     }
 
     return text;
@@ -173,11 +172,9 @@ export class MessageList implements OnInit {
       let startIsWrapped = false;
 
       if (nameMatch) {
-        const mostRecentMessage = this.messages().findLast(
-          (msg) => msg.name === nameMatch[1] && msg.style?.length > 2,
-        );
+        const mostRecentMessage = this.messages().findLast(msg => msg.name === nameMatch[1] && msg.style?.length > 2);
         const bgColor = this.getBackground(mostRecentMessage);
-        const qlass = bgColor.charAt(1) > '8' ? 'local-light' : 'local-dark';
+        const qlass = (bgColor.charAt(1) > '8') ? 'local-light' : 'local-dark';
         const color = this.getColor(mostRecentMessage);
 
         if (color && color !== currentColor) {
@@ -190,8 +187,8 @@ export class MessageList implements OnInit {
         let bg = this.getBackground(currentColor);
         let qlass = 'local-light';
 
-        bg = bg === '#333' ? '#444' : bg === '#CCC' ? '#BBB' : bg;
-        qlass = bg.charAt(1) > '8' ? qlass : 'local-dark';
+        bg = bg === '#333' ? '#444' : (bg === '#CCC' ? '#BBB' : bg);
+        qlass = (bg.charAt(1) > '8') ? qlass : 'local-dark';
         start = `<span class="${qlass}" style="background-color: ${bg}; padding: 1px 2px">${start}</span>`;
       }
 
@@ -211,15 +208,17 @@ export class MessageList implements OnInit {
       text2 += part ? (i % 2 === 0 ? part : `<span class="nobr">${part}</span>`) : '';
     }
 
-    return text2
-      .replace(/>\(\*＾＾\*\)</g, '>(<mark>*</mark>＾＾<mark>*</mark>)<')
+    return text2.replace(/>\(\*＾＾\*\)</g, '>(<mark>*</mark>＾＾<mark>*</mark>)<')
       .replace(/\uFE68/g, '\\\u200D');
   }
 
   protected formatTime(time: number): string {
-    if (!time) return '';
-    else if (this.localTime()) return new Date(time * 1000).toLocaleString();
-    else return new Date(time * 1000).toISOString().substring(0, 19).replace('T', ' ');
+    if (!time)
+      return '';
+    else if (this.localTime())
+      return new Date(time * 1000).toLocaleString();
+    else
+      return new Date(time * 1000).toISOString().substring(0, 19).replace('T', ' ');
   }
 
   protected formatMessageTime(time: number | Message): string {
@@ -239,9 +238,12 @@ export class MessageList implements OnInit {
   }
 
   protected getBackground(message: Message | string): string {
-    if (document.body.classList.contains('theme-li1999')) return 'transparent';
-    else if (isString(message)) return getTextBackground(message, this.darkMode());
-    else return getTextBackground(this.getColor(message), this.darkMode());
+    if (document.body.classList.contains('theme-li1999'))
+      return 'transparent';
+    else if (isString(message))
+      return getTextBackground(message, this.darkMode());
+    else
+      return getTextBackground(this.getColor(message), this.darkMode());
   }
 
   protected getColor(message: Message): string {
@@ -258,10 +260,7 @@ export class MessageList implements OnInit {
   }
 
   protected isLight(message: Message): boolean {
-    return (
-      document.body.classList.contains('theme-li1999') ||
-      getLuminance(this.getBackground(message)) > 127
-    );
+    return document.body.classList.contains('theme-li1999') || getLuminance(this.getBackground(message)) > 127;
   }
 
   protected quoteMessage(message: Message): void {
@@ -274,24 +273,19 @@ export class MessageList implements OnInit {
   }
 
   protected editMessage(message: Message): void {
-    this.httpClient
-      .get<any>('/api/can-edit', {
-        params: { name: this.name(), tripCode: this.tripCode(), msgId: message.msgId },
-      })
-      .subscribe({
-        next: (response): void => {
-          this.edit.emit({
-            bbCode: response.bbCode,
-            color: response.color,
-            chatIndex: this.chatIndex(),
-            msgId: message.msgId,
-            time: this.formatMessageTime(message.time),
-          });
-        },
-        error: (error): void => {
-          if (error.status === 400 && error.error?.error) notify('error', error.error.error);
-          else this.connectionTrouble.emit(error.message || error.toString());
-        },
+    this.httpClient.get<any>('/api/can-edit',
+      {
+        params: { name: this.name(), tripCode: this.tripCode(), msgId: message.msgId } }).subscribe({
+          next: (response): void => {
+            this.edit.emit({ bbCode: response.bbCode, color: response.color, chatIndex: this.chatIndex(),
+              msgId: message.msgId, time: this.formatMessageTime(message.time) });
+          },
+          error: (error): void => {
+            if (error.status === 400 && error.error?.error)
+              notify('error', error.error.error);
+            else
+              this.connectionTrouble.emit(error.message || error.toString());
+          }
       });
   }
 
@@ -302,28 +296,30 @@ export class MessageList implements OnInit {
   protected scrollToBottom() {
     const messages = document.querySelector('chat-message-list .message-content');
 
-    if (messages) messages.scrollTop = messages.scrollHeight;
+    if (messages)
+      messages.scrollTop = messages.scrollHeight;
   }
 
   protected scrollToTop() {
     const messages = document.querySelector('chat-message-list .message-content');
 
-    if (messages) messages.scrollTop = 0;
+    if (messages)
+      messages.scrollTop = 0;
   }
 
   protected getImages(html: string): string[] {
     const pos = html.indexOf(' &lt; ');
 
-    if (pos > 0) html = html.substring(pos);
+    if (pos > 0)
+      html = html.substring(pos);
     else {
       const match = html.match(QUOTE_MARKER_PATTERN);
 
-      if (match) html = html.substring(match.index + match[0].length);
+      if (match)
+        html = html.substring(match.index + match[0].length);
     }
 
-    return html
-      .split(/\bhref="(http(s?):\/\/[^>]+?\.(avif|gif|jpeg|jpg|png|svg|webp))"/g)
-      .filter((_s, i) => (i - 1) % 4 === 0);
+    return html.split(/\bhref="(http(s?):\/\/[^>]+?\.(avif|gif|jpeg|jpg|png|svg|webp))"/g).filter((_s, i) => (i - 1) % 4 === 0);
   }
 
   protected hasImages(html: string): boolean {
