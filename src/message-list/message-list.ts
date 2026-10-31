@@ -1,12 +1,4 @@
-import {
-  Component,
-  ElementRef,
-  input,
-  OnInit,
-  output,
-  signal,
-  ChangeDetectionStrategy,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, input, OnInit, output, signal } from '@angular/core';
 import { kaomojiNonGothicRegex, Message } from '../../server/src/shared-types';
 import { colorFromStyle, getLuminance, getTextBackground, notify, showInvisibles } from '../main';
 import { debounce, htmlUnescape, isObject, isString } from '@tubular/util';
@@ -39,7 +31,7 @@ export interface EditEvent {
   imports: [SafeHtmlPipe],
   templateUrl: './message-list.html',
   changeDetection: ChangeDetectionStrategy.Eager,
-  styleUrl: './message-list.scss',
+  styleUrl: './message-list.scss'
 })
 export class MessageList implements OnInit {
   showInvisibles = showInvisibles;

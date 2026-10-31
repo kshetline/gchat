@@ -251,7 +251,6 @@ export function bbCodeToQuillOps(bbCode: string): QuillOp[] {
     FormsModule,
     PickerComponent,
     QuillModule,
-    ToggleButton,
   ],
   templateUrl: './message-entry.html',
   changeDetection: ChangeDetectionStrategy.Eager,

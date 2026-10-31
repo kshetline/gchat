@@ -46,8 +46,8 @@ if (process.env.LOG_FILE_PATH) {
     console[method] = (...args: unknown[]) => {
       orig(...args);
 
-      if (isString(args[0] && (args[0] as string).includes('%s'))) {
-        args[0] = (args[0] as string).replace(/(?<!%)%s/g, () => args.length > 1 ? String(args.splice(1, 1)) : '%s');
+      if (isString(args[0]) && args[0].includes('%s')) {
+        args[0] = args[0].replace(/(?<!%)%s/g, () => args.length > 1 ? String(args.splice(1, 1)) : '%s');
       }
 
       logFile.write(prefix + timeStamp() + ' ' + args.map(a => {

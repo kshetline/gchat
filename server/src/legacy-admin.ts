@@ -3,13 +3,16 @@ import { HtmlParser } from 'fortissimo-html';
 import { DbMessage, MessageInfo } from './shared-types';
 import { Now, parseChatTime } from './chat-util.js';
 import { getDb } from './db.js';
+import { processMillis } from '@tubular/util';
 
 const ADMIN_URL = process.env.CHAT_ADMIN_URL;
 const ADMIN_PASSWORD = process.env.CHAT_ADMIN_PWD;
 const IP_UPDATE_INTERVAL = 90000; // 90 seconds
 const IP_UPDATE_BACKDATING = 7_200_000; // 2 hours
+const IP_BAN_CHECK_INTERVAL = 30000; // 30 seconds
 
 const parser = new HtmlParser();
+let bannedIps: string[] = [];
 
 export async function getLegacyPostData(): Promise<MessageInfo[]> {
   if (!ADMIN_URL || !ADMIN_PASSWORD)
@@ -47,6 +50,33 @@ export async function getLegacyPostData(): Promise<MessageInfo[]> {
   return result;
 }
 
+export async function getBannedIps(): Promise<void> {
+  const result = new Set<string>();
+
+  if (!ADMIN_URL || !ADMIN_PASSWORD)
+    return;
+
+  const params = new URLSearchParams();
+
+  params.append('pass', ADMIN_PASSWORD);
+  params.append('mente_addr', 'Select');
+
+  try {
+    const raw = (await axios.post(ADMIN_URL, params)).data;
+    const dom = parser.parse(raw).domRoot;
+    const rows = dom.querySelectorAll('input').filter(r => r.getAttribute('name')[1] === 'del');
+
+    for (const row of rows) {
+      result.add(row.getAttribute('value')[1]);
+    }
+  }
+  catch (error) {
+    console.error('Error fetching legacy banned IPs:', error);
+  }
+
+  bannedIps = Array.from(result);
+}
+
 let lastIpUpdate = 0;
 
 export async function updateRemoteIps(allTime = false): Promise<void> {
@@ -67,6 +97,7 @@ export async function updateRemoteIps(allTime = false): Promise<void> {
       return;
 
     const infos = await getLegacyPostData();
+    await getBannedIps();
     const map = new Map<string, MessageInfo>();
 
     for (const info of infos)
@@ -95,4 +126,30 @@ export async function adminDeleteMessage(_name: string, time: number): Promise<v
     new Date(time * 1000).toISOString().substring(0, 19).replace(/-0/g, '-').replace(/-/g, '/').replace(/T/, '-'));
 
   await axios.post(ADMIN_URL, params);
+}
+
+let lastBannedUpdate = 0;
+
+export async function isLegacyBannedIp(ip: string): Promise<boolean> {
+  if (!ip)
+    return false;
+
+  const now = processMillis();
+
+  if (now - lastBannedUpdate > IP_BAN_CHECK_INTERVAL) {
+    await getBannedIps();
+    lastBannedUpdate = now;
+  }
+
+  if (bannedIps.includes(ip))
+    return true;
+
+  for (const bannedIp of bannedIps) {
+    const $ = /^([^*]+)\*/.exec(bannedIp);
+
+    if ($ && ip.startsWith($[1]))
+      return true;
+  }
+
+  return false;
 }

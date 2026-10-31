@@ -1,39 +1,18 @@
 import {
-  ChangeDetectorRef,
-  Component,
-  inject,
-  OnInit,
-  signal,
-  ViewChild,
-  WritableSignal,
-  ChangeDetectionStrategy,
+  ChangeDetectionStrategy, ChangeDetectorRef, Component, inject, OnInit, signal, ViewChild, WritableSignal
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import {
-  Config,
-  DmSession,
-  NotifySound,
-  Message,
-  Messages,
-  ParticipantInfo,
-  Preferences,
-  TypingStatus,
-  MAX_DM_AGE,
+  Config, DmSession, NotifySound, MAX_DM_AGE, Message, Messages, ParticipantInfo, Preferences, TypingStatus
 } from '../../server/src/shared-types';
 import { clone, forEach, isAndroid, isEqual, processMillis } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { FileUploadEvent, MessageEntry, MessageUpdateEvent } from '../message-entry/message-entry';
 import {
-  NotificationHandler,
-  notify,
-  registerNotificationHandler,
-  setIsTypingFunction,
-  shouldIgnoreClick,
-  showInvisibles,
-  startClickSuppress,
-  userscriptAction,
+  NotificationHandler, notify, registerNotificationHandler, setIsTypingFunction, shouldIgnoreClick, showInvisibles,
+  startClickSuppress, userscriptAction
 } from '../main';
 import { applyTheme, getThemeMenuStyle, getThemes, resetDefaultThemeBackground } from '../themes';
 import { DeleteEvent, EditEvent, MessageList } from '../message-list/message-list';
@@ -85,12 +64,12 @@ interface DmInfo {
     SliderModule,
     TabsModule,
     ToastModule,
-    ToggleButtonModule,
+    ToggleButtonModule
   ],
   providers: [MessageService],
   templateUrl: './app.html',
   changeDetection: ChangeDetectionStrategy.Eager,
-  styleUrl: './app.scss',
+  styleUrl: './app.scss'
 })
 export class App implements OnInit {
   showInvisibles = showInvisibles;
@@ -1070,18 +1049,6 @@ export class App implements OnInit {
     let totalNewMessages = 0;
     let notificationTab = this.selectedChat() || -1;
 
-    for (let i = currentDMs.length - 1; i >= 0; --i) {
-      if (dms.findIndex((d) => d.id === currentDMs[i].id) < 0) {
-        const messages = currentDMs[i].messages();
-        const newMessages = messages.filter((m) => m.time > now - MAX_DM_AGE);
-
-        if (newMessages.length !== messages.length) {
-          currentDMs[i].messages.set(newMessages);
-          changed = true;
-        }
-      }
-    }
-
     for (const dm of dms) {
       let index = currentDMs.findIndex((d) => d.id === dm.id);
 
@@ -1130,7 +1097,7 @@ export class App implements OnInit {
     );
 
     for (const dm of currentDMs) {
-      if (dms.findIndex((d) => d.id === dm.id) < 0) {
+      if (dms.findIndex(d => d.id === dm.id) < 0) {
         dm.closed = true;
         changed = true;
       }

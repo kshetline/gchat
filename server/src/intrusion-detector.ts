@@ -4,6 +4,7 @@ import { clone } from '@tubular/util';
 import { getDb, getKeyValue } from './db.js';
 import tripcode from 'tripcode';
 import ip_ from 'ip';
+import { isLegacyBannedIp } from './legacy-admin';
 
 export const TIME_WINDOW = 120; // seconds
 
@@ -112,12 +113,12 @@ export async function isBannedIp(ip: string): Promise<boolean> {
   if (bannedIps) {
     const now = Date.now();
 
-    return (bannedIps.some(ipEntry =>
-      (ip.includes('/') ? ip_.cidrSubnet(ipEntry.ip).contains(ip) : ipEntry.ip === ip)
-      && (!ipEntry.expiry || ipEntry.expiry > now)));
+    if (bannedIps.some(ipEntry => (ip.includes('/') ? ip_.cidrSubnet(ipEntry.ip).contains(ip) : ipEntry.ip === ip)
+        && (!ipEntry.expiry || ipEntry.expiry > now)))
+      return true;
   }
 
-  return false;
+  return isLegacyBannedIp(ip);
 }
 
 export async function tallyForLockout(now: number, isGet: boolean, ip: string, token: string, name: string,
