@@ -217,7 +217,7 @@ async function sessionsCheck(): Promise<void> {
 export function reportUploadProgress(req: express.Request, progress: number): void {
   const session = sessions.get(getToken(req));
 
-  if (session)
+  if (session && (progress === 0 || !session.progress || session.progress < progress))
     session.progress = Math.round(progress);
 }
 

@@ -8,7 +8,7 @@ import { HtmlParser  } from 'fortissimo-html';
 import { sleep, toBoolean, toInt } from '@tubular/util';
 import { allowedExtensions, allowedTypes, MB } from './shared-types.js';
 import * as puppeteer from 'puppeteer';
-import { getExternalUploadLink } from './external-uploader.js';
+import { getExternalUploadLink, getUploadApiUploadLink } from './external-uploader.js';
 
 type MFile = Express.Multer.File;
 
@@ -84,8 +84,22 @@ export async function uploadSingle(req: express.Request, res: express.Response):
     });
   });
 
-  if (external)
-    return await getExternalUploadLink(req, file);
+  if (external) {
+    const uploads = [getUploadApiUploadLink(req, file), getExternalUploadLink(req, file)];
+
+    // The slower uploader may still be reading the file after the first link comes back,
+    // so don't delete it until both have finished.
+    Promise.allSettled(uploads).then(() => fs.unlink(file.path)).catch(() => {});
+
+    try {
+      return await Promise.any(uploads);
+    }
+    catch (e) {
+      const errors = (e as AggregateError).errors;
+
+      throw errors ? new Error(errors.map(err => err.message || String(err)).join('; ')) : e;
+    }
+  }
 
   const pwd = req.body.password;
 

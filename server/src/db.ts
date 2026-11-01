@@ -57,7 +57,7 @@ export async function getDb(): Promise<AsyncDatabase> {
       dm INTEGER NOT NULL DEFAULT 0,
       time INTEGER NOT NULL DEFAULT 0,
       synced_time INTEGER NOT NULL DEFAULT 0,
-      wt INTEGER,
+      wt INTEGER NULL,
       synced BOOLEAN NOT NULL DEFAULT 0,
       name TEXT NOT NULL,
       trip TEXT,
@@ -86,7 +86,8 @@ export async function getDb(): Promise<AsyncDatabase> {
       proxied BOOLEAN NOT NULL DEFAULT 0,
       last_active INTEGER NOT NULL DEFAULT 0,
       last_post INTEGER NOT NULL DEFAULT 0,
-      allow_dm  BOOLEAN NOT NULL DEFAULT 0
+      allow_dm  BOOLEAN NOT NULL DEFAULT 0,
+      tz_off INTEGER NULL
     )`));
 
   await db.exec(modifyIfNeeded(

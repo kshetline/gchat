@@ -1,6 +1,9 @@
 import * as puppeteer from 'puppeteer';
+import axios from 'axios';
+import { randomBytes } from 'node:crypto';
+import { openAsBlob } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import fs from 'fs/promises';
+import { extname } from 'node:path';
 import { sleep, toNumber } from '@tubular/util';
 import express from 'express';
 import { isShuttingDown, reportUploadProgress } from './app.js';
@@ -8,6 +11,10 @@ import { restartLocalSocksProxy, startLocalSocksProxy } from './socks-proxy.js';
 import { extractIp } from './chat-util.js';
 
 const PROXY_UPDATE_INTERVAL = 7200000; // 2 hours
+const UPLOAD_API_FILES_URL = process.env.UPLOAD_API_FILES_URL;
+const UPLOAD_API_FOLDER = process.env.UPLOAD_API_FOLDER;
+const UPLOAD_API_PAGE_SIZE = 100; // API maximum
+const UPLOAD_API_DEFAULT_EXPIRY = 604800; // 1 week (allowed: 0 = never, 3600, 86400, 604800, 2592000)
 
 type MFile = Express.Multer.File;
 
@@ -214,14 +221,93 @@ export async function getExternalUploadLink(req: express.Request, file: MFile): 
 
   reportUploadProgress(req, 0);
 
-  try {
-    await fs.unlink(file.path);
-  }
-  catch {}
-
   if (link)
     return link;
 
   initExternalUploader(true).catch();
   throw new Error('External uploader: ' + (error || 'failed to upload file'));
+}
+
+function uploadApiHeaders(): Record<string, string> {
+  return { Authorization: `Bearer ${process.env.UPLOAD_API_KEY}` };
+}
+
+async function getUploadApiFileNames(): Promise<Set<string>> {
+  const names = new Set<string>();
+
+  for (let pageNum = 1; ; ++pageNum) {
+    const response = await axios.get(UPLOAD_API_FILES_URL, {
+      headers: uploadApiHeaders(),
+      params: { page: pageNum, per_page: UPLOAD_API_PAGE_SIZE }
+    });
+    const data = response.data;
+    // The list response shape isn't documented, so accept a bare array or a few likely wrapper fields.
+    const files: any[] = Array.isArray(data) ? data : data?.files ?? data?.data ?? data?.items ?? [];
+    const lastSize = names.size;
+
+    files.forEach(f => f?.name && names.add(f.name));
+
+    // Stop on a short page, or if the server seems to be ignoring the page parameter.
+    if (files.length < UPLOAD_API_PAGE_SIZE || names.size === lastSize)
+      break;
+  }
+
+  return names;
+}
+
+async function getUniqueUploadApiFileName(originalName: string): Promise<string> {
+  const existing = await getUploadApiFileNames();
+  const ext = extname(originalName).toLowerCase();
+  let name: string;
+
+  do {
+    name = randomBytes(12).toString('hex').toUpperCase() + ext;
+  } while (existing.has(name));
+
+  return name;
+}
+
+export async function getUploadApiUploadLink(req: express.Request, file: MFile,
+                                          expiry = UPLOAD_API_DEFAULT_EXPIRY): Promise<string> {
+  if (!process.env.UPLOAD_API_KEY)
+    throw new Error('Upload API: no API key configured');
+
+  let link: string;
+  let error: string;
+
+  try {
+    const form = new FormData();
+    const fileName = await getUniqueUploadApiFileName(file.originalname);
+
+    form.append('file', await openAsBlob(file.path, { type: file.mimetype }), fileName);
+    form.append('expiry', expiry.toString());
+    form.append('folder', UPLOAD_API_FOLDER);
+
+    const response = await axios.post(UPLOAD_API_FILES_URL, form, {
+      headers: uploadApiHeaders(),
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity,
+      onUploadProgress: evt => {
+        if (evt.total)
+          reportUploadProgress(req, evt.loaded * 100 / evt.total);
+      }
+    });
+
+    link = response.data?.url;
+
+    if (!link)
+      error = 'No link returned';
+  }
+  catch (e) {
+    const data = (e as any).response?.data;
+
+    error = data?.message || data?.error || (e as any).message || e.toString();
+  }
+
+  reportUploadProgress(req, 0);
+
+  if (link)
+    return link;
+
+  throw new Error('Upload API:' + (error || 'failed to upload file'));
 }
