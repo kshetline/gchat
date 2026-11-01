@@ -11,7 +11,7 @@ export class AsyncDatabaseWrapperForMySQL extends AsyncDatabase {
   override get inner(): never { throw new Error('Not implemented'); }
 
   override async close(): Promise<void> {
-    this.connection.end();
+    await this.connection.end();
   }
 
   // Converts SQLite-style positional params (?1, ?2, plain ?) to MySQL plain ?

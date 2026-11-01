@@ -268,6 +268,7 @@ async function getDirectMessages(name: string, tripCode: string, openDmString: s
       style: row.style,
       synced: !!row.synced,
       time: row.synced_time,
+      wt: row.wt,
       trip: tripcode(row.trip ?? '')
     }));
 
@@ -336,6 +337,9 @@ async function participantCheck(req: express.Request, forceInChat = false, nameO
     }
   }
   else {
+    if (q.tzOff)
+      await db.run('UPDATE participants SET tz_off = ? WHERE name = ?', toInt(q.tzOff), name);
+
     const changes = (await db.run('DELETE FROM participants WHERE name = ? AND remote = 1', name))?.changes;
 
     if ((changes || 0) > 0)
@@ -570,7 +574,8 @@ function hasChatOpen(name: string, dmId: number): boolean {
     const session = sessions.get(token);
     const tripCode = tripcode(q.tripCode);
     const name = cleanName(q.name);
-    const active = toBoolean(req.query.active);
+    const active = toBoolean(q.active);
+    const maxMessages = Math.min(toInt(q.max, MAX_CLIENT_MESSAGES), MAX_CLIENT_MESSAGES);
     const now = Now();
 
     if (session) {
@@ -591,7 +596,7 @@ function hasChatOpen(name: string, dmId: number): boolean {
 
     const db = await getDb();
     const rows = (await db.all<DbMessage>(
-      'SELECT * FROM messages WHERE deleted = 0 AND dm = 0 ORDER BY messages.synced_time')).slice(-MAX_CLIENT_MESSAGES);
+      'SELECT * FROM messages WHERE deleted = 0 AND dm = 0 ORDER BY messages.synced_time')).slice(-maxMessages);
     let messages = rows.filter(row => !row.deleted).map(row => ({
       editCount: row.edit_count,
       email: row.email,
@@ -607,7 +612,8 @@ function hasChatOpen(name: string, dmId: number): boolean {
       remote: !!row.remote,
       style: row.style,
       time: row.synced_time,
-      trip: row.remote ? row.trip : tripcode(row.trip)
+      trip: row.remote ? row.trip : tripcode(row.trip),
+      wt: row.wt,
     } as Message));
 
     if (!session?.isAdmin)
@@ -670,6 +676,8 @@ function hasChatOpen(name: string, dmId: number): boolean {
       const participant = await getNamedParticipantRecord(participantInfo.name);
 
       if (participant && !participant.remote) {
+        participantInfo.tzOff = participant.tz_off;
+
         let session2 = sessions.get(participant.session_id);
 
         if (!session2 && participant.name === name) {
@@ -1018,8 +1026,8 @@ function hasChatOpen(name: string, dmId: number): boolean {
         comment = encryptMessage(comment, dmSession.ekey);
     }
 
-    const result = await db.run('INSERT INTO messages (dm, time, synced_time, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      dm, now, now, name, q.tripCode, q.email, 0, session?.ip, token, style, comment, hash);
+    const result = await db.run('INSERT INTO messages (dm, time, synced_time, wt, name, trip, email, remote, ip, session_id, style, message, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      dm, now, now, q.wt ? toInt(q.wt) : null, name, q.tripCode, q.email, 0, session?.ip, token, style, comment, hash);
 
     if (!dm && (framed || proxyHidden))
       addPendingDuplicate(result.lastID, now, name, comment);

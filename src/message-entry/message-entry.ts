@@ -15,6 +15,7 @@ import { toObservable } from '@angular/core/rxjs-interop';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService } from 'primeng/api';
 import { PreferencesService } from '../preferences.service';
+import { ToggleButton } from 'primeng/togglebutton';
 import { HttpClient } from '@angular/common/http';
 
 // I don't want to persist this setting in localStorage -- per session in a better time frame.
@@ -211,7 +212,7 @@ export function bbCodeToQuillOps(bbCode: string): QuillOp[] {
 
 @Component({
   selector: 'chat-message-entry',
-  imports: [ConfirmDialogModule, ColorSelector, FormsModule, PickerComponent, QuillModule],
+  imports: [ConfirmDialogModule, ColorSelector, FormsModule, PickerComponent, QuillModule, ToggleButton],
   templateUrl: './message-entry.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './message-entry.scss',

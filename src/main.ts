@@ -156,3 +156,9 @@ export async function userscriptAction(actionOrMaxWait: string | number, ...args
       }, maxWait);
   });
 }
+
+export function getWallTime(): number {
+  const d = new Date();
+
+  return Math.floor((d.getTime() - d.getTimezoneOffset() * 60000) / 1000);
+}

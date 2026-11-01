@@ -4,7 +4,7 @@ import { clone } from '@tubular/util';
 import { getDb, getKeyValue } from './db.js';
 import tripcode from 'tripcode';
 import ip_ from 'ip';
-import { isLegacyBannedIp } from './legacy-admin';
+import { isLegacyBannedIp } from './legacy-admin.js';
 
 export const TIME_WINDOW = 120; // seconds
 

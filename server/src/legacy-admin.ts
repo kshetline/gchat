@@ -9,7 +9,7 @@ const ADMIN_URL = process.env.CHAT_ADMIN_URL;
 const ADMIN_PASSWORD = process.env.CHAT_ADMIN_PWD;
 const IP_UPDATE_INTERVAL = 90000; // 90 seconds
 const IP_UPDATE_BACKDATING = 7_200_000; // 2 hours
-const IP_BAN_CHECK_INTERVAL = 30000; // 30 seconds
+const IP_BAN_CHECK_INTERVAL = 60000; // 1 minute
 
 const parser = new HtmlParser();
 let bannedIps: string[] = [];

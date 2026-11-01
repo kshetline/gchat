@@ -59,6 +59,7 @@ export interface Message {
   synced: boolean;
   time: number;
   trip: string;
+  wt?: number;
 }
 
 export interface DbMessage {
@@ -81,6 +82,7 @@ export interface DbMessage {
   synced: number;
   time: number;
   trip: string;
+  wt?: number;
 }
 
 export interface DbParticipant {
@@ -95,6 +97,7 @@ export interface DbParticipant {
   remote: number;
   trip: string;
   session_id: string;
+  tz_off?: number;
 }
 
 export interface ParticipantInfo {
@@ -102,6 +105,7 @@ export interface ParticipantInfo {
   idle?: number;
   name: string;
   remote?: boolean;
+  tzOff?: number;
 }
 
 export interface DbDmSession {

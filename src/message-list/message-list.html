@@ -23,7 +23,7 @@
           }
           @if (message.time) {
             <span class="time" [class.flagged]="!!message.flagged && !message.remote" [class.expired]="!!message.expired"
-              [title]="message.origTime === message.time ? '' : formatTime(message.origTime)">{{ formatMessageTime(message) }}</span>
+              [title]="getTimeDetails(message)">{{ formatMessageTime(message) }}</span>
           }
         </div>
         <div class="bubble-wrap" [class.me]="message.isMe"

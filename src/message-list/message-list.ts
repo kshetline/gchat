@@ -213,10 +213,10 @@ export class MessageList implements OnInit {
       .replace(/\uFE68/g, '\\\u200D');
   }
 
-  protected formatTime(time: number): string {
+  protected formatTime(time: number, forceIso = false): string {
     if (!time)
       return '';
-    else if (this.localTime())
+    else if (this.localTime() && !forceIso)
       return new Date(time * 1000).toLocaleString();
     else
       return new Date(time * 1000).toISOString().substring(0, 19).replace('T', ' ');
@@ -324,5 +324,14 @@ export class MessageList implements OnInit {
 
   protected hasImages(html: string): boolean {
     return this.getImages(html).length > 0;
+  }
+
+  protected getTimeDetails(message: Message): string {
+    let deets = message.origTime === message.time ? '' : this.formatTime(message.origTime);
+
+    if (message.wt != null)
+      deets += '~' + this.formatTime(message.wt, true);
+
+    return deets;
   }
 }

@@ -6,13 +6,13 @@ import { firstValueFrom } from 'rxjs';
 import {
   Config, DmSession, MAX_DM_AGE, Message, Messages, NotifySound, ParticipantInfo, Preferences, TypingStatus
 } from '../../server/src/shared-types';
-import { clone, forEach, isAndroid, isEqual, processMillis } from '@tubular/util';
+import { clone, forEach, isAndroid, isEqual, isIOS, isLikelyMobile, isSafari, processMillis } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { FileUploadEvent, MessageEntry, MessageUpdateEvent } from '../message-entry/message-entry';
 import {
-  NotificationHandler, notify, registerNotificationHandler, setIsTypingFunction, shouldIgnoreClick, showInvisibles,
-  startClickSuppress, userscriptAction
+  getWallTime, NotificationHandler, notify, registerNotificationHandler, setIsTypingFunction, shouldIgnoreClick,
+  showInvisibles, startClickSuppress, userscriptAction
 } from '../main';
 import { applyTheme, getThemeMenuStyle, getThemes, resetDefaultThemeBackground } from '../themes';
 import { DeleteEvent, EditEvent, MessageList } from '../message-list/message-list';
@@ -28,7 +28,6 @@ import { SliderModule } from 'primeng/slider';
 import { ToggleButtonModule } from 'primeng/togglebutton';
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
-import { isIOS, isSafari } from '@tubular/util';
 import ReconnectingWebSocket from 'reconnecting-websocket';
 
 const REPOLL_RATE = 20000; // 20 seconds
@@ -424,8 +423,10 @@ export class App implements OnInit {
           framed: this.framed,
           inChat: this.inChat(),
           name: this.name(),
+          max: isLikelyMobile() ? '250' : '',
           openDms: this.openDmList(),
-          tripCode: this.tripCode()
+          tripCode: this.tripCode(),
+          tzOff: new Date().getTimezoneOffset()
         }
       }).subscribe({
       next: (messages: Messages): void => {
@@ -612,7 +613,7 @@ export class App implements OnInit {
 
     this.saveTripCode();
 
-    const params = { ...this.prefs, framed: this.framed, dm };
+    const params = { ...this.prefs, framed: this.framed, dm, wt: getWallTime() };
 
     this.httpClient.post('/api/send', { comment }, { params }).subscribe({
       next: (): void => {
@@ -1086,5 +1087,18 @@ export class App implements OnInit {
 
   protected getLegacyAge(): number {
     return (Math.floor(Date.now() / 1000) - this.lastSuccessfulLegacyPoll()) / 60;
+  }
+
+  protected tzOffset(participant: ParticipantInfo): string {
+    if (participant.tzOff == null)
+      return '';
+
+    let tzOff = participant.tzOff;
+    let offset = 'UTC' + (tzOff < 0 ? '+' : '-'); // Yes, the displayed sign is reversed.
+
+    tzOff = Math.abs(tzOff);
+    offset += String(Math.floor(tzOff / 60)).padStart(2, '0') + ':' + String(tzOff % 60).padStart(2, '0');
+
+    return offset;
   }
 }
