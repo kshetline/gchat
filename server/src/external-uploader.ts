@@ -9,7 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { last, toInt, toNumber } from '@tubular/util';
 import express from 'express';
 import { isShuttingDown, reportUploadProgress } from './app.js';
-import { restartLocalSocksProxy, startLocalSocksProxy } from './socks-proxy.js';
+import { anonymizeProxy, closeAnonymizedProxy } from 'proxy-chain';
 import { extractIp } from './chat-util.js';
 
 const PROXY_UPDATE_INTERVAL = 7200000; // 2 hours
@@ -26,9 +26,29 @@ type MFile = Express.Multer.File;
 let browser: puppeteer.Browser;
 let page: puppeteer.Page;
 let inInit = false;
-let proxyPort: number;
+let localProxyUrl: string;
 let lastProxyUpdate = Date.now();
 export let proxyIp: string;
+
+// scheme should be socks5h for Node clients (remote DNS); proxy-chain accepts either.
+function upstreamSocksUrl(scheme = 'socks5'): string {
+  const user = encodeURIComponent(process.env.SOCKS5_USER ?? '');
+  const pass = encodeURIComponent(process.env.SOCKS5_PASSWORD ?? '');
+  const auth = user ? `${user}:${pass}@` : '';
+
+  return `${scheme}://${auth}${process.env.SOCKS5_HOST}`;
+}
+
+// Chrome can't authenticate to a SOCKS5 proxy, so proxy-chain provides a local, no-auth
+// HTTP proxy which forwards to the authenticated upstream SOCKS5 proxy.
+export async function stopLocalProxy(): Promise<void> {
+  if (localProxyUrl) {
+    const url = localProxyUrl;
+
+    localProxyUrl = undefined;
+    await closeAnonymizedProxy(url, true);
+  }
+}
 
 export async function initExternalUploader(force = false, newProxy = false): Promise<void> {
   if (inInit) return new Promise<void>(resolve => {
@@ -54,15 +74,13 @@ export async function initExternalUploader(force = false, newProxy = false): Pro
       if (browser) await browser.close();
       browser = undefined;
 
-      if (!proxyPort)
-        proxyPort = await startLocalSocksProxy();
-      else if (newProxy) {
-        proxyPort = 0;
-        proxyPort = await restartLocalSocksProxy();
-      }
+      if (newProxy)
+        await stopLocalProxy();
+
+      localProxyUrl ??= await anonymizeProxy(upstreamSocksUrl());
 
       const options: puppeteer.LaunchOptions = {
-        args: [`--proxy-server=socks5://127.0.0.1:${proxyPort}`],
+        args: [`--proxy-server=${localProxyUrl}`],
       };
 
       if (process.env.CHROME_PATH) {
@@ -258,11 +276,8 @@ let uploadApi: AxiosInstance;
 function getUploadApi(): AxiosInstance {
   if (!uploadApi) {
     if (process.env.SOCKS5_HOST) {
-      const user = encodeURIComponent(process.env.SOCKS5_USER ?? '');
-      const pass = encodeURIComponent(process.env.SOCKS5_PASSWORD ?? '');
-      const auth = user ? `${user}:${pass}@` : '';
       // socks5h: DNS is resolved by the proxy, not locally
-      const agent = new SocksProxyAgent(`socks5h://${auth}${process.env.SOCKS5_HOST}`, { keepAlive: true });
+      const agent = new SocksProxyAgent(upstreamSocksUrl('socks5h'), { keepAlive: true });
 
       uploadApi = axios.create({ httpAgent: agent, httpsAgent: agent, proxy: false });
     }

@@ -18,15 +18,22 @@ import { convertBBCodeToHtml, extractIp, getIp, getToken, messageHash, Now, time
 import tripcode from 'tripcode';
 import path from 'path';
 import fs from 'fs';
-import { initExternalUploader, proxyIp } from './external-uploader.js';
+import { initExternalUploader, proxyIp, stopLocalProxy } from './external-uploader.js';
 import { isBannedName, intrusionDetector, isBannedIp } from './intrusion-detector.js';
-import { stopLocalSocksProxy } from './socks-proxy.js';
 import { startWebSocketServer, sendToAll, sendToIp, wsPort } from './web-socket.js';
 import { adminDeleteMessage, updateRemoteIps } from './legacy-admin.js';
 
 // noinspection ES6ConvertVarToLetConst
 var shuttingDown = false;
 export function isShuttingDown(): boolean { return shuttingDown; }
+
+// When running under Phusion Passenger (e.g. Plesk), disable auto-install mode, which otherwise
+// hijacks the first http.Server to call listen() and throws if any other http.Server (such as
+// proxy-chain's local proxy) calls listen(). The main server instead listens on 'passenger'.
+const passenger = (globalThis as any).PhusionPassenger;
+
+if (passenger)
+  passenger.configure({ autoInstall: false });
 
 if (process.env.LOG_FILE_PATH) {
   // Send console output to a log file
@@ -531,8 +538,8 @@ function hasChatOpen(name: string, dmId: number): boolean {
     next();
   });
 
-  const server = app.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}`);
+  const server = app.listen(passenger ? 'passenger' : port, () => {
+    console.log(passenger ? 'Server running under Phusion Passenger' : `Server running on http://localhost:${port}`);
   });
 
   startWebSocketServer(server);
@@ -1323,7 +1330,7 @@ function hasChatOpen(name: string, dmId: number): boolean {
 
     shuttingDown = true;
     console.log(`${timeStamp()} -- Shutting down...`);
-    stopLocalSocksProxy().then(() => getDb().then(db => db.close().then(() => {
+    stopLocalProxy().then(() => getDb().then(db => db.close().then(() => {
       clearTimeout(monitorTimeout);
       stopLegacyPolling();
     }).catch())).catch();

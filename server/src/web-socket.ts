@@ -42,7 +42,7 @@ export function startWebSocketServer(server?: http.Server): void {
     try {
       if (server && (wsPort === 0 || wsPort === httpPort)) {
         wsServer = new WebSocketServer({ server });
-        port = (server.address() as AddressInfo).port || httpPort;
+        port = (server.address() as AddressInfo)?.port || httpPort;
       }
       else {
         server = http.createServer();
