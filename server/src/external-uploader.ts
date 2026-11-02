@@ -5,7 +5,7 @@ import { openAsBlob } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { extname } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
-import { toNumber } from '@tubular/util';
+import { last, toInt, toNumber } from '@tubular/util';
 import express from 'express';
 import { isShuttingDown, reportUploadProgress } from './app.js';
 import { restartLocalSocksProxy, startLocalSocksProxy } from './socks-proxy.js';
@@ -14,6 +14,9 @@ import { extractIp } from './chat-util.js';
 const PROXY_UPDATE_INTERVAL = 7200000; // 2 hours
 const UPLOAD_API_FILES_URL = process.env.UPLOAD_API_FILES_URL;
 const UPLOAD_API_FOLDER = process.env.UPLOAD_API_FOLDER;
+const UPLOAD_API_MAX_AGE_SECS = toInt(process.env.UPLOAD_API_MAX_AGE_SECS, 259200);
+const UPLOAD_API_MAX_FILES = toInt(process.env.UPLOAD_API_MAX_FILES, 50);
+const UPLOAD_API_MAX_TOTAL_SIZE = toInt(process.env.UPLOAD_API_MAX_TOTAL_SIZE_MB, 1000) * 1024 * 1024;
 const UPLOAD_API_PAGE_SIZE = 100; // API maximum
 const UPLOAD_API_DEFAULT_EXPIRY = 604800; // 1 week (allowed: 0 = never, 3600, 86400, 604800, 2592000)
 
@@ -253,38 +256,40 @@ function uploadApiHeaders(): Record<string, string> {
   return { Authorization: `Bearer ${process.env.UPLOAD_API_KEY}` };
 }
 
-async function getUploadApiFileNames(signal?: AbortSignal): Promise<Set<string>> {
-  const names = new Set<string>();
+interface ApiFile {
+  created_at: string;
+  name: string;
+  size: number;
+  uuid: string;
+}
+
+async function getUploadApiFiles(signal?: AbortSignal): Promise<ApiFile[]> {
+  const files: ApiFile[] = [];
 
   for (let pageNum = 1; ; ++pageNum) {
-    const response = await axios.get(UPLOAD_API_FILES_URL, {
+    const response = (await axios.get<{ files?: ApiFile[]; total: number }>(UPLOAD_API_FILES_URL, {
       headers: uploadApiHeaders(),
       signal,
-      params: { page: pageNum, per_page: UPLOAD_API_PAGE_SIZE }
-    });
-    const data = response.data;
-    // The list response shape isn't documented, so accept a bare array or a few likely wrapper fields.
-    const files: any[] = Array.isArray(data) ? data : data?.files ?? data?.data ?? data?.items ?? [];
-    const lastSize = names.size;
+      params: { folder: UPLOAD_API_FOLDER, page: pageNum, per_page: UPLOAD_API_PAGE_SIZE, sort: 'created_at', order: 'desc' }
+    }))?.data;
 
-    files.forEach(f => f?.name && names.add(f.name));
+    response?.files?.forEach(f => files.push(f));
 
-    // Stop on a short page, or if the server seems to be ignoring the page parameter.
-    if (files.length < UPLOAD_API_PAGE_SIZE || names.size === lastSize)
+    if (!response || response.files?.length === 0 || files.length >= response.total)
       break;
   }
 
-  return names;
+  return files;
 }
 
 async function getUniqueUploadApiFileName(originalName: string, signal?: AbortSignal): Promise<string> {
-  const existing = await getUploadApiFileNames(signal);
+  const existing = (await getUploadApiFiles(signal))?.map(f => f.name);
   const ext = extname(originalName).toLowerCase();
   let name: string;
 
   do {
     name = randomBytes(12).toString('hex').toUpperCase() + ext;
-  } while (existing.has(name));
+  } while (existing.includes(name));
 
   return name;
 }
@@ -328,9 +333,41 @@ export async function getUploadApiUploadLink(req: express.Request, file: MFile, 
   }
 
   reportUploadProgress(req, 0);
+  doApiUploaderFileMaintenance().catch();
 
   if (link)
     return link;
 
   throw new Error('Upload API: ' + (error || 'failed to upload file'));
+}
+
+async function deleteUploadApiFile(file: ApiFile): Promise<void> {
+  await axios.delete(UPLOAD_API_FILES_URL + '/' + file.uuid, { headers: uploadApiHeaders() });
+}
+
+let doingMaintenance = false;
+
+async function doApiUploaderFileMaintenance(): Promise<void> {
+  if (doingMaintenance)
+    return;
+
+  doingMaintenance = true;
+
+  const files = await getUploadApiFiles();
+  const oldestAllowed = new Date(Date.now() - UPLOAD_API_MAX_AGE_SECS * 1000).toISOString().replace(/\.\d\d\dZ$/, 'Z');
+
+  while (files.length > UPLOAD_API_MAX_FILES)
+    await deleteUploadApiFile(files.pop());
+
+  while (last(files)?.created_at < oldestAllowed)
+    await deleteUploadApiFile(files.pop());
+
+  let totalSize = files.reduce((acc, file) => acc + file.size, 0);
+
+  while (totalSize > UPLOAD_API_MAX_TOTAL_SIZE) {
+    totalSize -= files.pop().size;
+    await deleteUploadApiFile(last(files));
+  }
+
+  doingMaintenance = false;
 }

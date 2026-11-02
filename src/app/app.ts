@@ -6,7 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import {
   Config, DmSession, MAX_DM_AGE, Message, Messages, NotifySound, ParticipantInfo, Preferences, TypingStatus
 } from '../../server/src/shared-types';
-import { clone, forEach, isAndroid, isEqual, isIOS, isLikelyMobile, isSafari, processMillis } from '@tubular/util';
+import { clone, forEach, isAndroid, isChromeOS, isEqual, isIOS, isLikelyMobile, isSafari, processMillis } from '@tubular/util';
 import { FormsModule } from '@angular/forms';
 import { PreferencesService } from '../preferences.service';
 import { FileUploadEvent, MessageEntry, MessageUpdateEvent } from '../message-entry/message-entry';
@@ -424,7 +424,7 @@ export class App implements OnInit {
           framed: this.framed,
           inChat: this.inChat(),
           name: this.name(),
-          max: isLikelyMobile() ? '250' : '',
+          max: isLikelyMobile() || isChromeOS() ? '250' : '',
           openDms: this.openDmList(),
           tripCode: this.tripCode(),
           tzOff: new Date().getTimezoneOffset()
