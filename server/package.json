@@ -26,6 +26,7 @@
     "mysql2": "^3.22.2",
     "promised-sqlite3": "^2.1.0",
     "puppeteer": "^24.39.0",
+    "socks-proxy-agent": "^8.0.5",
     "sqlite3": "^6.0.1",
     "tough-cookie": "^6.0.2",
     "tripcode": "^4.0.0",

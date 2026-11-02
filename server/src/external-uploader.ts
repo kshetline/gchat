@@ -1,5 +1,6 @@
 import * as puppeteer from 'puppeteer';
-import axios from 'axios';
+import axios, { AxiosInstance } from 'axios';
+import { SocksProxyAgent } from 'socks-proxy-agent';
 import { randomBytes } from 'node:crypto';
 import { openAsBlob } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -252,6 +253,26 @@ export async function getExternalUploadLink(req: express.Request, file: MFile, s
   throw new Error('External uploader: ' + (error || 'failed to upload file'));
 }
 
+let uploadApi: AxiosInstance;
+
+function getUploadApi(): AxiosInstance {
+  if (!uploadApi) {
+    if (process.env.SOCKS5_HOST) {
+      const user = encodeURIComponent(process.env.SOCKS5_USER ?? '');
+      const pass = encodeURIComponent(process.env.SOCKS5_PASSWORD ?? '');
+      const auth = user ? `${user}:${pass}@` : '';
+      // socks5h: DNS is resolved by the proxy, not locally
+      const agent = new SocksProxyAgent(`socks5h://${auth}${process.env.SOCKS5_HOST}`, { keepAlive: true });
+
+      uploadApi = axios.create({ httpAgent: agent, httpsAgent: agent, proxy: false });
+    }
+    else
+      uploadApi = axios.create();
+  }
+
+  return uploadApi;
+}
+
 function uploadApiHeaders(): Record<string, string> {
   return { Authorization: `Bearer ${process.env.UPLOAD_API_KEY}` };
 }
@@ -267,7 +288,7 @@ async function getUploadApiFiles(signal?: AbortSignal): Promise<ApiFile[]> {
   const files: ApiFile[] = [];
 
   for (let pageNum = 1; ; ++pageNum) {
-    const response = (await axios.get<{ files?: ApiFile[]; total: number }>(UPLOAD_API_FILES_URL, {
+    const response = (await getUploadApi().get<{ files?: ApiFile[]; total: number }>(UPLOAD_API_FILES_URL, {
       headers: uploadApiHeaders(),
       signal,
       params: { folder: UPLOAD_API_FOLDER, page: pageNum, per_page: UPLOAD_API_PAGE_SIZE, sort: 'created_at', order: 'desc' }
@@ -310,7 +331,7 @@ export async function getUploadApiUploadLink(req: express.Request, file: MFile, 
     form.append('expiry', expiry.toString());
     form.append('folder', UPLOAD_API_FOLDER);
 
-    const response = await axios.post(UPLOAD_API_FILES_URL, form, {
+    const response = await getUploadApi().post(UPLOAD_API_FILES_URL, form, {
       headers: uploadApiHeaders(),
       signal,
       maxBodyLength: Infinity,
@@ -342,7 +363,7 @@ export async function getUploadApiUploadLink(req: express.Request, file: MFile, 
 }
 
 async function deleteUploadApiFile(file: ApiFile): Promise<void> {
-  await axios.delete(UPLOAD_API_FILES_URL + '/' + file.uuid, { headers: uploadApiHeaders() });
+  await getUploadApi().delete(UPLOAD_API_FILES_URL + '/' + file.uuid, { headers: uploadApiHeaders() });
 }
 
 let doingMaintenance = false;
