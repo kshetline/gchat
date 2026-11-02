@@ -365,8 +365,9 @@ async function doApiUploaderFileMaintenance(): Promise<void> {
   let totalSize = files.reduce((acc, file) => acc + file.size, 0);
 
   while (totalSize > UPLOAD_API_MAX_TOTAL_SIZE) {
-    totalSize -= files.pop().size;
-    await deleteUploadApiFile(last(files));
+    const lastFile = files.pop();
+    totalSize -= lastFile.size;
+    await deleteUploadApiFile(lastFile);
   }
 
   doingMaintenance = false;
