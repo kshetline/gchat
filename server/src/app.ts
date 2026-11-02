@@ -615,7 +615,7 @@ function hasChatOpen(name: string, dmId: number): boolean {
       style: row.style,
       time: row.synced_time,
       trip: row.remote ? row.trip : tripcode(row.trip),
-      wt: row.wt,
+      wt: session?.isAdmin ? row.wt : undefined,
     } as Message));
 
     if (!session?.isAdmin)
@@ -677,7 +677,7 @@ function hasChatOpen(name: string, dmId: number): boolean {
       const participantInfo = participants[i];
       const participant = await getNamedParticipantRecord(participantInfo.name);
 
-      if (participant && !participant.remote) {
+      if (participant && !participant.remote && session?.isAdmin) {
         participantInfo.tzOff = participant.tz_off;
 
         let session2 = sessions.get(participant.session_id);
@@ -738,7 +738,7 @@ function hasChatOpen(name: string, dmId: number): boolean {
     let appendAt = 0;
     let oldMessages: Message[];
 
-    if (!isEqual(lastMessages, messages, { keysToIgnore: ['isMe', 'ip'] })) {
+    if (!isEqual(lastMessages, messages, { keysToIgnore: ['isMe', 'ip', 'wt'] })) {
       if (lastMessages?.length > 50 && messages?.length > 50) {
         deleteCount = Math.max(lastMessages.findIndex(m => m.hash === messages[0].hash), 0);
         appendAt = messages.findIndex(m => m.hash === lastMessages.at(-1).hash);
