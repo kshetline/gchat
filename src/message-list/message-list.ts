@@ -47,6 +47,7 @@ export class MessageList implements OnInit {
   chatIndex = input<number>(0);
   closed = input<boolean>(false);
   darkMode = input.required<boolean>();
+  dullMode = input.required<boolean>();
   dmId = input(0);
   dmName = input('');
   inChat = input.required<boolean>();

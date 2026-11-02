@@ -24,7 +24,7 @@
 <div class="connection-trouble" [style.display]="connectionTrouble() ? 'block' : 'none'">⚡️Connection trouble</div>
 <main xmlns="http://www.w3.org/1999/html">
   <div class="header">
-    <h1 class="form-h1">{{ title() }}
+    <h1 class="form-h1"><span [style.opacity]="dullMode() ? '0.25' : undefined">{{ dullMode() ? 'Chat' : title() }}</span>
       <p-toggleButton [(ngModel)]="panelToggle" offLabel="" onLabel=""
           offIcon="pi pi-chevron-down" onIcon="pi pi-chevron-right" class="rotate-button panel-hider"></p-toggleButton></h1>
     @if (!inChat()) {
@@ -139,7 +139,7 @@
         }
         <chat-message-list
             (connectionTrouble)="connectionTrouble.set(true)" [name]="name()" [tripCode]="tripCode()"
-            [isAdmin]="isAdmin()" [darkMode]="darkMode()" [inChat]="inChat()" [localTime]="localTime()"
+            [isAdmin]="isAdmin()" [darkMode]="darkMode()" [dullMode]="dullMode()" [inChat]="inChat()" [localTime]="localTime()"
             [isAtBottom]="newOnBottom()" [messages]="messages()" [messageEntry]="messageEntrySignal()"
             (edit)="editMessage($event)" (delete)="deleteMessage($event)"></chat-message-list>
       </p-tabpanel>
@@ -147,7 +147,7 @@
         <p-tabpanel [value]="i + 1">
           <chat-message-list [chatIndex]="i + 1" [closed]="!!dm.closed" [dmId]="dm.id" [dmName]="dm.name"
               (connectionTrouble)="connectionTrouble.set(true)" [name]="name()" [tripCode]="tripCode()"
-              [isAdmin]="isAdmin()" [darkMode]="darkMode()" [inChat]="true" [localTime]="localTime()"
+              [isAdmin]="isAdmin()" [darkMode]="darkMode()" [dullMode]="dullMode()" [inChat]="true" [localTime]="localTime()"
               [isAtBottom]="newOnBottom()" [messages]="dm.messages()" [messageEntry]="messageEntrySignal()"
               (edit)="editMessage($event)" (delete)="deleteMessage($event)"></chat-message-list>
         </p-tabpanel>

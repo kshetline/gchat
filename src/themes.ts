@@ -3,6 +3,7 @@ import { forEach } from '@tubular/util';
 export interface Theme {
   displayName: string;
   darkMode: boolean;
+  dull?: boolean;
   name: string;
 }
 
@@ -80,6 +81,12 @@ const themes: Record<string, any> = {
     darkMode: false,
     _background: '#F7F'
   },
+  dullsVille: {
+    displayName: 'Dullsville',
+    darkMode: false,
+    dull: true,
+    _background: '#DDD'
+  },
   abyss: {
     displayName: 'Abyss',
     darkMode: true,
@@ -105,6 +112,12 @@ const themes: Record<string, any> = {
     darkMode: true,
     _background: '#111',
   },
+  dullsVilleDark: {
+    displayName: 'DullsvilleDark',
+    darkMode: true,
+    dull: true,
+    _background: '#222'
+  },
   li1999: {
     displayName: 'Like It’s 1999',
     darkMode: false,
@@ -115,6 +128,7 @@ export function getThemes(): Theme[] {
   return Object.keys(themes).map(key => ({
     displayName: themes[key].displayName,
     darkMode: themes[key].darkMode,
+    dull: !!themes[key].dull,
     name: key
   }));
 }

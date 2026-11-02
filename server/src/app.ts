@@ -76,6 +76,8 @@ const adminName = process.env.CHAT_ADMIN_NAME;
 const adminTrip = process.env.CHAT_ADMIN_TRIP;
 const typingStatus = {} as TypingStatus;
 const config: Config = {
+  apiUploaderName: unescapeUnicode(process.env.API_UPLOADER_NAME || 'API Uploader'),
+  apiUploaderShortName: unescapeUnicode(process.env.API_UPLOADER_SHORT_NAME || 'APIUploader'),
   backgroundColor: process.env.CHAT_BACKGROUND || '#DDD',
   externalUploaderName: unescapeUnicode(process.env.EXTERNAL_UPLOADER_NAME || 'External Uploader'),
   externalUploaderShortName: unescapeUnicode(process.env.EXTERNAL_UPLOADER_SHORT_NAME || 'ExtUploader'),

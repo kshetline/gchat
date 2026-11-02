@@ -226,6 +226,8 @@ export class MessageEntry implements OnInit {
   private quill: Quill;
   private savedColor = 0;
 
+  protected apiUploaderName = signal('API Uploader');
+  protected apiUploaderShortName = signal('APIUploader');
   protected busy = signal(false);
   protected busyTimer: any;
   protected canCancelUpload = signal(false);
@@ -350,6 +352,8 @@ export class MessageEntry implements OnInit {
       try {
         const config = JSON.parse(configStr) as Config;
 
+        this.apiUploaderName.set(config.apiUploaderName || 'API Uploader');
+        this.apiUploaderShortName.set(config.apiUploaderShortName || 'APIUploader');
         this.externalUploaderName.set(config.externalUploaderName || 'External Uploader');
         this.externalUploaderShortName.set(config.externalUploaderShortName || 'Ext. Uploader');
         this.maxExtFileSizeInMb.set(config.fileSizeLimitExtInMb || 200);
@@ -634,10 +638,10 @@ export class MessageEntry implements OnInit {
 
     this.confirmationService.confirm({
       key: 'messageEntry',
-      message: `This option sends your uploads to ${this.externalUploaderName()}.<br><br>\n` +
+      message: `This option sends your uploads to ${this.externalUploaderName()} (or ${this.apiUploaderName()}).<br><br>\n` +
         'This provides greater privacy for your shared files, but a smaller maximum file ' +
         `size of ${this.maxExtFileSizeInMb()} MB. You also must abide by the ` +
-        `${this.externalUploaderName()} terms of service.`,
+        `${this.externalUploaderName()} and ${this.apiUploaderShortName()} terms of service.`,
       header: `Uploading to ${this.externalUploaderName()}`,
       icon: 'pi pi-info-circle',
       rejectLabel: 'Cancel',

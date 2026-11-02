@@ -4,7 +4,8 @@ import { randomBytes } from 'node:crypto';
 import { openAsBlob } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { extname } from 'node:path';
-import { sleep, toNumber } from '@tubular/util';
+import { setTimeout as delay } from 'node:timers/promises';
+import { toNumber } from '@tubular/util';
 import express from 'express';
 import { isShuttingDown, reportUploadProgress } from './app.js';
 import { restartLocalSocksProxy, startLocalSocksProxy } from './socks-proxy.js';
@@ -90,7 +91,7 @@ export async function initExternalUploader(force = false, newProxy = false): Pro
     throw new Error('Failed to initialize external uploader' + (error ? ': ' + error : ''));
 }
 
-export async function getExternalUploadLink(req: express.Request, file: MFile): Promise<string> {
+export async function getExternalUploadLink(req: express.Request, file: MFile, signal?: AbortSignal): Promise<string> {
   let uploaderReady = false;
 
   try {
@@ -107,6 +108,8 @@ export async function getExternalUploadLink(req: express.Request, file: MFile): 
 
   if (!uploaderReady || isShuttingDown())
     throw new Error('External uploader not available');
+
+  signal?.throwIfAborted();
 
   const fileBuffer = await readFile(file.path);
   const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
@@ -127,10 +130,13 @@ export async function getExternalUploadLink(req: express.Request, file: MFile): 
 
   // Send one chunk at a time to stay well under the CDP JSON size limit
   for (let i = 0; i < fileBuffer.length; i += CHUNK_SIZE) {
+    signal?.throwIfAborted();
     const chunk = fileBuffer.subarray(i, i + CHUNK_SIZE).toString('base64');
     // @ts-ignore
     await page.evaluate((chunk: string) => { (window as any).__fileChunks.push(chunk); }, chunk);
   }
+
+  signal?.throwIfAborted();
 
   // Assemble and dispatch — no large data crosses the CDP boundary here
   await page.evaluate(
@@ -170,9 +176,12 @@ export async function getExternalUploadLink(req: express.Request, file: MFile): 
   do {
     try {
       await page.waitForSelector('div.dz-preview.dz-complete :is(.responseText, .dz-error-message, .dz-progress)',
-        { timeout: 5000 });
+        { timeout: 5000, signal });
     }
     catch {}
+
+    if (signal?.aborted)
+      break;
 
     let progress = lastProgress;
 
@@ -212,9 +221,21 @@ export async function getExternalUploadLink(req: express.Request, file: MFile): 
       catch {}
     }
 
-    if (!link && !error)
-      await sleep(5000);
+    if (!link && !error) {
+      try {
+        await delay(5000, undefined, { signal });
+      }
+      catch {
+        break;
+      }
+    }
   } while (!link && !error && lackOfProgress < 8);
+
+  if (!link && signal?.aborted) {
+    // Reloading the page stops the in-browser upload.
+    page.reload().catch(() => {});
+    throw signal.reason;
+  }
 
   if (!error && !link)
     error = 'Upload stalled for unknown reason';
@@ -232,12 +253,13 @@ function uploadApiHeaders(): Record<string, string> {
   return { Authorization: `Bearer ${process.env.UPLOAD_API_KEY}` };
 }
 
-async function getUploadApiFileNames(): Promise<Set<string>> {
+async function getUploadApiFileNames(signal?: AbortSignal): Promise<Set<string>> {
   const names = new Set<string>();
 
   for (let pageNum = 1; ; ++pageNum) {
     const response = await axios.get(UPLOAD_API_FILES_URL, {
       headers: uploadApiHeaders(),
+      signal,
       params: { page: pageNum, per_page: UPLOAD_API_PAGE_SIZE }
     });
     const data = response.data;
@@ -255,8 +277,8 @@ async function getUploadApiFileNames(): Promise<Set<string>> {
   return names;
 }
 
-async function getUniqueUploadApiFileName(originalName: string): Promise<string> {
-  const existing = await getUploadApiFileNames();
+async function getUniqueUploadApiFileName(originalName: string, signal?: AbortSignal): Promise<string> {
+  const existing = await getUploadApiFileNames(signal);
   const ext = extname(originalName).toLowerCase();
   let name: string;
 
@@ -267,8 +289,8 @@ async function getUniqueUploadApiFileName(originalName: string): Promise<string>
   return name;
 }
 
-export async function getUploadApiUploadLink(req: express.Request, file: MFile,
-                                          expiry = UPLOAD_API_DEFAULT_EXPIRY): Promise<string> {
+export async function getUploadApiUploadLink(req: express.Request, file: MFile, signal?: AbortSignal,
+                                             expiry = UPLOAD_API_DEFAULT_EXPIRY): Promise<string> {
   if (!process.env.UPLOAD_API_KEY)
     throw new Error('Upload API: no API key configured');
 
@@ -277,7 +299,7 @@ export async function getUploadApiUploadLink(req: express.Request, file: MFile,
 
   try {
     const form = new FormData();
-    const fileName = await getUniqueUploadApiFileName(file.originalname);
+    const fileName = await getUniqueUploadApiFileName(file.originalname, signal);
 
     form.append('file', await openAsBlob(file.path, { type: file.mimetype }), fileName);
     form.append('expiry', expiry.toString());
@@ -285,6 +307,7 @@ export async function getUploadApiUploadLink(req: express.Request, file: MFile,
 
     const response = await axios.post(UPLOAD_API_FILES_URL, form, {
       headers: uploadApiHeaders(),
+      signal,
       maxBodyLength: Infinity,
       maxContentLength: Infinity,
       onUploadProgress: evt => {
@@ -309,5 +332,5 @@ export async function getUploadApiUploadLink(req: express.Request, file: MFile,
   if (link)
     return link;
 
-  throw new Error('Upload API:' + (error || 'failed to upload file'));
+  throw new Error('Upload API: ' + (error || 'failed to upload file'));
 }

@@ -85,10 +85,13 @@ export async function uploadSingle(req: express.Request, res: express.Response):
   });
 
   if (external) {
-    const uploads = [getUploadApiUploadLink(req, file), getExternalUploadLink(req, file)];
+    const controller = new AbortController();
+    // noinspection ES6MissingAwait
+    const uploads = [getUploadApiUploadLink(req, file, controller.signal),
+                     getExternalUploadLink(req, file, controller.signal)];
 
-    // The slower uploader may still be reading the file after the first link comes back,
-    // so don't delete it until both have finished.
+    // Runs in the background without holding up the return below. The canceled uploader may still
+    // be reading the file for a moment after the first link comes back, so wait for it to stop.
     Promise.allSettled(uploads).then(() => fs.unlink(file.path)).catch(() => {});
 
     try {
@@ -98,6 +101,9 @@ export async function uploadSingle(req: express.Request, res: express.Response):
       const errors = (e as AggregateError).errors;
 
       throw errors ? new Error(errors.map(err => err.message || String(err)).join('; ')) : e;
+    }
+    finally {
+      controller.abort();
     }
   }
 

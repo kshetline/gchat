@@ -95,6 +95,7 @@ export class App implements OnInit {
   protected darkMode = signal(false);
   protected disableEditor = signal(false);
   protected dms = signal([] as DmInfo[]);
+  protected dullMode = signal(false);
   protected email = signal('');
   protected framed = /\bframed=true\b/.test(location.toString());
   protected inChat = signal(false);
@@ -243,11 +244,11 @@ export class App implements OnInit {
       if (document.hidden)
         blurTime = processMillis();
       else
-        this.adjustScrolling(processMillis() < blurTime + 15000);
+        this.adjustScrolling(true);
     });
 
-    // window.addEventListener('blur', () => { blurTime = processMillis(); this.checkChatActive(); });
-    // window.addEventListener('focus', () => { this.checkChatActive(true); this.adjustScrolling(processMillis() < blurTime + 15000); });
+    window.addEventListener('blur', () => { blurTime = processMillis(); this.checkChatActive(); });
+    window.addEventListener('focus', () => { this.checkChatActive(true); this.adjustScrolling(processMillis() < blurTime + 15000); });
     window.addEventListener('scroll', () => this.checkChatActive(true));
     window.addEventListener('mousemove', () => (this.activity = true) && (this.lastActive = processMillis()));
     window.addEventListener('beforeunload', () => this.inChat() && this.leaveMainChat());
@@ -817,8 +818,8 @@ export class App implements OnInit {
     const messages = document.querySelector('p-tabpanel.p-tabpanel-active chat-message-list .message-content');
     // Need to check closeness before any new messages are added.
     const close = this.newOnBottom() ?
-      messages.scrollTop >= messages.scrollHeight - messages.clientHeight - 30 :
-      messages.scrollTop <= 30;
+      messages.scrollTop >= messages.scrollHeight - messages.clientHeight - 40 :
+      messages.scrollTop <= 40;
 
     setTimeout(() => {
       if (this.newOnBottom() && (!onlyWhenClose || close)) {
@@ -843,6 +844,7 @@ export class App implements OnInit {
     applyTheme(theme);
     this.showThemes.set(false);
     this.darkMode.set(this.themes.find(t => t.name === theme)?.darkMode || false);
+    this.dullMode.set(this.themes.find(t => t.name === theme)?.dull || false);
     this.prefs.theme = theme;
     this.prefService.set(this.prefs);
     setTimeout(() => this.messageEntry?.updateColor(false));

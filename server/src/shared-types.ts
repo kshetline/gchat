@@ -31,6 +31,8 @@ export const kaomojiRegex = new RegExp(`(${kaomoji.map(k => regexEscape(k.replac
 export const kaomojiNonGothicRegex = new RegExp(`(${kaomoji.filter(k => k.startsWith('#')).map(k => regexEscape(k.substring(1))).join('|')})`, 'g');
 
 export interface Config {
+  apiUploaderName: string;
+  apiUploaderShortName: string;
   backgroundColor: string;
   externalUploaderName: string;
   externalUploaderShortName: string;
