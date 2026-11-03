@@ -605,7 +605,7 @@ function hasChatOpen(name: string, dmId: number): boolean {
 
     const db = await getDb();
     const rows = (await db.all<DbMessage>(
-      'SELECT * FROM messages WHERE deleted = 0 AND dm = 0 ORDER BY messages.synced_time')).slice(-maxMessages);
+      'SELECT * FROM messages WHERE deleted = 0 AND dm = 0 ORDER BY messages.synced_time')).slice(-MAX_CLIENT_MESSAGES);
     let messages = rows.filter(row => !row.deleted).map(row => ({
       editCount: row.edit_count,
       email: row.email,
@@ -789,6 +789,9 @@ function hasChatOpen(name: string, dmId: number): boolean {
 
     if (lslp <= 0)
       lslp = messages.findLast(m => m?.remote)?.time ?? -1;
+
+    if (maxMessages < MAX_CLIENT_MESSAGES)
+      messages = messages.slice(-maxMessages);
 
     res.json({
       messages,
