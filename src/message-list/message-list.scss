@@ -261,18 +261,29 @@
   flex-wrap: wrap;
   gap: 1em;
   margin-bottom: 1em;
-  min-height: 180px;
   overflow-y: hidden;
   padding-left: 1em;
   padding-right: 2em;
   width: 100%;
+  box-sizing: border-box; // keep padding inside the 100% width
+
+  // The <a> is the actual flex item. Give it its own box so that Safari sizes it from the
+  // scaled image, rather than from a miscalculated intrinsic size which clips wide images.
+  a {
+    display: block;
+    flex: 0 0 auto;
+    line-height: 0; // no descender gap below the image
+    max-width: 100%;
+  }
 
   img {
+    display: block;
+    // Don't use a percentage here: it's circular (the <a> is sized from the image), so
+    // Chrome ignores it when sizing the <a>, making the <a> wider than the image.
     max-width: 320px;
     max-height: 180px;
     height: auto;       /* Maintains aspect ratio automatically */
     width: auto;        /* Maintains aspect ratio automatically */
-    object-fit: contain; /* Ensures the whole image is visible without clipping */
   }
 
   &.me {

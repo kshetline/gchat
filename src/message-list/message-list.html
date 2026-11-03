@@ -53,7 +53,8 @@
         @if (!dullMode() && hasImages(message.html)) {
           <div class="image-preview" [class.me]="message.isMe">
             @for (imageUrl of getImages(message.html); track imageUrl) {
-              <a [href]="imageUrl" target="_blank"><img [src]="imageUrl" alt="image"></a>
+              <a [href]="imageUrl" target="_blank"><img [src]="imageUrl" alt="image"
+                (load)="thumbnailLoaded($event)" (error)="thumbnailFailed($event)" (click)="thumbnailReload($event)"></a>
             }
           </div>
         }

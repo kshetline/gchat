@@ -335,4 +335,42 @@ export class MessageList implements OnInit {
 
     return deets;
   }
+
+  protected thumbnailFailed(event: Event): void {
+    const img = event.target as HTMLImageElement;
+
+    img.classList.add('failed');
+  }
+
+  protected thumbnailLoaded(event: Event): void {
+    const img = event.target as HTMLImageElement;
+    const ratio = img.naturalWidth / img.naturalHeight;
+
+    img.classList.remove('failed');
+
+    if (ratio > 1.777778) {
+      const width = Math.max(Math.min(img.naturalWidth, 320), 20);
+
+      img.style.width = `${width}px`;
+      img.style.height = `${width / ratio}px`;
+    }
+    else {
+      const height = Math.max(Math.min(img.naturalHeight, 180), 20);
+
+      img.style.width = `${height * ratio}px`;
+      img.style.height = `${height}px`;
+    }
+  }
+
+  protected thumbnailReload(event: Event): void {
+    const img = event.target as HTMLImageElement;
+
+    if (img.classList.contains('failed')) {
+      const url = new URL(img.src);
+
+      url.searchParams.set('retry', String(Date.now()));
+      img.src = url.toString();
+      event.preventDefault();
+    }
+  }
 }
