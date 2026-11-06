@@ -525,12 +525,13 @@ export async function legacySendMessage(ip: string, name: string, email: string,
   const now = processMillis();
   const formUrl = `https://${domain}/comchat.cgi`;
   let error = '';
-  let comment = `《${name}${tripCode ? '◆' + tripcode(tripCode) : ''}》${comment0}`;
+  const identifier = `《${name}${tripCode ? '◆' + tripcode(tripCode) : ''}》`;
+  let comment = comment0;
   let face = '';
-  const $ = /^(.+)(\[kao](.+)\[\/kao])\s*$/.exec(comment);
+  const $ = /^(.*)(\[kao](.+)\[\/kao])\s*$/.exec(comment);
 
   if ($ && kaomojiOriginal.has($[3])) {
-    comment = $[1];
+    comment = $[1] || '\u200A'; // hair space
     face = $[3];
   }
 
@@ -545,7 +546,7 @@ export async function legacySendMessage(ip: string, name: string, email: string,
     params.append('name', proxyName);
     params.append('email', email);
     params.append('password', proxyTrip || '');
-    params.append('comment', comment || '\u00A0');
+    params.append('comment', identifier + (comment || '\u00A0')); // non-breaking space
     params.append('face', face);
     params.append('color', color.toString() || '');
     params.append('mode', 'regist');

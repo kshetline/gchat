@@ -49,6 +49,8 @@ interface DmInfo {
   viewed?: boolean;
 }
 
+export let scrollAdjustment: (extraLeeway?: number) => void;
+
 @Component({
   selector: 'chat-root',
   imports: [ColorSelector, ConfirmDialogModule, DecimalPipe, FormsModule, MessageEntry, MessageList,
@@ -263,6 +265,7 @@ export class App implements OnInit {
     registerNotificationHandler(this.notify);
     setIsTypingFunction(this.isTyping);
     this.initToken().then(() => this.getMessages());
+    scrollAdjustment = (extraLeeway = 0) => this.adjustScrolling(true, extraLeeway);
 
     // Make sure message polling is running
     setInterval(() => {
@@ -538,6 +541,9 @@ export class App implements OnInit {
 
         this.changeRef.detectChanges();
         this.delayedAdjustScrolling();
+
+        if (isAdmin)
+          this.getMessages(true);
       },
       error: (error): void => {
         this.isAdminFlag.set(false);
@@ -814,12 +820,13 @@ export class App implements OnInit {
     this.disableEditor.set(this.sending() || (this.selectedChat() > 0 && !!this.dms()[this.selectedChat() - 1]?.closed));
   }
 
-  protected adjustScrolling(onlyWhenClose = false): void {
+  protected adjustScrolling(onlyWhenClose = false, extraLeeway = 0): void {
     const messages = document.querySelector('p-tabpanel.p-tabpanel-active chat-message-list .message-content');
     // Need to check closeness before any new messages are added.
+    const leeway = 40 + extraLeeway;
     const close = this.newOnBottom() ?
-      messages.scrollTop >= messages.scrollHeight - messages.clientHeight - 40 :
-      messages.scrollTop <= 40;
+      messages.scrollTop >= messages.scrollHeight - messages.clientHeight - leeway :
+      messages.scrollTop <= leeway;
 
     setTimeout(() => {
       if (this.newOnBottom() && (!onlyWhenClose || close)) {

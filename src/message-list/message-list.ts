@@ -5,6 +5,7 @@ import { debounce, htmlUnescape, isObject, isString } from '@tubular/util';
 import { MessageEntry } from '../message-entry/message-entry';
 import { HttpClient } from '@angular/common/http';
 import { SafeHtmlPipe } from '../safe-html-pipe/safe-html-pipe';
+import { scrollAdjustment } from '../app/app';
 
 const matchEmojiish = /^[☀☁☎☝☺♈♉♊♋♌♍♎♏♐♑♒♓♠♣♥♦⚠⛎✂✅✈✌✳✴❌❤➿〽㊗㊙]/u;
 // noinspection RegExpDuplicateAlternationBranch (Seems to be a false positive)
@@ -345,6 +346,7 @@ export class MessageList implements OnInit {
   protected thumbnailLoaded(event: Event): void {
     const img = event.target as HTMLImageElement;
     const ratio = img.naturalWidth / img.naturalHeight;
+    let height: number;
 
     img.classList.remove('failed');
 
@@ -352,14 +354,17 @@ export class MessageList implements OnInit {
       const width = Math.max(Math.min(img.naturalWidth, 320), 20);
 
       img.style.width = `${width}px`;
-      img.style.height = `${width / ratio}px`;
+      height = width / ratio;
+      img.style.height = `${height}px`;
     }
     else {
-      const height = Math.max(Math.min(img.naturalHeight, 180), 20);
-
+      height = Math.max(Math.min(img.naturalHeight, 180), 20);
       img.style.width = `${height * ratio}px`;
       img.style.height = `${height}px`;
     }
+
+    this.scrollCheck();
+    scrollAdjustment(height);
   }
 
   protected thumbnailReload(event: Event): void {
